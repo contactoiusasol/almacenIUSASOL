@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/admin.css">
+</head>
+<body>
+  <div class="login-container">
+    <h2>📦 Inventario</h2>
+    <button id="btnAgregar" class="btn">+ Agregar Producto</button>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th>Cantidad</th>
+          <th>UM</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tablaInventario">
+        <tr>
+          <td>A001</td>
+          <td>Cable eléctrico</td>
+          <td>150</td>
+          <td>mts</td>
+          <td>
+            <button class="editar btn-small">Editar</button>
+            <button class="eliminar btn-small">Eliminar</button>
+          </td>
+        </tr>
+        <tr>
+          <td>B002</td>
+          <td>Interruptor industrial</td>
+          <td>75</td>
+          <td>pz</td>
+          <td>
+            <button class="editar btn-small">Editar</button>
+            <button class="eliminar btn-small">Eliminar</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>
