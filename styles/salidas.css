@@ -1,0 +1,246 @@
+:root{
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --muted: #666;
+  --accent: #2563eb;
+  --soft: #eef2f7;
+  --shadow: rgba(17,24,39,0.06);
+  --container-padding: 20px;
+}
+
+*{ box-sizing: border-box; }
+html,body{ height:100%; }
+body{
+  font-family: "Quicksand", sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 30px;
+  color: #34495e;
+}
+
+/* Contenedor */
+.container{
+  max-width: 1100px;
+  margin: 32px auto;
+  background: var(--card);
+  padding: var(--container-padding);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+/* Botón volver */
+.back-btn{
+  display:inline-block;
+  margin-bottom:12px;
+  padding:8px 14px;
+  background:#c5d7f2;
+  color:#2d3e50;
+  text-decoration:none;
+  border-radius:10px;
+  font-weight:600;
+}
+.back-btn:hover{ background:#a7c3ed; }
+
+/* Títulos y inputs */
+h1{ text-align:center; margin:8px 0 18px; font-size:20px; color:#34495e; }
+.solicitante-box{ display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.solicitante-box label{ font-weight:600; }
+input[readonly]{ background:#f5f5f5; border:1px solid #ddd; padding:8px 10px; border-radius:6px; width:320px; }
+
+/* Botones */
+.btns{ margin-top:12px; display:flex; gap:8px; align-items:center; }
+button{ padding:8px 12px; border-radius:8px; border:0; cursor:pointer; background:var(--accent); color:#fff; }
+button.secondary{ background:#6b7280; }
+
+/* wrapper para tablas */
+.table-wrap{
+  width:100%;
+  overflow-x:auto;    /* scroll horizontal si no cabe */
+  border-radius:10px;
+  padding: 6px 0;
+}
+
+/* Tablas: permitimos que las columnas se dimensionen por contenido (auto) */
+table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout: auto;        /* <-- importante: NO fixed, deja que el contenido determine el ancho */
+  min-width:720px;           /* mantiene scroll en pantallas pequeñas */
+  margin-top:12px;
+  background: white;
+}
+
+/* cabecera */
+thead{ background:#d6e4f9; }
+thead th{
+  padding:12px 10px;
+  text-align:left;
+  font-weight:700;
+  color:#2d3e50;
+  font-size:14px;
+  border-bottom:1px solid var(--soft);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  white-space: nowrap;       /* que los headers no hagan wrap */
+}
+
+/* celdas: permitimos wrap por defecto para que no se corten */
+th, td{
+  padding:10px;
+  font-size:14px;
+  color:#34495e;
+  border-bottom:1px solid #f2f6fb;
+  white-space: normal;       /* importante: permitir wrap */
+  word-break: break-word;    /* rompe palabras largas */
+  overflow: visible;         /* mostrar contenido completo */
+  vertical-align: middle;
+}
+
+/* Columnas que queremos compactas (sin wrap) */
+.col-code, th.col-code, td.col-code,
+.col-um, th.col-um, td.col-um,
+.col-acc, th.col-acc, td.col-acc {
+  white-space: nowrap;
+  width: 1%;                 /* fuerza a que la columna se ajuste al contenido mínimo */
+  max-width: 140px;
+}
+
+/* Ajustes finos por columna (si quieres, mantén o ajusta números) */
+th:nth-child(2), td:nth-child(2){ max-width: 420px; } /* Descripción: ancha pero con wrap */
+th:nth-child(8), td:nth-child(8){ max-width: 380px; } /* Observaciones */
+th:nth-child(7), td:nth-child(7){ max-width: 220px; } /* Destinatario */
+
+/* Inputs / badges dentro de la tabla */
+input.pending-cantidad,
+.pending-resp-name,
+.pending-resp-last,
+.pending-dest,
+.pending-observaciones{
+  padding:6px 8px;
+  font-size:13px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  height:auto;
+  min-height:30px;
+  box-sizing:border-box;
+  background:#fff;
+  width:100%;
+}
+
+/* Estética de badges y botones */
+.badge-inv{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#eef2ff;
+  color:#1e3a8a;
+  border:1px solid #dbeafe;
+  font-size:13px;
+}
+
+button.eliminar-btn{
+  padding:6px 10px;
+  border-radius:8px;
+  border:0;
+  background:#f8c7c7;
+  color:#8b1e1e;
+  cursor:pointer;
+}
+button.eliminar-btn:hover{ background:#f39b9b; }
+
+.empty-note{ color:#777; text-align:center; padding:12px; }
+
+/* HR normalizado */
+.section-sep{
+  border:0;
+  height:1px;
+  background: linear-gradient(90deg, transparent, #e6eefc, transparent);
+  margin:24px 0;
+  border-radius:2px;
+}
+
+/* UTILS: forzar que una celda no haga wrap si la marcas con .no-wrap */
+.no-wrap{ white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
+
+/* Responsive */
+@media (max-width:900px){
+  table{ min-width: 640px; }
+  th:nth-child(2), td:nth-child(2){ max-width: 300px; }
+}
+@media (max-width:640px){
+  thead th, th, td{ padding:8px; font-size:13px; }
+  .solicitante-box input[readonly]{ width:100%; }
+  table{ min-width:620px; }
+}
+/* --- contenedor especial para tabla + panel derecho --- */
+.table-container {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* la tabla ocupa todo el espacio disponible */
+.table-container .table-wrap {
+  flex: 1 1 auto;
+  max-width: calc(100% - 200px); /* deja espacio para el panel */
+  overflow-x: auto;
+}
+
+/* panel derecho con acciones / info relacionado a la tabla */
+.table-controls {
+  width: 190px;
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  position: sticky;
+  top: 24px;            /* se queda visible al hacer scroll */
+  height: fit-content;
+  padding-left: 6px;
+}
+
+/* estilo botones del panel (más compactos verticales) */
+.table-controls button {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* un botón secundario */
+.table-controls button.secondary {
+  background: #6b7280;
+}
+
+/* pequeño bloque informativo en el panel (ej: cantidad total) */
+.table-controls .info-box {
+  background: #f7fbff;
+  border: 1px solid #e6f2ff;
+  padding: 8px;
+  border-radius: 10px;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+/* iconos/acciones concretas alineadas a la derecha dentro del panel */
+.table-controls .right-actions {
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+
+/* en pantallas pequeñas apilamos: tabla arriba, panel abajo */
+@media (max-width: 900px) {
+  .table-container { flex-direction: column-reverse; }
+  .table-container .table-wrap { max-width: 100%; }
+  .table-controls { position: relative; top: 0; width: 100%; flex-direction: row; flex-wrap: wrap; gap:8px; }
+  .table-controls button { flex: 1 1 auto; text-align:center; }
+}

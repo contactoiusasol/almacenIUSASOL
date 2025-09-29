@@ -6,27 +6,28 @@
   <title>Login - Almacén</title>
   <link rel="stylesheet" href="../styles/styles.css">
   <link rel="stylesheet" href="../styles/login.css">
-  
 </head>
 <body>
   <div class="login-container">
     <h2>Iniciar Sesión</h2>
     <form id="loginForm">
       <div class="input-group">
-        <label for="username">Usuario</label>
-        <input type="text" id="username" placeholder="Ingresa tu usuario">
+        <label for="loginEmail">Correo</label>
+        <input type="email" id="loginEmail" placeholder="Ingresa tu correo">
       </div>
       <div class="input-group">
-        <label for="password">Contraseña</label>
-        <input type="password" id="password" placeholder="Ingresa tu contraseña">
+        <label for="loginPassword">Contraseña</label>
+        <input type="password" id="loginPassword" placeholder="Ingresa tu contraseña">
       </div>
       <button type="submit" class="btn">Entrar</button>
       <p class="register-link">
-     ¿No tienes cuenta? <a href="register.html">Regístrate</a>
-    </p>
+        ¿No tienes cuenta? <a href="register.html">Regístrate</a>
+      </p>
     </form>
+    <div id="toastContainer"></div>
   </div>
 
-  <script src="script.js"></script>
+  <!-- Importar login.js -->
+  <script type="module" src="../js/login.js"></script>
 </body>
 </html>

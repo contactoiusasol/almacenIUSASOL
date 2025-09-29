@@ -1,0 +1,761 @@
+/* ------------------- ESTILOS GENERALES ------------------- */
+body {
+  font-family: "Quicksand", sans-serif;
+  background: #f4f6f9;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 30px auto;
+  background: transparent;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: #333;
+}
+
+.back-btn {
+  display: inline-block;
+  margin-bottom: 15px;
+  text-decoration: none;
+  background: #007bff;
+  color: white;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: background 0.3s ease;
+}
+
+.back-btn:hover {
+  background: #0056b3;
+}
+
+.actions-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+#searchInput {
+  flex: 1;
+  padding: 10px;
+  margin-right: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* ------------------- TABLA ------------------- */
+#inventoryTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+#inventoryTable th {
+  background: #6881e2;
+  color: white;
+  padding: 12px;
+  text-align: left;
+}
+
+#inventoryTable td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+
+#inventoryTable tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+#inventoryTable tr:hover {
+  background-color: #f1f1f1;
+}
+
+/* ------------------- BOTONES ------------------- */
+.acciones {
+  display: flex;
+  gap:20px;
+}
+
+.btn-edit,
+.btn-delete,
+.btn-save,
+.btn-add {
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  
+
+}
+
+/* Botón Agregar */
+.btn-add {
+  background-color: #28a745;
+  color: white;
+}
+.btn-add:hover {
+  background-color: #218838;
+}
+
+/* Editar */
+.btn-edit {
+  background-color: #f5f84dd9;
+  color: rgb(52, 51, 51);
+}
+.btn-edit:hover {
+  background-color: #fff75ee1;
+}
+
+/* Eliminar */
+.btn-delete {
+  background-color: #dc3545;
+  color: white;
+}
+.btn-delete:hover {
+  background-color: #b02a37;
+}
+
+/* Guardar */
+.btn-save {
+  background-color: #009879;
+  color: white;
+  width: 100%;
+  margin-top: 10px;
+}
+.btn-save:hover {
+  background-color: #007f66;
+}
+.btn-salida {
+  background-color: #ffda6b;
+  color: rgb(0, 0, 0);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.btn-salida:hover {
+  background-color: #f0971a6b;
+}
+
+
+/* Botón Ver Salidas */
+.btn-salidas {
+  background-color: #2196f3;      /* Azul moderno */
+  color: #fff;                     /* Texto blanco */
+  border: none;
+  border-radius: 8px;              /* Esquinas redondeadas */
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 100;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 50px;                        /* Espacio entre icono y texto */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-salidas:hover {
+  background-color: #1976d2;       /* Azul más oscuro al pasar el mouse */
+  transform: translateY(-2px);     /* Efecto sutil de elevación */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.25);
+}
+
+.btn-salidas:active {
+  background-color: #1565c0;       /* Azul aún más oscuro al hacer clic */
+  transform: translateY(0);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ------------------- MODAL ------------------- */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+  background: white;
+  margin: 5% auto;
+  padding: 20px;
+  border-radius: 10px;
+  width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.close {
+  float: right;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+label {
+  display: block;
+  margin-top: 10px;
+  font-weight: 600;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  margin-top: 5px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+
+/* ------------------- Modal ------------------- */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(30, 30, 30, 0.6);
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: #ace2ca;
+  padding: 25px;
+  border-radius: 16px;
+  width: 420px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  font-size: 22px;
+  color: #2c3e50;
+  font-weight: 600;
+  text-align: center;
+}
+
+.modal-content label {
+  display: block;
+  margin: 10px 0 5px;
+  color: #34495e;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.modal-content input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border 0.2s;
+}
+
+.modal-content input:focus {
+  border: 1px solid #3a86ff;
+  box-shadow: 0 0 4px rgba(58, 134, 255, 0.3);
+}
+
+.close {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  font-size: 26px;
+  cursor: pointer;
+  color: #95a5a6;
+  transition: color 0.2s;
+}
+
+.close:hover {
+  color: #e74c3c;
+}
+
+.btn-save {
+  margin-top: 18px;
+  width: 100%;
+  padding: 12px;
+  background: #3a86ff;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background 0.3s;
+}
+
+.btn-save:hover {
+  background: #265df2;
+}
+
+/* Animación entrada modal */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+.toast {
+  position: fixed;
+  top: 20px;
+  right: -300px; /* oculto inicialmente */
+  background: #4caf50; /* verde éxito */
+  color: white;
+  padding: 14px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  font-family: 'Quicksand', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  transition: right 0.5s ease, opacity 0.5s ease;
+  z-index: 9999;
+  opacity: 0;
+}
+
+.toast.show {
+  right: 20px;  /* entra en pantalla */
+  opacity: 1;
+}
+
+/* Modal Confirmación */
+.custom-modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.custom-modal-content {
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  text-align: center;
+  width: 350px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  animation: fadeIn 0.3s ease;
+}
+
+.custom-modal-content h3 {
+  margin-bottom: 12px;
+  color: #d9534f;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.custom-modal-content p {
+  margin-bottom: 20px;
+  font-size: 15px;
+  color: #444;
+}
+
+.modal-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.modal-buttons .btn-yes {
+  background: #d9534f;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.modal-buttons .btn-yes:hover {
+  background: #c9302c;
+}
+
+.modal-buttons .btn-no {
+  background: #6c757d;
+  color: #fff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+}
+
+.modal-buttons .btn-no:hover {
+  background: #5a6268;
+}
+
+@keyframes fadeIn {
+  from {opacity: 0; transform: scale(0.9);}
+  to {opacity: 1; transform: scale(1);}
+}
+
+/* colores de stock */
+    .color-legend {
+      display: flex;
+      gap: 20px;
+      margin: 15px 0;
+      font-family: 'Quicksand', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-box {
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+    .green { background: #7bf17f; }
+    .yellow { background: #fff59d; }
+    .red { background: #d80808; }
+    
+/* Colores por stock */
+.stock-low td {
+  background-color: rgba(226,153,153,0.85); /* rojo */
+  color: #2a2a2a !important;
+}
+
+.stock-medium td {
+  background-color: rgba(255,245,157,0.95); /* amarillo */
+  color: #222 !important;
+}
+
+.stock-high td {
+  background-color: rgba(72,195,111,0.56); /* verde */
+  color: #0b3c1a !important;
+}
+
+/* --- Solución al borde redondeado --- */
+.table-wrapper {
+  border-radius: 10px;
+  overflow: hidden; /* evita que el color se salga */
+}
+/* Modal general */
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 999;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #f9fdf9;
+  padding: 24px;
+  border-radius: 12px;
+  width: 380px;
+  max-width: 95%;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.25s ease-in-out;
+}
+
+/* Título */
+.modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #020007;
+}
+
+/* Inputs y selects */
+.form-group {
+  margin-bottom: 14px;
+}
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #444;
+}
+.input-text,
+.input-select {
+  width: 90%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #e87c7c;
+  font-size: 14px;
+  transition: border 0.2s;
+}
+.input-text:focus,
+.input-select:focus {
+  outline: none;
+  border: 1px solid #7ab97a;
+  box-shadow: 0 0 0 2px rgba(122, 185, 122, 0.2);
+}
+.input-text.readonly {
+  background: #f1f1f1;
+  border: 1px solid #e0e0e0;
+  color: #666;
+}
+
+/* Botones */
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+.btn-cancel {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #f8a1a1;
+  color: #666262;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-cancel:hover {
+  background: #eb4848;
+}
+.btn-primary {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #4caf50;
+  color: white;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #449d48;
+}
+
+/* Animación */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+/* ---------------- Modal overlay & modal base ---------------- */
+/* ----- Modal más grande y aireado ----- */
+.entrada-lookup-modal,
+.salida-modal {
+  width: 880px;            /* Aumentado: se verá más grande en pantallas anchas */
+  max-width: 96%;
+  background: linear-gradient(180deg,#ffffff 0%, #fbfbff 100%);
+  border-radius: 14px;     /* un poco más redondeado */
+  padding: 22px;           /* más espacio interior */
+  box-shadow: 0 28px 64px rgba(2,6,23,0.40);
+  font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
+  transform: translateY(-6px);
+  transition: transform .18s ease, opacity .18s ease;
+  z-index: 11001;
+  border: 1px solid rgba(15,23,42,0.045);
+  font-size: 15px;         /* base de texto más grande */
+}
+
+/* Header más grande */
+.entrada-lookup-modal h3,
+.salida-modal .modal-title {
+  font-size: 20px;
+  letter-spacing: 0.1px;
+}
+
+/* Inputs y selects más grandes */
+.entrada-lookup-modal input[type="text"],
+.entrada-lookup-modal input[type="number"],
+.entrada-lookup-modal select,
+.salida-modal input[type="text"],
+.salida-modal input[type="number"],
+.salida-modal textarea {
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+/* Botones más grandes y con más padding */
+.btn-primary, .btn-secondary, .btn-cancel {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+/* Lista/tabla de entradas: celdas más altas */
+#entradaListWrap th, #entradaListWrap td {
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+/* Ajuste responsive: en pantallas pequeñas mantenemos compactación */
+@media (max-width: 1000px) {
+  .entrada-lookup-modal, .salida-modal {
+    width: 92%;
+    padding: 16px;
+    border-radius: 12px;
+    font-size: 15px;
+  }
+}
+
+/* Toast más grande y con z-index mayor (siempre delante) */
+#toast {
+  top: 22px;
+  right: 22px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 15px;
+  box-shadow: 0 20px 48px rgba(2,6,23,0.28);
+  z-index: 15000; /* más alto para siempre superar overlays */
+}
+
+
+/* close button estilo */
+.modal-close-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 6px;
+  line-height: 1;
+  color: #374151;
+  border-radius: 6px;
+}
+.modal-close-btn:hover { background: rgba(15,23,42,0.04); }
+
+/* inputs y selects limpios */
+.entrada-lookup-modal input[type="text"],
+.entrada-lookup-modal input[type="number"],
+.entrada-lookup-modal select,
+.salida-modal input[type="text"],
+.salida-modal input[type="number"],
+.salida-modal textarea {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6e9ef;
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
+  font-size: 14px;
+  outline: none;
+  transition: box-shadow .12s ease, border-color .12s ease;
+}
+.entrada-lookup-modal input:focus,
+.entrada-lookup-modal select:focus,
+.salida-modal input:focus,
+.salida-modal textarea:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 6px 18px rgba(99,102,241,0.08);
+}
+
+/* botones (consistentes) */
+.btn-primary, .btn-primary:active {
+  background: linear-gradient(180deg,#06b6d4,#0891b2);
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(3,105,121,0.14);
+}
+.btn-secondary {
+  background: linear-gradient(180deg,#e2e8f0,#d1d5db);
+  color: #0f172a;
+  border: 1px solid rgba(15,23,42,0.04);
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* footer close button pequeño */
+.btn-cancel {
+  background: #fff0f0;
+  color: #b91c1c;
+  border-radius: 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(185,28,28,0.06);
+}
+
+/* lista interna de entradas */
+#entradaListWrap table { width: 100%; border-collapse: collapse; }
+#entradaListWrap th, #entradaListWrap td {
+  padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #f5f7fb;
+}
+
+/* pequeños ajustes responsive */
+@media (max-width: 720px) {
+  .entrada-lookup-modal, .salida-modal {
+    width: 96%;
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .btn-primary, .btn-secondary { padding: 8px 10px; font-size: 13px; }
+}
+
+/* ---------------- Toast (alerta) ---------------- */
+#toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(2,6,23,0.22);
+  font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: transform .28s ease, opacity .28s ease;
+  z-index: 13000; /* importante: encima de overlays/modales */
+}
+
+/* visible state - cuando se muestra con JS */
+#toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}

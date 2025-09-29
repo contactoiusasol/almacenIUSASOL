@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario</title>
+  <link rel="stylesheet" href="../styles/incentariouser.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">  
+</head>
+<body>
+  <div class="container">
+    <a href="usuario.html" class="back-btn">⬅ Volver al Panel</a>
+    <h1>Inventario de Productos</h1>
+
+    <!-- Leyenda de colores -->
+    <div class="color-legend">
+      <div class="legend-item">
+        <div class="legend-box green"></div>
+        <span>Stock suficiente (más de 10)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box yellow"></div>
+        <span>Stock medio (entre 2 y 10)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box red"></div>
+        <span>Stock crítico (1 o menos)</span>
+      </div>
+    </div>
+
+    <div class="actions-header">
+      <input type="text" id="searchInput" placeholder="Buscar por código o descripción...">
+      <button id="verMovimientoBtn" class="ver-movimiento-btn">Ver lista de movimiento</button>
+    </div>
+
+    <table id="inventoryTable">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th>UM</th>
+          <th>INVENTARIO I069</th>
+          <th>INVENTARIO I078</th>
+          <th>INVENTARIO I07F</th>
+          <th>INVENTARIO I312</th>
+          <th>INVENTARIO I073</th>
+          <th>INVENTARIO FÍSICO EN ALMACÉN</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Productos se cargan dinámicamente -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- :contentReference[oaicite:0]{index=0} -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="../js/inventariouser.js"></script>
+</body>
+</html>

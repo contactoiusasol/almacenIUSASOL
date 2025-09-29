@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salidas de Inventario</title>
+  <link rel="stylesheet" href="../styles/salidas.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <a href="inventario.html" class="back-btn">⬅ Volver al Inventario</a>
+    <h1>Lista de Salidas</h1>
+
+    <!-- Responsable (se rellena automáticamente si el usuario está autenticado) -->
+    <div class="solicitante-box">
+      <label for="nombreResponsable">Responsable de la salida:</label><br />
+      <input type="text" id="nombreResponsable" readonly placeholder="Cargando usuario...">
+    </div>
+
+    <div class="btns">
+      <button id="btnConfirmAll">Confirmar todo</button>
+      <button id="btnClearPending" class="secondary">Vaciar pendientes</button>
+      <button id="btnRefresh" class="secondary" style="margin-left:auto">🔄 Refrescar historial</button>
+    </div>
+
+    <!-- Pendientes -->
+    <section id="pendingSection">
+      <h2>Salidas pendientes</h2>
+      <div class="table-wrap">
+        <table id="pendingTable" class="table-pending" aria-label="Salidas pendientes">
+          <thead>
+            <tr>
+              <th class="col-code">Código</th>
+              <th class="col-desc">Descripción</th>
+              <th class="col-um">UM</th>
+              <th class="col-inv">Inventario</th>
+              <th class="col-cant">Cantidad De Salida</th>
+              <th class="col-resp">Responsable</th>
+              <th class="col-dest">Destinatario</th>
+              <th class="col-obs">Observaciones</th>
+              <th class="col-acc">Acción</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <hr class="section-sep">
+
+    <!-- Historial -->
+    <section id="historySection">
+      <h2>Historial de salidas</h2>
+      <div class="table-wrap">
+        <table id="salidasTable" aria-label="Historial de salidas">
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th>UM</th>
+              <th>Inventario</th>
+              <th>Cantidad de Salida</th>
+              <th>Fecha Salida</th>
+              <th>Responsable</th>
+              <th>Destinatario</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- script principal (module) -->
+  <script type="module" src="../js/salidas.js"></script>
+</body>
+</html>

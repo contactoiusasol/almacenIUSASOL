@@ -1,0 +1,245 @@
+body {
+  font-family: "Quicksand", sans-serif;
+  background: #fdf6f9;
+  margin: 0;
+  padding: 0;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 15px;
+  padding: 30px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+h1 {
+  text-align: center;
+  color: #808fff;
+  margin-bottom: 20px;
+}
+
+.back-btn {
+  text-decoration: none;
+  color: #fff;
+  background: #ffb3c6;
+  padding: 10px 20px;
+  border-radius: 25px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: background 0.3s;
+}
+.back-btn:hover {
+  background: #80ffd7;
+}
+
+.solicitante-box {
+  margin-bottom: 20px;
+}
+.solicitante-box label {
+  font-weight: 600;
+  margin-right: 10px;
+}
+.solicitante-box input {
+  padding: 10px;
+  border: 2px solid #b3c7ff;
+  border-radius: 8px;
+  width: 250px;
+}
+
+#tabla-movimiento {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+#tabla-movimiento th {
+  background: #626464;
+  color: #fff;
+  padding: 10px;
+  text-align: left;
+}
+#tabla-movimiento td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.cantidad-input {
+  width: 70px;
+  padding: 5px;
+  border-radius: 5px;
+  border: 2px solid #ffffff;
+}
+
+.eliminar-btn {
+  background: #ffa48f;
+  border: none;
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.eliminar-btn:hover {
+  background: #ff5c8a;
+}
+
+.acciones {
+  margin-top: 25px;
+  text-align: center;
+}
+
+#btnImprimir {
+  background: #35188c;
+  color: #fff;
+  border: none;
+  padding: 12px 25px;
+  border-radius: 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.15);
+  transition: transform 0.2s;
+}
+#btnImprimir:hover {
+  transform: scale(1.05);
+}
+
+.alert {
+  position: fixed;
+  bottom: 20px;
+  right: -400px;
+  background: #ffd6d6;
+  color: #762c19;
+  padding: 15px 25px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  font-weight: 600;
+  transition: right 0.5s ease;
+  z-index: 1000;
+}
+.alert.show {
+  right: 20px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Área de impresión */
+.print-area {
+  background: #fff;
+  padding: 20px;
+}
+.print-area table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+.print-area th, .print-area td {
+  border: 1px solid #ccc;
+  padding: 10px;
+}
+
+/* --- Estilo para la hoja de salida (impresión) --- */
+@page {
+  margin: 20mm;
+}
+
+* {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  #hoja-salida, #hoja-salida * {
+    visibility: visible !important;
+  }
+
+  #hoja-salida {
+    position: absolute !important;
+    top: 0 !important;                  /* ✅ fuerza que vaya arriba */
+    left: 0 !important;
+    right: 0 !important;
+    margin: 0 auto !important;          /* solo centrado horizontal */
+    width: 90% !important;
+    max-width: 900px !important;
+    background: #faf9fb !important;
+    padding: 30px !important;
+    border-radius: 15px !important;
+    box-shadow: none !important;
+  }
+
+  #hoja-salida h2 {
+    text-align: center !important;
+    font-size: 24px !important;
+    color: #7b6c9f !important;
+    margin-bottom: 20px !important;
+  }
+
+  #hoja-salida .usuario-nombre,
+  #hoja-salida .fecha {
+    color: #555 !important;
+    font-size: 13px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Tabla alineada arriba con borde completo */
+  #hoja-salida table {
+    width: 100% !important;
+    margin: 0 auto !important;
+    border-collapse: collapse !important;
+    table-layout: fixed !important;
+    background: #ffffff !important;
+    border: 2px solid #d6c3aa !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
+  }
+
+  #hoja-salida thead th {
+    background: linear-gradient(90deg, #f0e3d2, #ffffff) !important; /* tono café pastel */
+    color: #6b513b !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    font-size: 0.9rem !important;
+    padding: 12px 10px !important;
+    border: 1px solid #d6c3aa !important;
+  }
+
+  #hoja-salida tbody td {
+    background: #ffffff !important;
+    color: #444 !important;
+    padding: 12px 10px !important;
+    font-size: 0.9rem !important;
+    border: 1px solid #d6c3aa !important;
+    text-align: center !important;
+    word-wrap: break-word !important;
+  }
+
+  #hoja-salida tbody tr:nth-child(even) td {
+    background: #f9f6f2 !important; /* fila alterna café pastel claro */
+  }
+
+  #hoja-salida thead th:first-child {
+    border-top-left-radius: 12px !important;
+  }
+  #hoja-salida thead th:last-child {
+    border-top-right-radius: 12px !important;
+  }
+  #hoja-salida tbody tr:last-child td:first-child {
+    border-bottom-left-radius: 12px !important;
+  }
+  #hoja-salida tbody tr:last-child td:last-child {
+    border-bottom-right-radius: 12px !important;
+  }
+
+  #tabla-movimiento,
+  #tabla-movimiento * {
+    display: none !important;
+  }
+}

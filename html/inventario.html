@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventario como admin</title>
+  <link rel="stylesheet" href="../styles/inventario.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <a href="admin.html" class="back-btn">⬅ Volver al Panel</a>
+    <h1>Inventario de Productos</h1>
+
+    <!-- Leyenda de colores -->
+    <div class="color-legend">
+      <div class="legend-item">
+        <div class="legend-box green"></div>
+        <span>Stock suficiente (más de 10)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box yellow"></div>
+        <span>Stock medio (entre 2 y 10)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-box red"></div>
+        <span>Stock crítico (1 o menos)</span>
+      </div>
+    </div>
+
+    <div class="actions-header">
+      <input type="text" id="searchInput" placeholder="Buscar por código o descripción...">
+      <button class="btn-add" id="btnOpenModal">➕ Agregar Producto</button>
+      <button class="btn-salidas" id="btnVerSalidas">📋 Ver Salidas</button> 
+    </div>
+    
+    <table id="inventoryTable">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th>UM</th>
+          <th>INVENTARIO I069</th>
+          <th>INVENTARIO I078</th>
+          <th>INVENTARIO I07F</th>
+          <th>INVENTARIO I312</th>
+          <th>INVENTARIO I073</th>
+          <th>INVENTARIO FÍSICO EN ALMACÉN</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Productos se cargan dinámicamente -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Modal para agregar/editar producto -->
+  <div class="modal" id="modalForm">
+    <div class="modal-content">
+      <span class="close" id="btnCloseModal">&times;</span>
+      <h2>Agregar Producto</h2>
+      <form id="productForm">
+        <label>Código:</label>
+        <input type="number" name="codigo" required>
+
+        <label>Descripción:</label>
+        <input type="text" name="descripcion" required>
+
+        <label>UM:</label>
+        <input list="unidades" name="um" required>
+        <datalist id="unidades">
+          <option value="PZA">
+          <option value="M">
+          <option value="M2">
+          <option value="KG">
+          <option value="JGO"> 
+          <option value="L">
+          <option value="MIL">
+          <option value="CAJ">
+          <option value="PAQ">
+        </datalist>
+
+        <label>Inventario I069:</label>
+        <input type="number" name="i069" min="0">
+
+        <label>Inventario I078:</label>
+        <input type="number" name="i078" min="0">
+
+        <label>Inventario I07F:</label>
+        <input type="number" name="i07f" min="0">
+
+        <label>Inventario I312:</label>
+        <input type="number" name="i312" min="0">
+
+        <label>Inventario I073:</label>
+        <input type="number" name="i073" min="0">
+
+        <!-- CHECKBOX para habilitar sumar cantidades al editar -->
+        <div style="margin-top:8px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;">
+            <input type="checkbox" name="sumar" id="sumarCheckbox" />
+            <span>Sumar cantidades al editar (registrar entrada)</span>
+          </label>
+        </div>
+
+        <label>Inventario Físico en Almacén:</label>
+        <input type="number" name="almacen" id="almacen" readonly>
+
+        <button type="submit" class="btn-save">💾 Guardar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notificación personalizada -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Modal Confirmación -->
+  <div id="confirmModal" class="custom-modal">
+    <div class="custom-modal-content">
+      <h3>⚠ Confirmar Acción</h3>
+      <p id="confirmMessage">¿Seguro que deseas eliminar este producto?</p>
+      <div class="modal-buttons">
+        <button id="btnConfirmYes" class="btn-yes">Sí, eliminar</button>
+        <button id="btnConfirmNo" class="btn-no">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal para ver salidas -->
+  <div id="modalSalidas" class="modal">
+    <div class="modal-content">
+      <span id="btnCloseSalidas" class="close">&times;</span>
+      <h2>Historial de Salidas</h2>
+      <table id="salidasTable">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th>Cantidad</th>
+            <th>Observaciones</th>
+            <th>Fecha</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Modal unificado para registrar salida -->
+  <div id="salidaModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <span class="close" id="salidaCloseBtn">&times;</span>
+      <h2>📦 Registrar Salida</h2>
+      <form id="salidaForm">
+        
+        <div class="field">
+          <label for="salidaInventarioSelect">Inventario origen</label>
+          <select id="salidaInventarioSelect" required>
+            <option value="">-- Selecciona inventario --</option>
+            <option value="I069">INVENTARIO I069</option>
+            <option value="I078">INVENTARIO I078</option>
+            <option value="I07F">INVENTARIO I07F</option>
+            <option value="I312">INVENTARIO I312</option>
+            <option value="I073">INVENTARIO I073</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="salidaCantidadInput">Cantidad</label>
+          <input id="salidaCantidadInput" type="number" min="1" required />
+          <small id="salidaDisponible" class="muted"></small>
+        </div>
+
+        <div class="field">
+          <label for="salidaResponsableInput">Responsable (Nombre y Apellido)</label>
+          <input id="salidaResponsableInput" type="text" placeholder="Ej. Juan Pérez" required />
+        </div>
+
+        <div class="field">
+          <label for="salidaObservacionesInput">Observaciones</label>
+          <textarea id="salidaObservacionesInput" rows="2"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="salidaCancelBtn" class="secondary">Cancelar</button>
+          <button type="submit" id="salidaAddBtn" class="primary">Agregar a pendientes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Supabase -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="../js/inventario.js"></script>
+
+  <script>
+    // 🔹 Calcula automáticamente el Inventario Físico en Almacén
+    const inputsInventario = ["i069", "i078", "i07f", "i312", "i073"];
+    inputsInventario.forEach((name) => {
+      const el = document.querySelector(`[name="${name}"]`);
+      if (el) el.addEventListener("input", actualizarAlmacen);
+    });
+    function actualizarAlmacen() {
+      let total = 0;
+      inputsInventario.forEach((name) => {
+        const v = parseInt(document.querySelector(`[name="${name}"]`).value);
+        total += Number.isNaN(v) ? 0 : v;
+      });
+      const alm = document.getElementById("almacen");
+      if (alm) alm.value = total;
+    }
+
+    // Asegurar que al abrir modal el checkbox "sumar" esté deseleccionado por defecto
+    document.addEventListener('DOMContentLoaded', () => {
+      const sumar = document.getElementById('sumarCheckbox');
+      if (sumar) sumar.checked = false;
+    });
+  </script>
+
+</body>
+</html>

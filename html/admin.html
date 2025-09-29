@@ -3,49 +3,67 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Panel Admin</title>
-  <link rel="stylesheet" href="../css/styles.css">
-  <link rel="stylesheet" href="../css/admin.css">
+  <title>Panel Administrador</title>
+  <link rel="stylesheet" href="../styles/admin.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
-  <div class="login-container">
-    <h2>📦 Inventario</h2>
-    <button id="btnAgregar" class="btn">+ Agregar Producto</button>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Descripción</th>
-          <th>Cantidad</th>
-          <th>UM</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody id="tablaInventario">
-        <tr>
-          <td>A001</td>
-          <td>Cable eléctrico</td>
-          <td>150</td>
-          <td>mts</td>
-          <td>
-            <button class="editar btn-small">Editar</button>
-            <button class="eliminar btn-small">Eliminar</button>
-          </td>
-        </tr>
-        <tr>
-          <td>B002</td>
-          <td>Interruptor industrial</td>
-          <td>75</td>
-          <td>pz</td>
-          <td>
-            <button class="editar btn-small">Editar</button>
-            <button class="eliminar btn-small">Eliminar</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <!-- Encabezado -->
+  <header>Panel de Almacén
+  <button id="logoutBtn">Cerrar sesión</button>
+  </header>
 
-  <script src="admin.js"></script>
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul>
+         <li><a href="inventario.html">📊 Reportes</a></li>
+        <li><a href="inventario.html">📂 Inventario</a></li>
+        <li><a href="proveedores.html">🚚 Proveedores</a></li>
+        <li><a href="clientes.html">👥 Clientes</a></li>
+        <li><a href="reportes.html">📊 Reportes</a></li>
+      </ul>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="main">
+      <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de Administrador</h2>
+
+      <div class="dashboard">
+        <a href="agregar_producto.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/plus-math.png" alt="Agregar producto">
+          <h3>Agregar Producto</h3>
+        </a>
+
+        <a href="inventario.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario">
+          <h3>Ver Inventario</h3>
+        </a>
+
+        <a href="movimiento.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos">
+          <h3>Movimientos</h3>
+        </a>
+
+        <a href="salidas.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/sell-stock.png" alt="Salidas">
+          <h3>Salidas</h3>
+        </a>
+
+        <a href="reportes.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/add-file.png" alt="Reportes">
+          <h3>Reportes</h3>
+        </a>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      // Aquí puedes limpiar el almacenamiento local si guardas el login
+      localStorage.removeItem('usuario'); 
+      // Redirigir al login
+      window.location.href = 'login.html';
+    });
+  </script>
 </body>
 </html>

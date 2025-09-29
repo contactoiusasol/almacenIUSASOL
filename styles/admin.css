@@ -1,50 +1,149 @@
-.table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 1rem;
-  }
-  
-  .table th, .table td {
-    padding: 0.3rem;
-    border: 1px solid rgba(255,255,255,0.2);
-    text-align: center;
-    color: #fff;
-  }
-  
-  .table th {
-    background: rgba(10,0,0,0.5);
-    font-weight: bold;
-  }
-  
-  .table tr:nth-child(even) {
-    background: rgba(255,255,255,0.1);
-  }
-  
-  .btn-small {
-    padding: 0.3rem 0.6rem;
-    font-size: 0.8rem;
-    margin: 0 2px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    transition: 0.2s;
-  }
-  
-  .editar {
-    background-color: #f0ad4e;
-    color: white;
-  }
-  
-  .editar:hover {
-    background-color: #ec971f;
-  }
-  
-  .eliminar {
-    background-color: #d9534f;
-    color: white;
-  }
-  
-  .eliminar:hover {
-    background-color: #c9302c;
-  }
-  
+/* General */
+body {
+  margin: 0;
+  font-family: "Quicksand", "Poppins", "Segoe UI", Arial, sans-serif; /* tipografía más agradable */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: url("../img/panel.jpeg") no-repeat center center/cover;
+  color: #3e2f2f; /* café oscuro suave */
+}
+
+/* Header */
+header {
+  background: rgba(62, 87, 139, 0.336); /* beige/café pastel */
+  color: #fff7f7;
+  padding: 28px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+  backdrop-filter: blur(8px);
+  letter-spacing: 0.5px;
+}
+
+/* Layout */
+.layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 220px;
+  background: rgba(192, 204, 246, 0.482); /* café pastel translúcido */
+  padding: 20px 10px;
+  backdrop-filter: blur(14px);
+  border-right: 1px solid rgba(255, 255, 255, 0.264);
+}
+
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+
+.sidebar ul li {
+  margin: 15px 0;
+}
+
+.sidebar ul li a {
+  color: #1c1b19; /* texto claro */
+  text-decoration: none;
+  font-size: 16px;
+  padding: 10px 15px;
+  display: block;
+  transition: background 0.3s, padding-left 0.3s, color 0.3s;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.sidebar ul li a:hover {
+  background: rgba(255, 255, 255, 0.2); /* más visible en hover */
+  padding-left: 20px;
+  color: #2d1e1e;
+}
+
+/* Main content */
+.main {
+  flex: 1;
+  padding: 25px;
+  overflow-y: auto;
+}
+
+.welcome {
+  font-size: 20px;
+  margin-bottom: 20px;
+  color: #100b09; /* café oscuro elegante */
+  background: rgba(255,255,255,0.7);
+  padding: 10px 15px;
+  border-radius: 8px;
+  display: inline-block;
+  backdrop-filter: blur(10px);
+  font-weight: 500;
+}
+
+/* Dashboard */
+.dashboard {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: rgba(240, 240, 240, 0.8);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+  transition: transform 0.3s, box-shadow 0.3s;
+  backdrop-filter: blur(12px);
+}
+
+.card:hover {
+  transform: translateY(-5px) scale(1.05);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.25);
+}
+
+.card img {
+  width: 50px;
+  margin-bottom: 10px;
+}
+
+.card h3 {
+  font-size: 15px;
+  color: #5d4037; /* café más cálido */
+}
+/* ---------------- BOTÓN CERRAR SESIÓN (ESTILO COOL) ---------------- */
+#logoutBtn {
+  position: fixed;
+  top: 25px;
+  right: 25px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 12px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background: rgba(233, 226, 226, 0.2);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(230, 196, 196, 0.25);
+  transition: all 0.3s ease;
+  z-index: 1000;
+
+  animation: float 4s ease-in-out infinite;
+}
+
+#logoutBtn:hover {
+  background: rgba(81, 185, 185, 0.873);
+  transform: scale(1.07);
+  box-shadow: 0 10px 25px rgba(255, 80, 80, 0.4);
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}

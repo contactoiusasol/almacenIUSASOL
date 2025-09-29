@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de usuario</title>
+  <link rel="stylesheet" href="../styles/usuario.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Encabezado -->
+  <header>
+    Panel de Almacén
+    <button id="logoutBtn">Cerrar sesión</button>
+  </header>
+
+  <!-- Layout con sidebar y contenido -->
+  <div class="layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <ul>
+        <li><a href="inventariouser.html">📦 Inventario</a></li>
+        <li><a href="movimientomaterial.html">📑 Movimientos de materiales</a></li>
+      </ul>
+    </aside>
+
+    <!-- Contenido principal -->
+    <main class="main">
+      <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de usuario</h2>
+
+      <div class="dashboard">
+        <!-- Opción Inventario -->
+        <a href="inventariouser.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario">
+          <h3>Ver Inventario</h3>
+        </a>
+
+        <!-- Opción Movimientos -->
+        <a href="movimientomaterial.html" class="card">
+          <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos">
+          <h3>Movimientos de Materiales</h3>
+        </a>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      // Aquí puedes limpiar el almacenamiento local si guardas el login
+      localStorage.removeItem('usuario'); 
+      // Redirigir al login
+      window.location.href = 'login.html';
+    });
+  </script>
+</body>
+</html>

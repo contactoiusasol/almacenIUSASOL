@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Movimiento de Material</title>
+  <link rel="stylesheet" href="../styles/movimientomaterial.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <a href="inventariouser.html" class="back-btn">⬅ Volver al Inventario</a>
+    <h1>Lista de Movimiento de Material</h1>
+
+    <div class="solicitante-box">
+      <label for="nombreSolicitante">Nombre del solicitante:</label>
+      <input type="text" id="nombreSolicitante" readonly placeholder="Cargando usuario...">
+    </div>
+
+    <table id="tabla-movimiento">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th>UM</th>
+          <th>Cantidad</th>
+          <th>Eliminar</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="acciones">
+      <button id="btnImprimir">🖨️ Imprimir Hoja de Salida</button>
+    </div>
+  </div>
+
+  <!-- Hoja de salida para impresión -->
+  <div id="hoja-salida" style="display:none;">
+    <h2>📋 Hoja de productos solicitanes 📋</h2>
+    <p><strong>Solicitante:</strong> <span id="nombreSalida"></span></p>
+    <p><strong>Fecha:</strong> <span id="fechaSalida"></span></p>
+
+    <table id="tablaSalida">
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Descripción</th>
+          <th>UM</th>
+          <th>Cantidad</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script type="module" src="../js/movimientomaterial.js"></script>
+</body>
+</html>

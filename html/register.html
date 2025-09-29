@@ -6,22 +6,28 @@
   <title>Registro - Almacén</title>
   <link rel="stylesheet" href="../styles/styles.css">
   <link rel="stylesheet" href="../styles/login.css">
-  <!--script de supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-<script src="../js/register.js" type="module"></script>
 
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+  <!-- JS Registro -->
+  <script type="module" src="../js/register.js"></script>
 </head>
 <body>
   <div class="login-container">
     <h2>Crear Cuenta</h2>
     <form id="registerForm">
       <div class="input-group">
-        <label for="newUser">Usuario</label>
-        <input type="text" id="newUser" placeholder="Elige un usuario">
+        <label for="newNombre">Nombre</label>
+        <input type="text" id="newNombre" placeholder="Escribe tu nombre">
       </div>
       <div class="input-group">
-        <label for="newEmail">Correo</label>
-        <input type="email" id="newEmail" placeholder="ejemplo@correo.com">
+        <label for="newApellido">Apellido</label>
+        <input type="text" id="newApellido" placeholder="Escribe tu apellido">
+      </div>
+      <div class="input-group">
+        <label for="newemail">Correo</label>
+        <input type="email" id="newemail" placeholder="ejemplo@correo.com">
       </div>
       <div class="input-group">
         <label for="newPassword">Contraseña</label>
@@ -38,6 +44,15 @@
     </form>
   </div>
 
-  <script src="register.js"></script>
+  <!-- Modal de éxito -->
+  <div id="successModal" class="modal">
+    <div class="modal-content">
+      <h3>✅ Registro Exitoso</h3>
+      <p>Tu cuenta ha sido creada correctamente.</p>
+    </div>
+  </div>
+
+  <!-- Contenedor de notificaciones -->
+  <div id="toastContainer" class="toast-container"></div>
 </body>
 </html>
