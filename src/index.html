@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Login - Almacén</title>
+<link rel="stylesheet" href="./styles/login.css" />
+<script type="module" src="./js/login.js"></script>
+</head>
+<body>
+  <div class="login-container">
+    <h2>Iniciar Sesión</h2>
+    <form id="loginForm">
+      <div class="input-group">
+        <label for="loginEmail">Correo</label>
+        <input type="email" id="loginEmail" placeholder="Ingresa tu correo" required />
+      </div>
+      <div class="input-group">
+        <label for="loginPassword">Contraseña</label>
+        <input type="password" id="loginPassword" placeholder="Ingresa tu contraseña" required />
+      </div>
+      <button type="submit" class="btn">Entrar</button>
+      <p class="register-link">¿No tienes cuenta? <a href="register.html">Regístrate</a></p>
+    </form>
+    <div id="toastContainer"></div>
+  </div>
+
+  <script type="module" src="../js/login.js"></script>
+</body>
+</html>
