@@ -1,56 +1,96 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Panel de usuario</title>
-  <link rel="stylesheet" href="../styles/usuario.css">
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/usuario.css" />
 </head>
 <body>
-  <!-- Encabezado -->
+  <div class="welcome-animation" id="welcomeAnimation" aria-hidden="true"></div>
+
   <header>
-    Panel de Almacén
-    <button id="logoutBtn">Cerrar sesión</button>
+    <div class="header-left">
+      <span class="welcome-msg title-underline">PANEL DE USUARIO 📦</span>
+    </div>
+    <div class="header-nav">
+      <a href="inventariouser.html" class="nav-btn">Inventario</a>
+      <a href="movimientomaterial.html" class="nav-btn">Movimientos</a>
+    </div>
+    <div class="header-right">
+      <button id="logoutBtn">Cerrar sesión</button>
+    </div>
   </header>
 
-  <!-- Layout con sidebar y contenido -->
-  <div class="layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <ul>
-        <li><a href="inventariouser.html">📦 Inventario</a></li>
-        <li><a href="movimientomaterial.html">📑 Movimientos de materiales</a></li>
-      </ul>
-    </aside>
+  <main class="main">
+    <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de Usuario</h2>
 
-    <!-- Contenido principal -->
-    <main class="main">
-      <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de usuario</h2>
+    <div class="dashboard">
+      <a href="inventariouser.html" class="card">
+        <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario" />
+        <h3>Ver Inventario</h3>
+      </a>
 
-      <div class="dashboard">
-        <!-- Opción Inventario -->
-        <a href="inventariouser.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario">
-          <h3>Ver Inventario</h3>
-        </a>
-
-        <!-- Opción Movimientos -->
-        <a href="movimientomaterial.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos">
-          <h3>Movimientos de Materiales</h3>
-        </a>
-      </div>
-    </main>
-  </div>
+      <a href="movimientomaterial.html" class="card">
+        <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos" />
+        <h3>Movimientos de Materiales</h3>
+      </a>
+    </div>
+  </main>
 
   <script>
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      // Aquí puedes limpiar el almacenamiento local si guardas el login
-      localStorage.removeItem('usuario'); 
-      // Redirigir al login
+document.addEventListener('DOMContentLoaded', () => {
+  // Enlazar logout de forma segura (si existe)
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      localStorage.removeItem('usuario');
+      sessionStorage.removeItem('welcomeShown_user');
+      sessionStorage.removeItem('welcomeShown');
       window.location.href = 'login.html';
     });
-  </script>
+  }
+
+  // Recuperar usuario
+  let usuario = null;
+  try { usuario = JSON.parse(localStorage.getItem('usuario')); } catch(e){ usuario = null; }
+
+  if (!usuario || !usuario.role) {
+    localStorage.removeItem('usuario');
+    setTimeout(() => window.location.href = 'login.html', 50);
+    return;
+  }
+
+
+  const nombre = usuario.nombre || usuario.name || 'Usuario';
+  const anim = document.getElementById('welcomeAnimation');
+  function escapeHtml(str) { return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+
+  if (anim) {
+    // Emoji 🙈 como sticker
+    anim.innerHTML = `
+      <div class="avatar" aria-hidden="true">
+        <span class="sticker-emoji" role="img" aria-label="mono tapándose los ojos">🙈</span>
+      </div>
+      <div class="content">
+        <strong>Bienvenido, ${escapeHtml(nombre)} 👋</strong>
+        <div class="subtext">
+          <span class="role-badge"><span class="dot"></span>Usuario</span>
+          <span>Explora el inventario y registra movimientos ✅</span>
+        </div>
+      </div>
+    `;
+    const shownKey = 'welcomeShown_user';
+    if (!sessionStorage.getItem(shownKey)) {
+      anim.classList.add('show');
+      setTimeout(()=> { anim.classList.remove('show'); anim.classList.add('hide'); }, 4000);
+      sessionStorage.setItem(shownKey, 'true');
+    }
+  }
+
+  const h2 = document.getElementById('welcomeMessage');
+  if (h2) h2.textContent = `Bienvenido al Panel de Usuario, ${nombre}`;
+});
+</script>
 </body>
 </html>

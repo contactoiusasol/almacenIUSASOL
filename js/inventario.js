@@ -2,34 +2,48 @@
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
 const SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
-
 const supabase = window.supabase?.createClient
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
 // ------------------- Selectores DOM (si existen) -------------------
+// --- Referencias DOM (una única vez, sin duplicados) ---
 const tableBody = document.querySelector("#inventoryTable tbody");
 const searchInput = document.getElementById("searchInput");
 const modal = document.getElementById("modalForm"); // modal para agregar/editar producto
 const btnOpenModal = document.getElementById("btnOpenModal");
 const btnCloseModal = document.getElementById("btnCloseModal");
 const productForm = document.getElementById("productForm");
+const btnCancelModal = document.querySelector('#btnCancelModal');
+
 const tablaPendientesBody = document.querySelector("#pendingTable tbody"); // usado en renderPendingList
 const tablaHistorialBody = document.querySelector("#salidasTable tbody"); // usado por historial
+
 const btnConfirmAll = document.getElementById("btnConfirmAll");
 const btnClearPending = document.getElementById("btnClearPending");
 const btnRefresh = document.getElementById("btnRefresh");
+
 const nombreResponsableInput = document.getElementById("nombreResponsable");
 
-// ------------------- Estado -------------------
+// Estado de edición
 let editMode = false;
 let editingCodigo = null;
-
 // estado global del usuario autenticado (nombre/apellido)
 let CURRENT_USER_FULLNAME = "";
 let CURRENT_USER_NOMBRE = "";
 let CURRENT_USER_APELLIDO = "";
 let PRODUCTOS_COLUMN_MAP = null; // map: normalizedKey -> realColumnName
+
+// Helper para calcular la suma de inventarios
+function calcularAlmacen(producto) {
+  const i069 = getStockFromProduct(producto, 'I069') ?? 0;
+  const i078 = getStockFromProduct(producto, 'I078') ?? 0;
+  const i07f = getStockFromProduct(producto, 'I07F') ?? 0;
+  const i312 = getStockFromProduct(producto, 'I312') ?? 0;
+  const i073 = getStockFromProduct(producto, 'I073') ?? 0;
+
+  return i069 + i078 + i07f + i312 + i073;
+}
 
 // ------------------- Función Toast -------------------
 function showToast(message, success = true) {
@@ -58,7 +72,6 @@ function showToast(message, success = true) {
     setTimeout(() => { toast.textContent = ""; }, 280);
   }, 3000);
 }
-
 
 // ------------------- Confirmación personalizada -------------------
 function showConfirm(message, onConfirm) {
@@ -158,9 +171,46 @@ function getStockFromProduct(productObj, inventoryLabel) {
   return 0;
 }
 
+// muestra números con decimales si los tienen, mantiene strings tal cual
 function formatShowValue(val) {
-  if (val === null || val === undefined) return "";
+  if (val === null || val === undefined || val === "") return "";
+  // si ya es número
+  if (typeof val === "number") {
+    // si tiene parte fraccional -> mostrar hasta 2 decimales sin eliminar ceros significativos
+    if (!Number.isInteger(val)) {
+      // elimina ceros finales innecesarios pero conserva al menos 1 decimal si corresponde
+      return Number(val).toString();
+    }
+    return String(val);
+  }
+  // si es string que representa número, intentamos mantener su forma
+  const maybeNum = Number(String(val).replace(/,/g, '.').trim());
+  if (!Number.isNaN(maybeNum)) {
+    if (!Number.isInteger(maybeNum)) return String(maybeNum);
+    return String(maybeNum);
+  }
+  // fallback: texto
   return String(val);
+}
+if (typeof btnCancelModal !== 'undefined' && btnCancelModal && !btnCancelModal.dataset.cancelAttached) {
+  btnCancelModal.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (!productForm || !modal) return;
+    // cerrar modal
+    modal.style.display = 'none';
+    // limpiar form
+    if (typeof clearProductFormFields === 'function') clearProductFormFields();
+    // resetear flags de edición
+    editMode = false;
+    editingCodigo = null;
+    // restaurar botón guardar
+    const saveBtnInside = productForm.querySelector('.btn-save');
+    if (saveBtnInside) {
+      saveBtnInside.disabled = false;
+      saveBtnInside.textContent = "Crear Producto";
+    }
+  });
+  btnCancelModal.dataset.cancelAttached = "true";
 }
 
 // ---------------- Helpers para detección de columnas reales ----------------
@@ -421,7 +471,8 @@ async function openSalidaModal(producto) {
     <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px">
       <div style="flex:1">
         <label style="font-size:13px;color:#374151">Cantidad total requerida</label>
-        <input id="salidaCantidadInputModal" type="number" min="1" step="1" class="input-text" style="width:100%;box-sizing:border-box" />
+        <!-- <<< permitir decimales: min="0" step="any" -->
+        <input id="salidaCantidadInputModal" type="number" min="0" step="any" class="input-text" style="width:100%;box-sizing:border-box" />
       </div>
       <div style="width:140px">
         <label style="font-size:13px;color:#374151">UM</label>
@@ -493,8 +544,17 @@ async function openSalidaModal(producto) {
   function safeStock(producto, inv) {
     try {
       const s = typeof getStockFromProduct === "function" ? getStockFromProduct(producto, inv) : (producto[`INVENTARIO ${inv}`] ?? producto[inv] ?? 0);
-      return Number.isFinite(+s) ? parseInt(s||0,10) : 0;
+      // <<< usar parseFloat para preservar decimales (p.ej. 70.5)
+      const n = parseFloat(String(s).replace(',', '.'));
+      return Number.isFinite(n) ? n : 0;
     } catch (e) { return 0; }
+  }
+
+  // formatea cantidades para mostrar (quita .0 innecesarios)
+  function formatQty(n) {
+    if (!Number.isFinite(n)) return "0";
+    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
+    return String(n).replace(/\.?0+$/, '');
   }
 
   // ===================== Modal-toast más visible =====================
@@ -579,6 +639,80 @@ async function openSalidaModal(producto) {
   }
   // ===================================================================
 
+  // --- handlers mejorados para inputs de distribución (soportan decimales sin "pelear" con el typing) ---
+  function onDistribKeydown(e) {
+    // permitir coma como separador decimal: la convertimos a punto en el input
+    if (e.key === ',') {
+      e.preventDefault();
+      const el = e.target;
+      const start = el.selectionStart || 0;
+      const end = el.selectionEnd || 0;
+      const val = el.value || "";
+      const newVal = val.slice(0, start) + '.' + val.slice(end);
+      el.value = newVal;
+      // mover caret después del punto
+      const pos = start + 1;
+      setTimeout(() => { el.setSelectionRange(pos, pos); }, 0);
+      // disparar input manualmente para que se valide
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      return;
+    }
+    // dejamos al browser manejar el resto (números, punto, backspace, etc.)
+  }
+
+  function onDistribInputChange() {
+    const inp = this;
+    const inv = inp.dataset.inv;
+    const avail = Number(safeStock(producto, inv)) || 0;
+
+    const raw = (inp.value || "").toString().trim();
+    if (raw === "" || raw === "-") {
+      updateConfirmState();
+      return;
+    }
+
+    const parsed = parseFloat(raw.replace(',', '.'));
+    if (Number.isNaN(parsed)) {
+      updateConfirmState();
+      return;
+    }
+
+    // validaciones inmediatas sin sobrescribir mientras el usuario escribe
+    if (parsed < 0) {
+      modalToast(`No se permiten valores negativos.`, false, 2000, false);
+    } else if (parsed > avail) {
+      modalToast(`La cantidad ingresada (${parsed}) excede el stock disponible (${avail}).`, false, 2200, false);
+    }
+
+    updateConfirmState();
+  }
+
+  function onDistribInputBlur() {
+    const inp = this;
+    const inv = inp.dataset.inv;
+    const avail = Number(safeStock(producto, inv)) || 0;
+    let v = parseFloat((inp.value || "0").toString().replace(',', '.'));
+    if (Number.isNaN(v) || v < 0) v = 0;
+    if (v > avail) {
+      v = avail;
+      modalToast(`Ajustado ${inv} al stock disponible (${formatQty(avail)})`, false, 2500, false);
+    }
+    // normalizar visualmente (si prefieres 2 decimales usa v.toFixed(2))
+    inp.value = String(v);
+    updateConfirmState();
+  }
+
+  function attachDistribListeners() {
+    distribContainer.querySelectorAll('input[data-inv]').forEach(i => {
+      i.removeEventListener("input", onDistribInputChange);
+      i.removeEventListener("blur", onDistribInputBlur);
+      i.removeEventListener("keydown", onDistribKeydown);
+      i.addEventListener("input", onDistribInputChange);
+      i.addEventListener("blur", onDistribInputBlur);
+      i.addEventListener("keydown", onDistribKeydown);
+    });
+  }
+
   // render rows (muestra "No disponible" y desactiva input si stock == 0)
   async function renderDistribRows() {
     distribContainer.innerHTML = "";
@@ -601,18 +735,19 @@ async function openSalidaModal(producto) {
       if ((stocks[inv] || 0) <= 0) {
         left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — <span style="color:#9ca3af;font-style:italic">No disponible</span>`;
       } else {
-        left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — Disponible: <span data-inv-stock="${inv}">${stocks[inv]}</span>`;
+        left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — Disponible: <span data-inv-stock="${inv}">${formatQty(stocks[inv])}</span>`;
       }
 
       const right = document.createElement("div");
       right.style.display = "flex";
       right.style.alignItems = "center";
       right.style.gap = "8px";
+
       const input = document.createElement("input");
       input.setAttribute("data-inv", inv);
       input.type = "number";
       input.min = "0";
-      input.step = "1";
+      input.step = "any";                // <<< permitir decimales
       input.value = "0";
       input.className = "input-text";
       input.style.width = "90px";
@@ -625,62 +760,30 @@ async function openSalidaModal(producto) {
       }
 
       right.appendChild(input);
-
       row.appendChild(left);
       row.appendChild(right);
       distribContainer.appendChild(row);
     });
 
-    distribContainer.querySelectorAll('input[data-inv]').forEach(i => {
-      i.removeEventListener("input", onDistribInputChange);
-      i.addEventListener("input", onDistribInputChange);
-    });
+    // registrar listeners robustos que permiten typing con decimales
+    attachDistribListeners();
 
     updateConfirmState();
   }
 
-  // calcula total disponible (sum stocks)
+  // calcula total disponible (sum stocks) - usa floats
   function totalAvailable() {
     const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
     return inputs.reduce((acc, inp) => {
       const inv = inp.dataset.inv;
-      return acc + (safeStock(producto, inv) || 0);
+      const avail = safeStock(producto, inv) || 0;
+      return acc + avail;
     }, 0);
   }
 
-  // event al cambiar cualquier input de reparto -> validar
-  function onDistribInputChange() {
-    const inp = this;
-    const inv = inp.dataset.inv;
-    const avail = safeStock(producto, inv) || 0;
-    let v = parseInt(inp.value || "0", 10) || 0;
-    if (v > avail) {
-      inp.value = String(avail);
-      modalToast(`Ajustado ${inv} al stock disponible (${avail})`, false, 3000, false);
-    }
-    // si el usuario puso valor negativo o no numérico -> ajustar a 0
-    if (v < 0) inp.value = "0";
-    updateConfirmState();
-  }
-
-  // helpers para marcar campo inválido y limpiar marcación cuando el usuario escribe
-  function markInvalid(el) {
-    if (!el) return;
-    el.style.outline = "2px solid rgba(220,38,38,0.25)";
-    el.style.border = "1px solid #dc2626";
-    const clear = () => {
-      el.style.outline = "";
-      el.style.border = "";
-      el.removeEventListener("input", clear);
-      el.removeEventListener("change", clear);
-    };
-    el.addEventListener("input", clear);
-    el.addEventListener("change", clear);
-  }
-
-  // habilita/deshabilita botón Confirm y muestra mensaje si falla
+  // <-- ÚNICA versión de updateConfirmState: usa parseFloat (no dejar duplicados) -->
   function updateConfirmState() {
-    const totalNeeded = parseInt(cantidadInput.value || "0", 10) || 0;
+    const totalNeeded = parseFloat((cantidadInput.value || "0").toString().replace(',', '.')) || 0;
     const avail = totalAvailable();
 
     // limpiar banners temporales
@@ -698,13 +801,30 @@ async function openSalidaModal(producto) {
       return;
     }
 
-    if (totalNeeded > avail) {
+    // tolerancia para comparar floats (ej. 0.000001)
+    const EPS = 1e-6;
+    if (totalNeeded - avail > EPS) {
       btnConfirm.disabled = true;
-      modalToast(`La cantidad solicitada (${totalNeeded}) excede el total disponible (${avail}).`, false, 0, true);
+      modalToast(`La cantidad solicitada (${formatQty(totalNeeded)}) excede el total disponible (${formatQty(avail)}).`, false, 0, true);
       return;
     }
 
     btnConfirm.disabled = false;
+  }
+
+  // helpers para marcar campo inválido y limpiar marcación cuando el usuario escribe
+  function markInvalid(el) {
+    if (!el) return;
+    el.style.outline = "2px solid rgba(220,38,38,0.25)";
+    el.style.border = "1px solid #dc2626";
+    const clear = () => {
+      el.style.outline = "";
+      el.style.border = "";
+      el.removeEventListener("input", clear);
+      el.removeEventListener("change", clear);
+    };
+    el.addEventListener("input", clear);
+    el.addEventListener("change", clear);
   }
 
   // Clear distrib
@@ -723,7 +843,8 @@ async function openSalidaModal(producto) {
   // VALIDACIÓN ANTES DE CONFIRMAR (todos obligatorios excepto observaciones)
   function validateBeforeConfirm() {
     const missing = [];
-    const totalNeeded = parseInt(cantidadInput.value || "0", 10) || 0;
+    // aceptar decimales en cantidad total
+    const totalNeeded = parseFloat((cantidadInput.value || "0").toString().replace(',', '.')) || 0;
     if (!totalNeeded || totalNeeded <= 0) {
       missing.push("Cantidad total requerida");
       markInvalid(cantidadInput);
@@ -735,41 +856,38 @@ async function openSalidaModal(producto) {
       markInvalid(destInput);
     }
 
-    // revisar distribución: al menos un inventario con cantidad > 0
+    // revisar distribución: al menos un inventario con cantidad > 0 (usar float)
     const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
     const origenes = inputs.map(inp => {
       const inv = inp.dataset.inv;
-      const qty = parseInt(inp.value || "0", 10) || 0;
-      const avail = safeStock(producto, inv);
+      const qty = parseFloat((inp.value || "0").toString().replace(',', '.')) || 0;
+      const avail = Number(safeStock(producto, inv)) || 0;
       return { INVENTARIO_ORIGEN: `INVENTARIO ${inv}`, CANTIDAD: qty, AVAILABLE: avail, el: inp };
     }).filter(o => o.CANTIDAD > 0);
 
-    const sum = origenes.reduce((s,o) => s + (parseInt(o.CANTIDAD||0,10)||0), 0);
+    const sum = origenes.reduce((s,o) => s + (Number(o.CANTIDAD) || 0), 0);
+
+    // comparación con tolerancia
+    const EPS = 1e-6;
 
     if (origenes.length === 0) {
       missing.push("Distribución entre inventarios (elige al menos un inventario)");
-      // marcar visualmente todos los inputs de distribución
       inputs.forEach(i => markInvalid(i));
     } else {
-      // si hay distribución pero suma distinta -> mostrar error específico
-      if (sum !== totalNeeded) {
-        modalToast(`La suma por inventario (${sum}) no coincide con la cantidad total (${totalNeeded}). Ajusta los valores.`, false, 4000);
-        // marcar inputs implicados
+      if (Math.abs(sum - totalNeeded) > EPS) {
+        modalToast(`La suma por inventario (${formatQty(sum)}) no coincide con la cantidad total (${formatQty(totalNeeded)}). Ajusta los valores.`, false, 4000);
         origenes.forEach(o => markInvalid(o.el));
-        // no agregar al missing list porque ya mostramos toast específico
         return { ok: false, focusEl: origenes[0]?.el || cantidadInput };
       }
-      // verificar que cada cantidad no exceda su stock (onDistribInputChange ya protege esto, pero por si acaso)
       for (const o of origenes) {
-        if (o.CANTIDAD > o.AVAILABLE) {
-          modalToast(`La cantidad para ${o.INVENTARIO_ORIGEN} (${o.CANTIDAD}) excede su stock (${o.AVAILABLE}).`, false, 4000);
+        if (o.CANTIDAD - o.AVAILABLE > EPS) {
+          modalToast(`La cantidad para ${o.INVENTARIO_ORIGEN} (${formatQty(o.CANTIDAD)}) excede su stock (${formatQty(o.AVAILABLE)}).`, false, 4000);
           markInvalid(o.el);
           return { ok: false, focusEl: o.el };
         }
       }
     }
 
-    // responsable debe existir
     const responsable = (respInput.value || "").trim();
     if (!responsable) {
       missing.push("Responsable (inicia sesión)");
@@ -779,7 +897,6 @@ async function openSalidaModal(producto) {
     if (missing.length > 0) {
       const ms = `Completa los campos obligatorios: ${missing.join(", ")}`;
       modalToast(ms, false, 4500);
-      // focus en el primer campo faltante
       if (missing[0].includes("Cantidad")) cantidadInput.focus();
       else if (missing[0].includes("Destinatario")) destInput.focus();
       else if (missing[0].includes("Distribución")) {
@@ -853,7 +970,13 @@ async function openSalidaModal(producto) {
     try { btnCancel.removeEventListener("click", cancelHandler); } catch(e) {}
     try { btnConfirm.removeEventListener("click", confirmHandler); } catch(e) {}
     try { document.removeEventListener("keydown", escHandler); } catch(e) {}
-    try { distribContainer.querySelectorAll('input[data-inv]').forEach(i => i.removeEventListener("input", onDistribInputChange)); } catch(e) {}
+    try {
+      distribContainer.querySelectorAll('input[data-inv]').forEach(i => {
+        i.removeEventListener("input", onDistribInputChange);
+        i.removeEventListener("blur", onDistribInputBlur);
+        i.removeEventListener("keydown", onDistribKeydown);
+      });
+    } catch(e) {}
     if (_modalToastTimer) { clearTimeout(_modalToastTimer); _modalToastTimer = null; }
     overlay.remove();
   }
@@ -880,10 +1003,30 @@ async function openSalidaModal(producto) {
   }, 50);
   cantidadInput.addEventListener("input", updateConfirmState);
 
+  // -- refresca producto (si usas supabase) para evitar salir con stock desactualizado
+  async function refreshProductLive(producto) {
+    try {
+      if (typeof supabase !== "undefined") {
+        const { data, error } = await supabase
+          .from('productos')
+          .select('*')
+          .eq('CODIGO', producto.CODIGO)
+          .limit(1)
+          .maybeSingle();
+        if (!error && data) return data;
+      }
+    } catch (e) { /* noop */ }
+    // fallback: devuelve el producto que ya tenías
+    return producto;
+  }
+
+  producto = await refreshProductLive(producto);
+
   // render inicial
   await renderDistribRows();
   updateConfirmState();
 }
+
 /* ------------------ Botón / Modal para "Buscar Entradas por Código" ------------------ */
 (function initEntradaLookupFeature() {
   // crear botón y colocarlo junto a btnOpenModal si existe
@@ -899,7 +1042,9 @@ async function openSalidaModal(producto) {
   btnEntradaLookup.addEventListener("click", () => openEntradaLookupModal());
 })();
 
-/* Modal dinámico para buscar entradas por código */
+
+/* Modal dinámico para buscar entradas */
+/* Modal dinámico para buscar entradas por código - VERSIÓN SIMPLIFICADA */
 async function openEntradaLookupModal(prefillCodigo = "") {
   const existing = document.getElementById("entradaLookupOverlay");
   if (existing) existing.remove();
@@ -925,7 +1070,7 @@ async function openEntradaLookupModal(prefillCodigo = "") {
     </div>
 
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <input id="entradaCodigoInput" placeholder="Escribe el código (ej: ABC123)" value="${escapeHtml(prefillCodigo)}" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px" />
+      <input id="entradaCodigoInput" placeholder="Escribe el código (ej: 12345)" value="${escapeHtml(prefillCodigo)}" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px" />
       <button id="entradaBuscarBtn" class="btn-primary">Buscar</button>
       <button id="entradaRegistrarBtn" class="btn-secondary">Registrar entrada</button>
     </div>
@@ -953,26 +1098,36 @@ async function openEntradaLookupModal(prefillCodigo = "") {
   const listWrap = modal.querySelector("#entradaListWrap");
   const summaryDiv = modal.querySelector("#entradaSummary");
 
-  // helpers: intentar leer tabla de entradas en varias tablas comunes
-  async function tryFetchEntriesTable(codigo) {
-    if (!supabase) return { table: null, data: null, error: "Supabase no inicializado" };
+  // Buscar en tabla entradas específica
+  async function fetchEntradasTable(codigo) {
+    if (!supabase) return { data: null, error: "Supabase no inicializado" };
 
-    const candidateTables = ['entradas','entradas_productos','movimientos','movimientos_entradas','historial_entradas','stock_movimientos'];
-    for (const t of candidateTables) {
-      try {
-        const { data, error } = await supabase.from(t).select("*").eq("CODIGO", codigo).order("ADDED_AT", { ascending: false }).limit(500);
-        if (error) {
-          continue;
-        }
-        return { table: t, data: data || [] };
-      } catch (e) {
-        continue;
+    try {
+      const codigoNum = parseInt(codigo);
+      if (isNaN(codigoNum)) {
+        return { data: [], error: null };
       }
+
+      const { data, error } = await supabase
+        .from('entradas')
+        .select("*")
+        .eq("codigo", codigoNum)
+        .order("fecha", { ascending: false })
+        .limit(500);
+
+      if (error) {
+        console.error("Error fetching entradas:", error);
+        return { data: null, error };
+      }
+
+      return { data: data || [], error: null };
+    } catch (e) {
+      console.error("Exception fetching entradas:", e);
+      return { data: null, error: e };
     }
-    return { table: null, data: null };
   }
 
-  // función para renderizar resultados
+  // función para renderizar resultados - SIMPLIFICADA
   async function buscarYRenderizar() {
     const codigo = String(codigoInput.value || "").trim();
     if (!codigo) {
@@ -1007,63 +1162,37 @@ async function openEntradaLookupModal(prefillCodigo = "") {
       infoDiv.innerHTML = `Producto <strong>${escapeHtml(codigo)}</strong> no encontrado en tabla <code>productos</code>.`;
     }
 
-    // 2) buscar entradas en tablas candidatas
-    const { table, data } = await tryFetchEntriesTable(codigo);
+    // 2) buscar entradas en tabla entradas
+    const { data, error } = await fetchEntradasTable(codigo);
 
-    if (!table) {
-      listWrap.innerHTML = `<div style="color:#6b7280">No se encontró una tabla de entradas conocida o no existe historial para este producto.</div>`;
-      summaryDiv.innerHTML = "";
+    if (error) {
+      listWrap.innerHTML = `<div style="color:#dc2626">Error al buscar entradas: ${escapeHtml(error.message)}</div>`;
       return;
     }
 
     if (!data || data.length === 0) {
-      listWrap.innerHTML = `<div style="color:#6b7280">No hay entradas registradas en la tabla <code>${escapeHtml(table)}</code> para el código ${escapeHtml(codigo)}.</div>`;
-      summaryDiv.innerHTML = `<div style="font-size:13px;color:#374151">Entradas encontradas: 0</div>`;
+      listWrap.innerHTML = `<div style="color:#6b7280">No hay entradas registradas para el código ${escapeHtml(codigo)}.</div>`;
       return;
     }
 
-    // construir resumen
+    // construir resumen SIMPLIFICADO
     let totalQty = 0;
-    const byInv = {};
     const rows = data.map(r => {
-      const qtyFieldNames = ['CANTIDAD','cantidad','QTY','qty','quantity','cantidad_ingresada','UNITS'];
-      let qty = 0;
-      for (const k of Object.keys(r)) {
-        if (qtyFieldNames.includes(k)) { qty = toNumber(r[k]); break; }
-      }
-      if (!qty) {
-        for (const k of Object.keys(r)) {
-          if (typeof r[k] === 'number') { qty = Number(r[k]); break; }
-        }
-      }
-
-      const invCandidates = ['INVENTARIO','inventario','ALMACEN','almacen','ORIGEN','origen'];
-      let inv = null;
-      for (const k of Object.keys(r)) {
-        const nk = normalizeKeyName(k);
-        if (invCandidates.some(c => nk.includes(normalizeKeyName(c)))) { inv = String(r[k] || "") ; break; }
-      }
-      inv = inv || "—";
-
-      totalQty += Number(qty || 0);
-      byInv[inv] = (byInv[inv] || 0) + Number(qty || 0);
+      const qty = Number(r.cantidad || 0);
+      totalQty += qty;
 
       return {
         raw: r,
-        qty: Number(qty || 0),
-        inv: inv,
-        at: r.ADDED_AT || r.created_at || r.inserted_at || r.fecha || r.fecha_movimiento || ""
+        qty: qty,
+        fecha: r.fecha || "",
+        responsable: r.responsable || ""
       };
     });
 
-    let summaryHtml = `<div style="font-size:13px;color:#111;margin-bottom:6px"><strong>${rows.length}</strong> entradas encontradas (tabla <code>${escapeHtml(table)}</code>).</div>`;
-    summaryHtml += `<div style="font-size:13px;color:#111;margin-bottom:6px">Cantidad total registrada en estas entradas: <strong>${totalQty}</strong></div>`;
-    summaryHtml += `<div style="font-size:13px;color:#111">Desglose por inventario:</div><ul style="margin:6px 0 0 18px">`;
-    for (const k of Object.keys(byInv)) summaryHtml += `<li>${escapeHtml(k)}: ${byInv[k]}</li>`;
-    summaryHtml += `</ul>`;
-    summaryDiv.innerHTML = summaryHtml;
+    // SOLO mostrar la información esencial
+    summaryDiv.innerHTML = `<div style="font-size:13px;color:#111;margin-bottom:6px">Cantidad total registrada en estas entradas: <strong>${totalQty}</strong></div>`;
 
-    // lista detallada
+    // lista detallada SIMPLIFICADA
     const tableEl = document.createElement("table");
     tableEl.style.width = "100%";
     tableEl.style.borderCollapse = "collapse";
@@ -1071,9 +1200,13 @@ async function openEntradaLookupModal(prefillCodigo = "") {
       <thead>
         <tr style="text-align:left;font-size:13px;color:#374151">
           <th style="padding:6px 8px;border-bottom:1px solid #eee">Fecha</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">Inventario</th>
           <th style="padding:6px 8px;border-bottom:1px solid #eee">Cantidad</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">Usuario/Nota</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">I069</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">I078</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">I07F</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">I312</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">I073</th>
+          <th style="padding:6px 8px;border-bottom:1px solid #eee">Responsable</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -1083,136 +1216,288 @@ async function openEntradaLookupModal(prefillCodigo = "") {
     rows.forEach(r => {
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.at || "").slice(0,19))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.inv || "—"))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.qty || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.USUARIO || r.raw.user || r.raw.NOTAS || r.raw.nota || "") )}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(formatDate(r.fecha))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.cantidad || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i069 || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i078 || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i07f || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i312 || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i073 || 0))}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(r.responsable)}</td>
       `;
       tbody.appendChild(tr);
     });
 
     listWrap.innerHTML = "";
     listWrap.appendChild(tableEl);
-  } // buscarYRenderizar
+  }
 
-  // Registrar nueva entrada — abre mini-form dentro del modal
+  // Helper para formatear fecha
+  function formatDate(dateString) {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('es-ES');
+    } catch (e) {
+      return String(dateString).slice(0, 10);
+    }
+  }
+
+  // Registrar nueva entrada - MANTENIENDO LA FUNCIONALIDAD COMPLETA
   async function abrirRegistrarEntrada() {
     const codigo = String(codigoInput.value || "").trim();
-    if (!codigo) { showToast("Escribe un código antes de registrar", false); codigoInput.focus(); return; }
+    if (!codigo) { 
+      showToast("Escribe un código antes de registrar", false); 
+      codigoInput.focus(); 
+      return; 
+    }
 
     const formHtml = document.createElement("div");
     formHtml.style.border = "1px dashed #e5e7eb";
     formHtml.style.padding = "8px";
     formHtml.style.marginBottom = "10px";
     formHtml.innerHTML = `
-      <div style="display:flex;gap:8px;align-items:center">
-        <input id="regEntradaCantidad" type="number" min="1" placeholder="Cantidad" style="width:120px;padding:6px;border:1px solid #ddd;border-radius:6px" />
-        <select id="regEntradaInv" style="padding:6px;border:1px solid #ddd;border-radius:6px">
-          <option value="INVENTARIO I069">I069</option>
-          <option value="INVENTARIO I078">I078</option>
-          <option value="INVENTARIO I07F">I07F</option>
-          <option value="INVENTARIO I312">I312</option>
-          <option value="INVENTARIO I073">I073</option>
-          <option value="INVENTARIO FISICO EN ALMACEN">ALMACEN</option>
-        </select>
-        <input id="regEntradaNota" placeholder="Nota (opcional)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px" />
-        <button id="regEntradaDo" class="btn-primary">Registrar</button>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <strong style="min-width:160px">Agregar por inventario (acepta decimales)</strong>
+          <small style="color:#6b7280">Usa punto (.) para decimales. Ej: 12.5</small>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
+          <input id="in_i069" type="number" min="0" step="0.001" placeholder="I069" class="input-text" />
+          <input id="in_i078" type="number" min="0" step="0.001" placeholder="I078" class="input-text" />
+          <input id="in_i07f" type="number" min="0" step="0.001" placeholder="I07F" class="input-text" />
+          <input id="in_i312" type="number" min="0" step="0.001" placeholder="I312" class="input-text" />
+          <input id="in_i073" type="number" min="0" step="0.001" placeholder="I073" class="input-text" />
+        </div>
+
+        <div style="display:flex;gap:8px;align-items:center">
+          <div style="flex:1">
+            <label style="font-size:13px;color:#374151">Responsable</label>
+            <input id="entradaResponsable" type="text" class="input-text" />
+          </div>
+          <div style="width:160px">
+            <label style="font-size:13px;color:#374151">Total a agregar</label>
+            <input id="entradaTotal" type="text" readonly class="input-text readonly" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px">
+          <input id="entradaNota" placeholder="Nota (opcional)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px" />
+          <button id="entradaDo" class="btn-primary">Registrar entrada</button>
+          <button id="entradaCancel" class="btn-cancel">Cancelar</button>
+        </div>
       </div>
     `;
     summaryDiv.parentNode.insertBefore(formHtml, summaryDiv.nextSibling);
 
-    const qtyInput = formHtml.querySelector("#regEntradaCantidad");
-    const invSelect = formHtml.querySelector("#regEntradaInv");
-    const notaInput = formHtml.querySelector("#regEntradaNota");
-    const doBtn = formHtml.querySelector("#regEntradaDo");
+    const i069 = formHtml.querySelector("#in_i069");
+    const i078 = formHtml.querySelector("#in_i078");
+    const i07f = formHtml.querySelector("#in_i07f");
+    const i312 = formHtml.querySelector("#in_i312");
+    const i073 = formHtml.querySelector("#in_i073");
+    const totalField = formHtml.querySelector("#entradaTotal");
+    const responsableField = formHtml.querySelector("#entradaResponsable");
+    const notaField = formHtml.querySelector("#entradaNota");
+    const doBtn = formHtml.querySelector("#entradaDo");
+    const cancelBtn = formHtml.querySelector("#entradaCancel");
+
+    // Auto-completar responsable
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user ?? null;
+      if (user && user.email) {
+        responsableField.value = user.email;
+      } else {
+        responsableField.value = CURRENT_USER_FULLNAME || "";
+      }
+    } catch (e) { 
+      responsableField.value = CURRENT_USER_FULLNAME || ""; 
+    }
+
+    function parseInputQtyFloat(el) {
+      if (!el) return 0;
+      const sRaw = String(el.value || "0").trim();
+      if (sRaw === "") return 0;
+      
+      let s = sRaw.replace(/,/g, '.');
+      s = s.replace(/\s+/g, '');
+      
+      const n = Number(s);
+      return Number.isNaN(n) ? 0 : n;
+    }
+
+    function computeTotal() {
+      const a = parseInputQtyFloat(i069);
+      const b = parseInputQtyFloat(i078);
+      const c = parseInputQtyFloat(i07f);
+      const d = parseInputQtyFloat(i312);
+      const e = parseInputQtyFloat(i073);
+      const total = a + b + c + d + e;
+      return Number.isFinite(total) ? total : 0;
+    }
+
+    // Actualizar total en tiempo real
+    [i069, i078, i07f, i312, i073].forEach(inp => {
+      inp.addEventListener("input", () => {
+        const total = computeTotal();
+        totalField.value = total.toFixed(3);
+      });
+    });
+
+    // Inicializar total
+    totalField.value = "0.000";
+
+    // Cancelar
+    cancelBtn.addEventListener("click", () => {
+      formHtml.remove();
+    });
 
     doBtn.addEventListener("click", async () => {
-  const qty = parseInt(qtyInput.value || "0", 10) || 0;
-  const invLabel = invSelect.value; // ej. "INVENTARIO I069" o "ALMACEN"
-  const nota = String(notaInput.value || "").trim();
+      doBtn.disabled = true;
+      doBtn.textContent = "Registrando...";
 
-  if (qty <= 0) { showToast("Cantidad inválida", false); qtyInput.focus(); return; }
-  if (!supabase) { showToast("Supabase no inicializado", false); return; }
-
-  try {
-    // detectar columnas reales (si tienes helpers; si no, asumimos nombres por defecto)
-    await ensureProductosColumnMap?.(); // noop si no existe
-    const realCodigoCol = getRealColForName?.('codigo') || getRealColForName?.('CODIGO') || 'CODIGO';
-    const realInvCol = getRealColForInventoryLabel?.(invLabel) || getRealColForInventoryLabel?.(invLabel.replace(/INVENTARIO\s*/i,'')) || null;
-    const realAlmacenCol = getRealColForInventoryLabel?.('ALMACEN') || 'inventario_fisico_en_almacen' || 'almacen';
-
-    // Buscamos el producto; SI NO EXISTE -> NO CREAMOS, solo avisamos
-    const { data: prodRow, error: selErr } = await supabase
-      .from("productos")
-      .select("*")
-      .eq(realCodigoCol, codigo)
-      .maybeSingle();
-
-    if (selErr) throw selErr;
-
-    if (!prodRow) {
-      showToast(`El producto ${codigo} no existe en 'productos'. No se creó una nueva fila.`, false);
-      return;
-    }
-
-    // Determinar columna de inventario a actualizar (si no hay realInvCol, intentar heurística)
-    const targetCol = realInvCol || Object.keys(prodRow).find(k => /i069|i078|i07f|i312|i073/i.test(k)) || null;
-    if (!targetCol) {
-      showToast("No se pudo detectar la columna de inventario para este inventario seleccionado.", false);
-      console.warn("No inventory column detected for label:", invLabel, "prodRow keys:", Object.keys(prodRow));
-      return;
-    }
-
-    // Calcular nuevo stock y actualizar sólo esa columna (NO insertar fila nueva)
-    const currentStock = parseInt(prodRow[targetCol] || 0, 10) || 0;
-    const nuevoStock = currentStock + qty;
-    const updObj = {}; updObj[targetCol] = nuevoStock;
-
-    // Intentar recalcular campo ALMACEN (sumatoria) de forma defensiva
-    try {
-      const invCols = ['I069','I078','I07F','I312','I073']
-        .map(inv => getRealColForInventoryLabel?.(inv) || `inventario_${inv.toLowerCase()}`);
-      // filtrar únicos y válidos
-      const invColsFiltered = Array.from(new Set(invCols)).filter(Boolean);
-      if (invColsFiltered.length) {
-        const { data: rowAll, error: rErr } = await supabase
-          .from("productos")
-          .select(invColsFiltered.join(","))
-          .eq(realCodigoCol, codigo)
-          .maybeSingle();
-        if (!rErr && rowAll) {
-          let sum = 0;
-          invColsFiltered.forEach(c => { sum += parseInt(rowAll[c] || 0, 10) || 0; });
-          // si la columna que actualizamos no estaba en rowAll (raro), añadir nuevoStock
-          if (!invColsFiltered.includes(targetCol)) sum += nuevoStock;
-          updObj[realAlmacenCol] = sum;
-        } else {
-          // si no pudimos leer, simplemente no tocar almacen (no es crítico)
+      try {
+        const codigoVal = String(codigo || "").trim();
+        if (!codigoVal) { 
+          showToast("Código inválido", false); 
+          doBtn.disabled = false; 
+          doBtn.textContent = "Registrar entrada";
+          return; 
         }
+
+        const codigoNum = parseInt(codigoVal);
+        if (isNaN(codigoNum)) {
+          showToast("Código debe ser un número", false);
+          doBtn.disabled = false;
+          doBtn.textContent = "Registrar entrada";
+          return;
+        }
+
+        // Leer cantidades ingresadas
+        const q069 = parseInputQtyFloat(i069);
+        const q078 = parseInputQtyFloat(i078);
+        const q07f = parseInputQtyFloat(i07f);
+        const q312 = parseInputQtyFloat(i312);
+        const q073 = parseInputQtyFloat(i073);
+
+        const total = q069 + q078 + q07f + q312 + q073;
+        if (total <= 0) { 
+          showToast("Ingresa al menos una cantidad mayor a 0", false); 
+          doBtn.disabled = false; 
+          doBtn.textContent = "Registrar entrada";
+          return; 
+        }
+
+        // Preparar datos para insertar
+        const entradaData = {
+          codigo: codigoNum,
+          cantidad: total,
+          i069: q069,
+          i078: q078,
+          i07f: q07f,
+          i312: q312,
+          i073: q073,
+          responsable: responsableField.value || CURRENT_USER_FULLNAME || "Sistema",
+          fecha: new Date().toISOString().split('T')[0]
+        };
+
+        // Insertar en tabla entradas
+        const { data, error } = await supabase
+          .from("entradas")
+          .insert([entradaData])
+          .select();
+
+        if (error) {
+          console.error("Error detallado de Supabase:", error);
+          throw new Error(`Error al insertar: ${error.message}`);
+        }
+
+        // Actualizar también el producto
+        await actualizarProductoConEntradas(codigoVal, q069, q078, q07f, q312, q073);
+
+        showToast("✅ Entrada registrada correctamente", true);
+
+        // Actualizar UI
+        await buscarYRenderizar();
+        formHtml.remove();
+
+      } catch (err) {
+        console.error("Error registrando entradas:", err);
+        showToast(`❌ Error: ${err.message}`, false);
+      } finally {
+        doBtn.disabled = false;
+        doBtn.textContent = "Registrar entrada";
       }
-    } catch (e) {
-      console.warn("No se pudo recalcular ALMACEN, operación prosigue:", e);
-    }
-
-    const { error: updErr } = await supabase
-      .from("productos")
-      .update(updObj)
-      .eq(realCodigoCol, codigo);
-
-    if (updErr) throw updErr;
-
-    // Actualizar UI: recargar productos y resumen de entradas
-    showToast(`✅ Se sumaron ${qty} a ${codigo} (${targetCol}). Nuevo stock: ${nuevoStock}`, true);
-    await loadProducts();         // refresca la tabla principal
-    if (typeof buscarYRenderizar === "function") await buscarYRenderizar(); // refresca modal/búsqueda si está abierto
-    formHtml?.remove?.(); // cierra mini-form si existe
-
-  } catch (err) {
-    console.error("Registrar entrada (solo sumar) error:", err);
-    showToast("❌ Error al sumar entrada (ver consola)", false);
+    });
   }
-});
 
+  // Función para actualizar el producto con las nuevas entradas
+  async function actualizarProductoConEntradas(codigo, q069, q078, q07f, q312, q073) {
+    try {
+      await ensureProductosColumnMap?.();
+
+      const realCodigoCol = getRealColForName?.('codigo') || getRealColForName?.('CODIGO') || 'CODIGO';
+      
+      const { data: prodRow, error: selErr } = await supabase
+        .from("productos")
+        .select("*")
+        .eq(realCodigoCol, codigo)
+        .maybeSingle();
+
+      if (selErr || !prodRow) {
+        console.warn("No se pudo obtener el producto para actualizar:", selErr);
+        return;
+      }
+
+      const colI069 = detectRealColLabel(prodRow, 'I069') || 'INVENTARIO I069';
+      const colI078 = detectRealColLabel(prodRow, 'I078') || 'INVENTARIO I078';
+      const colI07F = detectRealColLabel(prodRow, 'I07F') || 'INVENTARIO I07F';
+      const colI312 = detectRealColLabel(prodRow, 'I312') || 'INVENTARIO I312';
+      const colI073 = detectRealColLabel(prodRow, 'I073') || 'INVENTARIO I073';
+
+      const updObj = {};
+      updObj[colI069] = (Number(prodRow[colI069] || 0) + q069);
+      updObj[colI078] = (Number(prodRow[colI078] || 0) + q078);
+      updObj[colI07F] = (Number(prodRow[colI07F] || 0) + q07f);
+      updObj[colI312] = (Number(prodRow[colI312] || 0) + q312);
+      updObj[colI073] = (Number(prodRow[colI073] || 0) + q073);
+
+      const { error: updErr } = await supabase
+        .from('productos')
+        .update(updObj)
+        .eq(realCodigoCol, codigo);
+
+      if (updErr) {
+        console.warn("Error actualizando producto:", updErr);
+      }
+
+    } catch (error) {
+      console.error("Error en actualizarProductoConEntradas:", error);
+    }
+  }
+
+  // Helper para detectar columnas reales
+  function detectRealColLabel(prodRow, label) {
+    if (!prodRow) return null;
+    if (typeof getRealColForInventoryLabel === "function") {
+      const r = getRealColForInventoryLabel(label);
+      if (r) return r;
+    }
+    const variants = [
+      `INVENTARIO ${label}`,
+      `inventario_${label.toLowerCase()}`,
+      label,
+      label.toLowerCase(),
+      `INVENTARIO ${label.toUpperCase()}`
+    ];
+    const keys = Object.keys(prodRow || {});
+    for (const v of variants) {
+      const found = keys.find(k => String(k).toLowerCase() === String(v).toLowerCase());
+      if (found) return found;
+    }
+    for (const k of keys) if (new RegExp(label, "i").test(k)) return k;
+    return null;
   }
 
   // listeners
@@ -1228,7 +1513,6 @@ async function openEntradaLookupModal(prefillCodigo = "") {
 
   if (prefillCodigo) buscarYRenderizar();
 }
-
 async function renderPendingList() {
   if (!tablaPendientesBody) return;
 
@@ -1451,29 +1735,41 @@ async function renderPendingList() {
 // ------------------- Renderizar tabla (robusta, con Stock Real y clases) -------------------
 function renderTable(products) {
   if (!tableBody) return;
-
   tableBody.innerHTML = "";
 
   products.forEach((p) => {
-    const i069 = getStockFromProduct(p, 'I069');
-    const i078 = getStockFromProduct(p, 'I078');
-    const i07f = getStockFromProduct(p, 'I07F');
-    const i312 = getStockFromProduct(p, 'I312');
-    const i073 = getStockFromProduct(p, 'I073');
-    const fisico = getStockFromProduct(p, 'ALMACEN') || getStockFromProduct(p, 'INVENTARIO FISICO EN ALMACEN');
+    // Inventarios parciales siempre como números
+    const i069 = toNumber(getStockFromProduct(p, "I069"));
+    const i078 = toNumber(getStockFromProduct(p, "I078"));
+    const i07f = toNumber(getStockFromProduct(p, "I07F"));
+    const i312 = toNumber(getStockFromProduct(p, "I312"));
+    const i073 = toNumber(getStockFromProduct(p, "I073"));
 
+    // Valor físico: primero leer directo, si no hay usar suma
+    let rawFisico = getStockFromProduct(p, "INVENTARIO FISICO EN ALMACEN");
+    if (rawFisico === null || rawFisico === undefined || rawFisico === "") {
+      rawFisico = getStockFromProduct(p, "ALMACEN"); // fallback si existe con otro nombre
+    }
+    const fisicoVal =
+      rawFisico === null || rawFisico === undefined || rawFisico === ""
+        ? i069 + i078 + i07f + i312 + i073
+        : toNumber(rawFisico);
+
+    // Stock real = suma
     const stockReal = i069 + i078 + i07f + i312 + i073;
 
+    // Colorear filas según stock
     let stockClass = "stock-high";
     if (stockReal <= 1) stockClass = "stock-low";
     else if (stockReal <= 10) stockClass = "stock-medium";
 
+    // Crear fila
     const row = document.createElement("tr");
     row.className = stockClass;
 
-    // Celdas
+    // Columnas
     const tdCodigo = document.createElement("td");
-    tdCodigo.textContent = p["CODIGO"];
+    tdCodigo.textContent = p["CODIGO"] ?? "";
 
     const tdDesc = document.createElement("td");
     tdDesc.textContent = p["DESCRIPCION"] ?? "";
@@ -1482,61 +1778,60 @@ function renderTable(products) {
     tdUm.textContent = p["UM"] ?? "";
 
     const tdI069 = document.createElement("td");
-    tdI069.textContent = i069;
+    tdI069.textContent = formatShowValue(i069);
 
     const tdI078 = document.createElement("td");
-    tdI078.textContent = i078;
+    tdI078.textContent = formatShowValue(i078);
 
     const tdI07F = document.createElement("td");
-    tdI07F.textContent = i07f;
+    tdI07F.textContent = formatShowValue(i07f);
 
     const tdI312 = document.createElement("td");
-    tdI312.textContent = i312;
+    tdI312.textContent = formatShowValue(i312);
 
     const tdI073 = document.createElement("td");
-    tdI073.textContent = i073;
+    tdI073.textContent = formatShowValue(i073);
 
     const tdFisico = document.createElement("td");
-    tdFisico.textContent = formatShowValue(fisico);
+    tdFisico.textContent = formatShowValue(fisicoVal);
 
-    const tdAcciones = document.createElement("td");
-    tdAcciones.className = "acciones";
+    // Columna Acciones
+   // Columna Acciones
+const tdAcciones = document.createElement("td");
+tdAcciones.className = "acciones"; // coincide con el CSS que usarás
 
-    // botones
-    const btnEdit = document.createElement("button");
-    btnEdit.className = "btn-edit";
-    btnEdit.textContent = "✏ Editar";
-    btnEdit.addEventListener("click", () => editarProducto(p));
+const createBtn = (btnClass, emoji, text, handler) => {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = `btn ${btnClass}`;
+  // estructura: cuadrito del icono + etiqueta
+  btn.innerHTML = `<span class="icon-wrap" aria-hidden>${emoji}</span><span class="label">${text}</span>`;
+  if (handler) btn.addEventListener("click", handler);
+  return btn;
+};
 
-    const btnDelete = document.createElement("button");
-    btnDelete.className = "btn-delete";
-    btnDelete.textContent = "🗑 Eliminar";
-    btnDelete.addEventListener("click", () => eliminarProducto(p["CODIGO"]));
+const btnEdit = createBtn("btn-edit", "✏️", "Editar", () => editarProducto(p));
+const btnDelete = createBtn("btn-delete", "🗑️", "Eliminar", () => eliminarProducto(p["CODIGO"]));
+const btnSalida = createBtn("btn-salida", "📦", "Salida", () => openSalidaModal(p));
 
-    const btnSalida = document.createElement("button");
-    btnSalida.className = "btn-salida";
-    btnSalida.textContent = "📦 Salida";
-    btnSalida.addEventListener("click", () => openSalidaModal(p));
+// agrega los botones (en una sola fila — el gap lo controla CSS)
+tdAcciones.appendChild(btnEdit);
+tdAcciones.appendChild(btnDelete);
+tdAcciones.appendChild(btnSalida);
 
-    // append
-    tdAcciones.appendChild(btnEdit);
-    tdAcciones.appendChild(document.createTextNode(" "));
-    tdAcciones.appendChild(btnDelete);
-    tdAcciones.appendChild(document.createTextNode(" "));
-    tdAcciones.appendChild(btnSalida);
+// Agregar a la fila
+row.appendChild(tdCodigo);
+row.appendChild(tdDesc);
+row.appendChild(tdUm);
+row.appendChild(tdI069);
+row.appendChild(tdI078);
+row.appendChild(tdI07F);
+row.appendChild(tdI312);
+row.appendChild(tdI073);
+row.appendChild(tdFisico);
+row.appendChild(tdAcciones);
 
-    row.appendChild(tdCodigo);
-    row.appendChild(tdDesc);
-    row.appendChild(tdUm);
-    row.appendChild(tdI069);
-    row.appendChild(tdI078);
-    row.appendChild(tdI07F);
-    row.appendChild(tdI312);
-    row.appendChild(tdI073);
-    row.appendChild(tdFisico);
-    row.appendChild(tdAcciones);
-
-    tableBody.appendChild(row);
+tableBody.appendChild(row);
   });
 }
 
@@ -1547,14 +1842,28 @@ function clearProductFormFields() {
     // reset nativo
     productForm.reset();
   } catch (e) {}
+  
   // limpiar manualmente todos los inputs/textarea/check
   productForm.querySelectorAll('input,textarea,select').forEach(i => {
     try {
       if (i.type === "checkbox" || i.type === "radio") i.checked = false;
       else i.value = "";
+      
+      // Resetear estilos
+      i.removeAttribute('readonly');
+      i.disabled = false;
+      i.style.backgroundColor = '';
+      i.style.cursor = '';
     } catch (e) {}
   });
-  // si no existe el campo 'almacen' o 'sumar', no hay problema (se crearán/leerán si existen)
+  
+  // Mostrar checkbox 'sumar' por defecto
+  const chk = productForm.querySelector('[name="sumar"]');
+  if (chk) {
+    chk.disabled = false;
+    const parent = chk.closest('div');
+    if (parent) parent.style.display = 'block';
+  }
 }
 
 // ------------------- Editar Producto -------------------
@@ -1565,31 +1874,67 @@ function editarProducto(producto) {
   }
 
   editMode = true;
-  editingCodigo = producto["CODIGO"];
+  editingCodigo = producto?.CODIGO ?? producto?.codigo ?? null;
+
+  if (editingCodigo !== null && editingCodigo !== undefined) {
+    editingCodigo = String(editingCodigo).trim();
+  }
 
   // Abrir modal
   modal.style.display = "flex";
 
-  // Rellenar campos con valores actuales (getStockFromProduct usa heurísticas para detectar columnas)
-  productForm.querySelector('[name="codigo"]').value = producto["CODIGO"] ?? "";
-  productForm.querySelector('[name="descripcion"]').value = producto["DESCRIPCION"] ?? "";
-  productForm.querySelector('[name="um"]').value = producto["UM"] ?? "";
+  // Helper para setear valor defensivamente
+  const setVal = (name, value) => {
+    const el = productForm.querySelector(`[name="${name}"]`);
+    if (el) el.value = (value === undefined || value === null) ? "" : value;
+  };
 
-  productForm.querySelector('[name="i069"]').value = getStockFromProduct(producto, 'I069') ?? 0;
-  productForm.querySelector('[name="i078"]').value = getStockFromProduct(producto, 'I078') ?? 0;
-  productForm.querySelector('[name="i07f"]').value = getStockFromProduct(producto, 'I07F') ?? 0;
-  productForm.querySelector('[name="i312"]').value = getStockFromProduct(producto, 'I312') ?? 0;
-  productForm.querySelector('[name="i073"]').value = getStockFromProduct(producto, 'I073') ?? 0;
-  productForm.querySelector('[name="almacen"]').value = getStockFromProduct(producto, 'ALMACEN') ?? getStockFromProduct(producto, 'INVENTARIO FISICO EN ALMACEN') ?? 0;
+  // Rellenar SOLO código, descripción y UM
+  setVal('codigo', producto?.CODIGO ?? producto?.codigo ?? "");
+  setVal('descripcion', producto?.DESCRIPCION ?? producto?.descripcion ?? "");
+  setVal('um', producto?.UM ?? producto?.um ?? "");
 
-  // Forzar actualizar visual del almacen calculado (por si usas la función de suma en el HTML)
-  try { actualizarAlmacen(); } catch (e) {}
+  // OCULTAR completamente los campos de inventarios y almacén
+  const camposOcultar = ['i069', 'i078', 'i07f', 'i312', 'i073', 'almacen', 'sumar'];
+  
+  camposOcultar.forEach(campo => {
+    const field = productForm.querySelector(`[name="${campo}"]`);
+    if (field) {
+      const formGroup = field.closest('.form-group') || field.closest('div');
+      if (formGroup) {
+        formGroup.style.display = 'none';
+      }
+    }
+  });
 
-  // Dejar checkbox 'sumar' desmarcado por defecto cuando abres en modo editar
-  const chk = productForm.querySelector('[name="sumar"]');
-  if (chk) chk.checked = false;
+  // En modo EDICIÓN: BLOQUEAR código y UM, solo dejar descripción editable
+  const camposBloquear = ['codigo', 'um'];
+  
+  camposBloquear.forEach(campo => {
+    const field = productForm.querySelector(`[name="${campo}"]`);
+    if (field) {
+      field.setAttribute('readonly', 'true');
+      field.disabled = true;
+      field.style.backgroundColor = '#f5f5f5';
+      field.style.cursor = 'not-allowed';
+    }
+  });
 
-  productForm.querySelector('[name="codigo"]').setAttribute("readonly", "true");
+  // Habilitar solo descripción
+  const desc = productForm.querySelector('[name="descripcion"]');
+  if (desc) {
+    desc.removeAttribute('readonly');
+    desc.disabled = false;
+    desc.style.backgroundColor = '';
+    desc.style.cursor = '';
+    try { desc.focus(); desc.select?.(); } catch (e) { /* noop */ }
+  }
+  
+  // Cambiar el texto del botón para indicar que es edición
+  const saveBtn = productForm.querySelector('.btn-save');
+  if (saveBtn) {
+    saveBtn.textContent = "Guardar Cambios";
+  }
 }
 
 // ------------------- Eliminar Producto -------------------
@@ -1622,9 +1967,50 @@ if (btnOpenModal) {
     editMode = false;
     editingCodigo = null;
     clearProductFormFields();
-    const codeField = productForm.querySelector('[name="codigo"]');
-    if (codeField) codeField.removeAttribute("readonly");
+    
+    // En modo NUEVO: Mostrar solo código, descripción y UM
+    const camposMostrar = ['codigo', 'descripcion', 'um'];
+    const camposOcultar = ['i069', 'i078', 'i07f', 'i312', 'i073', 'almacen', 'sumar'];
+    
+    // Mostrar campos básicos
+    camposMostrar.forEach(campo => {
+      const field = productForm.querySelector(`[name="${campo}"]`);
+      if (field) {
+        const formGroup = field.closest('.form-group') || field.closest('div');
+        if (formGroup) {
+          formGroup.style.display = 'block';
+        }
+        field.removeAttribute('readonly');
+        field.disabled = false;
+        field.style.backgroundColor = '';
+        field.style.cursor = '';
+      }
+    });
+    
+    // Ocultar campos de inventarios
+    camposOcultar.forEach(campo => {
+      const field = productForm.querySelector(`[name="${campo}"]`);
+      if (field) {
+        const formGroup = field.closest('.form-group') || field.closest('div');
+        if (formGroup) {
+          formGroup.style.display = 'none';
+        }
+      }
+    });
+
     modal.style.display = "flex";
+    
+    // Cambiar texto del botón para nuevo producto
+    const saveBtn = productForm.querySelector('.btn-save');
+    if (saveBtn) {
+      saveBtn.textContent = "Crear Producto";
+    }
+    
+    // Enfocar el campo código
+    const codigoField = productForm.querySelector('[name="codigo"]');
+    if (codigoField) {
+      setTimeout(() => codigoField.focus(), 100);
+    }
   });
 }
 
@@ -1635,8 +2021,12 @@ if (btnCloseModal) {
     clearProductFormFields();
     editMode = false;
     editingCodigo = null;
-    const codeField = productForm.querySelector('[name="codigo"]');
-    if (codeField) codeField.removeAttribute("readonly");
+    
+    // Resetear texto del botón
+    const saveBtn = productForm.querySelector('.btn-save');
+    if (saveBtn) {
+      saveBtn.textContent = "Crear Producto";
+    }
   });
 }
 
@@ -1647,180 +2037,325 @@ window.addEventListener("click", (e) => {
     clearProductFormFields();
     editMode = false;
     editingCodigo = null;
-    const codeField = productForm.querySelector('[name="codigo"]');
-    if (codeField) codeField.removeAttribute("readonly");
+    
+    // Resetear texto del botón
+    const saveBtn = productForm.querySelector('.btn-save');
+    if (saveBtn) {
+      saveBtn.textContent = "Crear Producto";
+    }
   }
 });
 
 // ------------------- Guardar Producto (robusto) -------------------
-if (productForm) {
-  productForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
+productForm?.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  if (!productForm) return;
 
-    if (!supabase) {
-      showToast("Supabase no está inicializado", false);
+  const saveBtn = productForm.querySelector('.btn-save');
+  const originalBtnText = saveBtn?.textContent ?? "";
+
+  // bandera para saber si la operación sí llegó a aplicar cambios
+  let operationSucceeded = false;
+
+  // --- EDICIÓN: solo actualizar DESCRIPCION ---
+  if (editMode) {
+    const descEl = productForm.querySelector('[name="descripcion"]');
+    const nuevaDesc = (descEl?.value || "").trim();
+    if (!nuevaDesc) { showToast("Descripción vacía", false); descEl?.focus(); return; }
+
+    if (!supabase) { showToast("Supabase no inicializado", false); return; }
+
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Guardando..."; }
+
+    try {
+      await ensureProductosColumnMap?.();
+
+      const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
+      const realDescCol   = getRealColForName?.('DESCRIPCION') || getRealColForName?.('descripcion') || 'DESCRIPCION';
+
+      if (!editingCodigo) {
+        showToast("Código del producto no definido. No se puede actualizar.", false);
+        return;
+      }
+
+      // pedimos select() para confirmar que la fila fue devuelta
+      const resp = await supabase
+        .from('productos')
+        .update({ [realDescCol]: nuevaDesc })
+        .eq(realCodigoCol, editingCodigo)
+        .select()
+        .maybeSingle();
+
+      const { data, error } = resp || {};
+
+      // marcar éxito si no hay error o si data existe (Supabase a veces devuelve error con data)
+      if (!error || data) {
+        operationSucceeded = true;
+      }
+
+      if (operationSucceeded) {
+        showToast("Descripción actualizada", true);
+        try { await loadProducts(); } catch(_) {}
+        if (modal) modal.style.display = 'none';
+        editMode = false;
+        editingCodigo = null;
+      } else {
+        console.error("Error al actualizar descripción:", error);
+        showToast("Error actualizando descripción (ver consola)", false);
+      }
+    } catch (err) {
+      // Si la operación había sido marcada como exitosa, no mostramos el toast de error
+      if (operationSucceeded) {
+        console.warn("Operación resultó exitosa pero ocurrió excepción posterior:", err);
+        showToast("Descripción actualizada", true);
+        try { await loadProducts(); } catch(_) {}
+        if (modal) modal.style.display = 'none';
+        editMode = false;
+        editingCodigo = null;
+      } else {
+        console.error("Error inesperado al guardar descripción:", err);
+        showToast("Error inesperado al guardar descripción (ver consola)", false);
+      }
+    } finally {
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+    }
+    return;
+  }
+
+  // --- MODO CREAR: insertar nueva fila ---
+  try {
+    if (!supabase) { showToast("Supabase no inicializado", false); return; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Creando..."; }
+
+    await ensureProductosColumnMap?.();
+
+    const formData = new FormData(productForm);
+    const raw = Object.fromEntries(formData.entries());
+
+    // Validar campos obligatorios
+    const codigo = (raw['codigo'] || "").trim();
+    const descripcion = (raw['descripcion'] || "").trim();
+    const um = (raw['um'] || "").trim();
+
+    if (!codigo) {
+      showToast("El código es obligatorio", false);
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
       return;
     }
 
-    const formData = new FormData(productForm);
+    if (!descripcion) {
+      showToast("La descripción es obligatoria", false);
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+      return;
+    }
 
-    // valores desde el formulario (lo que ingresó el usuario)
-    const formValues = {
-      CODIGO: String(formData.get("codigo") || "").trim(),
-      DESCRIPCION: String(formData.get("descripcion") || "").trim(),
-      UM: String(formData.get("um") || "").trim(),
-      I069: parseInt(formData.get("i069")) || 0,
-      I078: parseInt(formData.get("i078")) || 0,
-      I07F: parseInt(formData.get("i07f")) || 0,
-      I312: parseInt(formData.get("i312")) || 0,
-      I073: parseInt(formData.get("i073")) || 0,
-      SUMAR: !!formData.get("sumar")
+    // Construir insert con valores por defecto para inventarios
+    const insertObj = {};
+    const mapCampo = (prefName, value) => {
+      const real = getRealColForName?.(prefName) || getRealColForName?.(prefName.toUpperCase()) || prefName.toUpperCase();
+      insertObj[real] = value;
     };
 
-    // recalculamos almacen localmente (suma)
-    const totalAlmacen = formValues.I069 + formValues.I078 + formValues.I07F + formValues.I312 + formValues.I073;
+    mapCampo('CODIGO', codigo);
+    mapCampo('DESCRIPCION', descripcion);
+    mapCampo('UM', um);
 
-    try {
-      await ensureProductosColumnMap();
+    // VALORES POR DEFECTO PARA INVENTARIOS - automáticamente en 0
+    const detectAndAssign = (label, val) => {
+      const realCol = getRealColForInventoryLabel?.(label) || label;
+      insertObj[realCol] = val || 0; // Siempre 0 para nuevo producto
+    };
 
-      // nombres reales si existen
-      const realCodigo = getRealColForName('codigo') || getRealColForName('CODIGO') || 'CODIGO';
-      const realDescripcion = getRealColForName('descripcion') || getRealColForName('DESCRIPCION') || 'DESCRIPCION';
-      const realUm = getRealColForName('um') || getRealColForName('UM') || 'UM';
+    detectAndAssign('I069', 0);
+    detectAndAssign('I078', 0);
+    detectAndAssign('I07F', 0);
+    detectAndAssign('I312', 0);
+    detectAndAssign('I073', 0);
 
-      // inventarios preferidos con label (usamos label para detectar la columna real)
-      const invList = [
-        { label: 'I069', val: formValues.I069 },
-        { label: 'I078', val: formValues.I078 },
-        { label: 'I07F', val: formValues.I07F },
-        { label: 'I312', val: formValues.I312 },
-        { label: 'I073', val: formValues.I073 }
-      ];
+    // Almacén también en 0
+    const realAlmacen = getRealColForInventoryLabel?.('ALMACEN') || 'INVENTARIO FISICO EN ALMACEN';
+    insertObj[realAlmacen] = 0;
 
-      // insertar nuevo producto
-      if (!editMode) {
-        // construir objeto para insert
-        const dbObj = {};
-        dbObj[realCodigo] = formValues.CODIGO;
-        dbObj[realDescripcion] = formValues.DESCRIPCION;
-        dbObj[realUm] = formValues.UM;
+    // intento de inserción
+    const resp = await supabase.from('productos').insert([insertObj]).select().limit(1).maybeSingle();
+    const { data, error } = resp || {};
 
-        // colocar valores por inventario (detectando column real o adivinando snake_case)
-        for (const inv of invList) {
-          const realKey = getRealColForInventoryLabel(inv.label) || `inventario_${inv.label.toLowerCase()}`;
-          dbObj[realKey] = inv.val;
-        }
-        // almacen físico -> detectar columna real para 'ALMACEN'
-        const realAlmacenKey = getRealColForInventoryLabel('ALMACEN') || 'inventario_fisico_en_almacen' || 'almacen';
-        dbObj[realAlmacenKey] = totalAlmacen;
-
-        const { error } = await supabase.from("productos").insert([dbObj]);
-        if (error) throw error;
-
-        showToast("✅ Producto agregado", true);
-        productForm.reset();
-        productForm.querySelector('[name="codigo"]').removeAttribute("readonly");
-        await loadProducts();
-        return;
-      }
-
-      // ------------------ MODO EDITAR ------------------
-      // Si editar y SUMAR está activado => sumar cantidades sobre stock actual (entrada)
-      if (editMode && formValues.SUMAR) {
-        // obtener fila actual con las columnas reales
-        const colsToSelect = [
-          realCodigo, realDescripcion, realUm
-        ];
-        // añadir inventario columnas al select (si existen)
-        invList.forEach(inv => {
-          const rk = getRealColForInventoryLabel(inv.label) || `inventario_${inv.label.toLowerCase()}`;
-          if (!colsToSelect.includes(rk)) colsToSelect.push(rk);
-        });
-        // intentar columna almacen real
-        const realAlmacenKey = getRealColForInventoryLabel('ALMACEN') || 'inventario_fisico_en_almacen' || 'almacen';
-        if (!colsToSelect.includes(realAlmacenKey)) colsToSelect.push(realAlmacenKey);
-
-        const { data: prodRow, error: prodErr } = await supabase
-          .from("productos")
-          .select(colsToSelect.join(","))
-          .eq(realCodigo, editingCodigo)
-          .maybeSingle();
-
-        if (prodErr) throw prodErr;
-        if (!prodRow) throw new Error("No se encontró el producto a editar (fetch).");
-
-        // construir objeto update sumando valores
-        const upd = {};
-        if (formValues.DESCRIPCION !== undefined) upd[realDescripcion] = formValues.DESCRIPCION;
-        if (formValues.UM !== undefined) upd[realUm] = formValues.UM;
-        
-
-        // sumar por cada inventario
-        let sumAlmacen = 0;
-        for (const inv of invList) {
-          const realKey = getRealColForInventoryLabel(inv.label) || `inventario_${inv.label.toLowerCase()}`;
-          const current = parseInt(prodRow[realKey] ?? 0, 10) || 0;
-          const nuevo = Math.max(0, current + (parseInt(inv.val, 10) || 0));
-          upd[realKey] = nuevo;
-          sumAlmacen += nuevo; // acumulamos para almacen
-        }
-
-        // fijar almacen a suma de inventarios
-        upd[realAlmacenKey] = sumAlmacen;
-
-        const { error: updErr } = await supabase
-          .from("productos")
-          .update(upd)
-          .eq(realCodigo, editingCodigo);
-
-        if (updErr) throw updErr;
-
-        showToast("✅ Cantidades sumadas y producto actualizado", true);
-        productForm.reset();
-        editMode = false;
-        editingCodigo = null;
-        const readonlyField = productForm.querySelector('[name="codigo"]');
-        if (readonlyField) readonlyField.removeAttribute("readonly");
-        await loadProducts();
-        return;
-      }
-
-      // ------------------ MODO EDITAR (REEMPLAZAR valores) ------------------
-      // construimos dbObj con los valores exactos del formulario (reemplazo)
-      const dbObj = {};
-      dbObj[realCodigo] = formValues.CODIGO;
-      dbObj[realDescripcion] = formValues.DESCRIPCION;
-      dbObj[realUm] = formValues.UM;
-
-      // asignar inventarios (detectando columna real)
-      for (const inv of invList) {
-        const realKey = getRealColForInventoryLabel(inv.label) || `inventario_${inv.label.toLowerCase()}`;
-        dbObj[realKey] = inv.val;
-      }
-      // almacen físico = suma
-      const realAlmacenKey2 = getRealColForInventoryLabel('ALMACEN') || 'inventario_fisico_en_almacen' || 'almacen';
-      dbObj[realAlmacenKey2] = totalAlmacen;
-
-      const { error } = await supabase
-        .from("productos")
-        .update(dbObj)
-        .eq(realCodigo, editingCodigo);
-
-      if (error) throw error;
-
-      showToast("✅ Producto actualizado", true);
-      productForm.reset();
-      editMode = false;
-      editingCodigo = null;
-      const readonlyField = productForm.querySelector('[name="codigo"]');
-      if (readonlyField) readonlyField.removeAttribute("readonly");
-      await loadProducts();
-    } catch (ex) {
-      console.error("Exception guardando producto:", ex);
-      showToast("Error inesperado al guardar producto (ver consola)", false);
+    if (!error || data) {
+      operationSucceeded = true;
     }
-  });
+
+    if (operationSucceeded) {
+      showToast("✅ Producto creado exitosamente", true);
+      await loadProducts();
+      if (modal) modal.style.display = 'none';
+    } else {
+      console.error("Error creando producto:", error);
+      // Si es error de duplicado
+      if (error?.code === '23505') {
+        showToast("❌ Ya existe un producto con ese código", false);
+      } else {
+        showToast("❌ Error al crear producto", false);
+      }
+    }
+
+  } catch (err) {
+    console.error("Error creando producto (capturado):", err);
+    showToast("❌ Error al crear producto", false);
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+  }
+});
+
+// ------------------- Refresh global: normalizar inventarios y recalcular almacen -------------------
+async function refreshAllInventarios({ confirmBefore = true, truncateDecimals = true } = {}) {
+  // confirmación simple para evitar ejecuciones accidentales
+  if (confirmBefore) {
+    const ok = window.confirm("Esto actualizará TODOS los productos: normalizará inventarios y recalculará INVENTARIO FÍSICO EN ALMACÉN. ¿Continuar?");
+    if (!ok) return;
+  }
+
+  if (!supabase) {
+    showToast("Supabase no inicializado", false);
+    return;
+  }
+
+  const btn = document.getElementById('btnRefresh');
+  if (btn) { btn.disabled = true; btn.dataset._origText = btn.textContent; btn.textContent = "Actualizando..."; }
+
+  showToast("Iniciando refresco de inventarios...");
+
+  try {
+    await ensureProductosColumnMap?.();
+
+    // Traer todos los productos (ajusta limit si tu tabla es muy grande)
+    const { data: productos, error: fetchErr } = await supabase.from('productos').select('*');
+    if (fetchErr) throw fetchErr;
+    if (!Array.isArray(productos) || productos.length === 0) {
+      showToast("No hay productos para procesar", false);
+      return;
+    }
+
+    const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
+    const realAlmacenCol = getRealColForInventoryLabel?.('ALMACEN') || 'INVENTARIO FISICO EN ALMACEN';
+
+    let updatedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
+
+    // helper local para detectar columna real (por si getRealColFor... no encontró)
+    const detectRealCol = (prodRow, label) => {
+      const r = getRealColForInventoryLabel?.(label);
+      if (r) return r;
+      // heurístico sencillo
+      const variants = [
+        `INVENTARIO ${label}`,
+        `inventario_${label.toLowerCase()}`,
+        label,
+        label.toLowerCase(),
+        `I${label}` // por si usan I069 etc
+      ];
+      const keys = Object.keys(prodRow || {});
+      for (const v of variants) {
+        const found = keys.find(k => String(k).toLowerCase() === String(v).toLowerCase());
+        if (found) return found;
+      }
+      // fallback: buscar primera key que contenga label
+      for (const k of keys) if (new RegExp(label, "i").test(k)) return k;
+      return null;
+    };
+
+    // función para convertir valores a entero seguro
+    const normalizeToInt = (val) => {
+      if (val === null || val === undefined || val === "") return 0;
+      // si ya es número entero
+      if (typeof val === 'number' && Number.isInteger(val)) return val;
+      // intentar parsear como número
+      const n = Number(String(val).replace(/,/g, ".").trim());
+      if (Number.isNaN(n) || !Number.isFinite(n)) return 0;
+      // si pide truncar decimales -> floor, sino round
+      return truncateDecimals ? Math.floor(n) : Math.round(n);
+    };
+
+    // procesar productos uno por uno (puedes paralelizar si necesitas más throughput)
+    for (const prod of productos) {
+      try {
+        // detectar columnas reales para este producto
+        const colI069 = detectRealCol(prod, 'I069') || detectRealCol(prod, '069') || 'INVENTARIO I069';
+        const colI078 = detectRealCol(prod, 'I078') || detectRealCol(prod, '078') || 'INVENTARIO I078';
+        const colI07F = detectRealCol(prod, 'I07F') || detectRealCol(prod, '07F') || 'INVENTARIO I07F';
+        const colI312 = detectRealCol(prod, 'I312') || detectRealCol(prod, '312') || 'INVENTARIO I312';
+        const colI073 = detectRealCol(prod, 'I073') || detectRealCol(prod, '073') || 'INVENTARIO I073';
+
+        // leer valores actuales (sin alterar el objeto original)
+        const rawI069 = prod[colI069];
+        const rawI078 = prod[colI078];
+        const rawI07F = prod[colI07F];
+        const rawI312 = prod[colI312];
+        const rawI073 = prod[colI073];
+
+        // normalizar a enteros
+        const newI069 = normalizeToInt(rawI069);
+        const newI078 = normalizeToInt(rawI078);
+        const newI07F = normalizeToInt(rawI07F);
+        const newI312 = normalizeToInt(rawI312);
+        const newI073 = normalizeToInt(rawI073);
+
+        const newAlmacen = (newI069 + newI078 + newI07F + newI312 + newI073);
+
+        // construir objeto de update solo si hay cambios
+        const upd = {};
+        // sólo asignar si la columna existe en la fila
+        if (colI069 && String(prod[colI069]) !== String(newI069)) upd[colI069] = newI069;
+        if (colI078 && String(prod[colI078]) !== String(newI078)) upd[colI078] = newI078;
+        if (colI07F && String(prod[colI07F]) !== String(newI07F)) upd[colI07F] = newI07F;
+        if (colI312 && String(prod[colI312]) !== String(newI312)) upd[colI312] = newI312;
+        if (colI073 && String(prod[colI073]) !== String(newI073)) upd[colI073] = newI073;
+
+        // asignar almacen si difiere
+        const existingAlmVal = prod[realAlmacenCol];
+        if (realAlmacenCol && String(existingAlmVal) !== String(newAlmacen)) upd[realAlmacenCol] = newAlmacen;
+
+        if (Object.keys(upd).length === 0) {
+          skippedCount++;
+          continue;
+        }
+
+        // ejecutar update por fila (usamos la columna CODIGO como identificador)
+        const codigoVal = prod[realCodigoCol] ?? prod['CODIGO'] ?? prod['codigo'];
+        if (!codigoVal) {
+          console.warn("Fila sin CODIGO detectada, se salta:", prod);
+          skippedCount++;
+          continue;
+        }
+
+        const { error: updErr } = await supabase.from('productos').update(upd).eq(realCodigoCol, codigoVal);
+        if (updErr) {
+          console.error("Error actualizando producto", codigoVal, updErr);
+          errorCount++;
+        } else {
+          updatedCount++;
+        }
+      } catch (rowErr) {
+        console.error("Error procesando fila durante refresh:", rowErr, prod);
+        errorCount++;
+      }
+    } // end for
+
+    // refrescar UI
+    try { await loadProducts(); } catch(e) { /* noop */ }
+
+    showToast(`Refresh completado: actualizados ${updatedCount}, sin cambios ${skippedCount}, errores ${errorCount}`, true);
+  } catch (err) {
+    console.error("Error en refreshAllInventarios:", err);
+    showToast("Error al refrescar inventarios (ver consola)", false);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._origText || "Refresh"; delete btn.dataset._origText; }
+  }
 }
+
+// --- conectar al botón de refresco si existe ---
+const btnRefreshEl = document.getElementById('btnRefresh');
+if (btnRefreshEl) btnRefreshEl.addEventListener('click', () => refreshAllInventarios({ confirmBefore: true, truncateDecimals: true }));
 
 // ------------------- Filtro de búsqueda -------------------
 if (searchInput) {
@@ -1878,6 +2413,7 @@ async function loadProducts() {
       showToast("Error al cargar productos", false);
       return;
     }
+    
 
     // inicializar map de columnas para futuras operaciones
     await ensureProductosColumnMap();
@@ -2132,155 +2668,57 @@ function clearAllPendings() {
 
 // ------------------- Try to set responsable from usuarios table
 async function setResponsableFromAuth() {
-  // marcar readonly para evitar edición manual (puedes quitar si quieres permitir edición)
-  if (nombreResponsableInput) {
-    nombreResponsableInput.setAttribute("readonly", "true");
-  }
-
-  function capitalizeWords(s) {
-    return String(s || "")
-      .trim()
-      .split(/\s+/)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(" ");
-  }
-
-  function nameFromEmail(email) {
-    if (!email) return { full: "", first: "", last: "" };
-    const local = String(email).split("@")[0].replace(/[._-]+/g, " ").trim();
-    const parts = local.split(/\s+/).map(p => p.trim()).filter(Boolean);
-    const first = parts.shift() || "";
-    const last = parts.join(" ") || "";
-    return {
-      full: capitalizeWords(`${first} ${last}`.trim()),
-      first: capitalizeWords(first),
-      last: capitalizeWords(last)
-    };
-  }
-
-  // fallback helper: set from a generic string (full name or email)
-  function applyFallbackName(fallbackStr) {
-    const fallback = String(fallbackStr || "").trim();
-    if (!fallback) {
-      CURRENT_USER_FULLNAME = "";
-      CURRENT_USER_NOMBRE = "";
-      CURRENT_USER_APELLIDO = "";
-      return;
-    }
-    if (fallback.includes("@")) {
-      const parsed = nameFromEmail(fallback);
-      CURRENT_USER_FULLNAME = parsed.full;
-      CURRENT_USER_NOMBRE = parsed.first;
-      CURRENT_USER_APELLIDO = parsed.last;
-    } else {
-      const parts = fallback.split(/\s+/).filter(Boolean);
-      CURRENT_USER_NOMBRE = capitalizeWords(parts.shift() || "");
-      CURRENT_USER_APELLIDO = capitalizeWords(parts.join(" ") || "");
-      CURRENT_USER_FULLNAME = `${CURRENT_USER_NOMBRE} ${CURRENT_USER_APELLIDO}`.trim();
-    }
-  }
-
   try {
-    // obtener usuario auth actual
+    console.info("setResponsableFromAuth - consultando auth");
     const { data: authData, error: authErr } = await supabase.auth.getUser();
     if (authErr) {
       console.warn("setResponsableFromAuth - supabase.auth.getUser error:", authErr);
-      applyFallbackName(""); // limpiar
-      if (nombreResponsableInput) nombreResponsableInput.value = "";
-      return;
     }
-
     const user = authData?.user ?? null;
-    if (!user) {
-      applyFallbackName("");
-      if (nombreResponsableInput) {
-        nombreResponsableInput.value = "";
-        nombreResponsableInput.placeholder = "Usuario no autenticado";
+
+    // 1) si auth trae email, lo usamos inmediatamente
+    if (user && user.email) {
+      if (typeof responsableField !== "undefined" && responsableField) responsableField.value = user.email;
+      console.info("setResponsableFromAuth - email desde auth:", user.email);
+      return user.email;
+    }
+
+    // 2) si user.id existe, buscar SOLO columnas seguras en tabla usuarios
+    if (user && user.id) {
+      const { data: uData, error: uErr } = await supabase
+        .from('usuarios')
+        .select('email,nombre,apellido') // <-- solo columnas seguras
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (uErr) {
+        console.warn("setResponsableFromAuth - error consultando usuarios:", uErr);
+      } else if (uData) {
+        const email = uData.email || null;
+        const nombreCompleto = `${(uData.nombre||"").trim()} ${(uData.apellido||"").trim()}`.trim();
+        if (email) {
+          if (typeof responsableField !== "undefined" && responsableField) responsableField.value = email;
+          console.info("setResponsableFromAuth - email desde tabla usuarios:", email);
+          return email;
+        } else if (nombreCompleto) {
+          if (typeof responsableField !== "undefined" && responsableField) responsableField.value = nombreCompleto;
+          console.info("setResponsableFromAuth - nombre completado desde usuarios:", nombreCompleto);
+          return nombreCompleto;
+        }
       }
-      return;
     }
 
-    // validar user.id antes de hacer la consulta a la tabla 'usuarios'
-    const userId = user.id;
-    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-    if (!userId || typeof userId !== "string" || !uuidRe.test(userId)) {
-      // evita llamada a usuarios con id inválido (previene 400)
-      console.warn("setResponsableFromAuth - userId inválido, usando fallback:", userId);
-      const fallback = user.user_metadata?.full_name ?? user.email ?? "";
-      applyFallbackName(fallback);
-      if (nombreResponsableInput) {
-        nombreResponsableInput.value = CURRENT_USER_FULLNAME || "";
-        nombreResponsableInput.setAttribute("readonly", "true");
-      }
-      return;
-    }
-
-    // DEBUG: mostrar id en consola para depuración
-    console.log("setResponsableFromAuth - consultando usuarios.id =", userId);
-
-    // consulta segura: .eq en vez de .filter y maybeSingle() para evitar URL malformada
-    const { data: udata, error: uerr } = await supabase
-      .from("usuarios")
-      .select("nombre,apellido,nombre_completo,email")
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (uerr) {
-      console.warn("setResponsableFromAuth - error consultando usuarios:", uerr);
-      // fallback a metadata/email del auth user
-      const fallback = user.user_metadata?.full_name ?? user.email ?? "";
-      applyFallbackName(fallback);
-    } else if (udata) {
-      const nombre = (udata.nombre || "").trim();
-      const apellido = (udata.apellido || "").trim();
-      const nombreCompleto = (udata.nombre_completo || "").trim();
-
-      if (nombre || apellido) {
-        CURRENT_USER_NOMBRE = capitalizeWords(nombre);
-        CURRENT_USER_APELLIDO = capitalizeWords(apellido);
-        CURRENT_USER_FULLNAME = `${CURRENT_USER_NOMBRE} ${CURRENT_USER_APELLIDO}`.trim();
-      } else if (nombreCompleto) {
-        const parts = nombreCompleto.trim().split(/\s+/).filter(Boolean);
-        CURRENT_USER_NOMBRE = capitalizeWords(parts.shift() || "");
-        CURRENT_USER_APELLIDO = capitalizeWords(parts.join(" ") || "");
-        CURRENT_USER_FULLNAME = capitalizeWords(nombreCompleto);
-      } else if (udata.email) {
-        const parsed = nameFromEmail(udata.email);
-        CURRENT_USER_FULLNAME = parsed.full;
-        CURRENT_USER_NOMBRE = parsed.first;
-        CURRENT_USER_APELLIDO = parsed.last;
-      } else {
-        // si no hay datos útiles en la fila, fallback a metadata/email
-        const fallback = user.user_metadata?.full_name ?? user.email ?? "";
-        applyFallbackName(fallback);
-      }
-    } else {
-      // no hay fila en usuarios -> fallback a metadata/email del auth user
-      const fallback = user.user_metadata?.full_name ?? user.email ?? "";
-      applyFallbackName(fallback);
-    }
-
-    // setear en input si existe
-    if (nombreResponsableInput) {
-      nombreResponsableInput.value = CURRENT_USER_FULLNAME || "";
-      nombreResponsableInput.setAttribute("readonly", "true");
-    }
-  } catch (err) {
-    console.warn("No se pudo obtener responsable desde auth (excepción):", err);
-    // fallback general
-    const fallback = (typeof err === "object" && err?.user?.email) ? err.user.email : "";
-    if (fallback) {
-      applyFallbackName(fallback);
-      if (nombreResponsableInput) nombreResponsableInput.value = CURRENT_USER_FULLNAME || "";
-    } else {
-      CURRENT_USER_FULLNAME = "";
-      CURRENT_USER_NOMBRE = "";
-      CURRENT_USER_APELLIDO = "";
-      try { if (nombreResponsableInput) nombreResponsableInput.value = ""; } catch {}
-    }
+    // 3) fallback
+    if (typeof responsableField !== "undefined" && responsableField) responsableField.value = CURRENT_USER_FULLNAME || "";
+    return null;
+  } catch (ex) {
+    console.error("setResponsableFromAuth - excepción:", ex);
+    if (typeof responsableField !== "undefined" && responsableField) responsableField.value = CURRENT_USER_FULLNAME || "";
+    return null;
   }
 }
+
+
 // ------------------- Init -------------------
 document.addEventListener("DOMContentLoaded", async () => {
   await setResponsableFromAuth();

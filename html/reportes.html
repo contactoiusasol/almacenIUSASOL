@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes de Inventario</title>
+    <link rel="stylesheet" href="../styles/reportes.css">
+    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <a href="admin.html" class="back-btn">⬅ Volver al Panel Admin</a>
+        <h1>📊 Reportes de Inventario</h1>
+
+        <!-- Filtros -->
+        <div class="filters-container">
+            <div class="filter-group">
+                <label for="monthSelect">Mes:</label>
+                <select id="monthSelect" class="filter-select">
+                    <option value="1">Enero</option>
+                    <option value="2">Febrero</option>
+                    <option value="3">Marzo</option>
+                    <option value="4">Abril</option>
+                    <option value="5">Mayo</option>
+                    <option value="6">Junio</option>
+                    <option value="7">Julio</option>
+                    <option value="8">Agosto</option>
+                    <option value="9">Septiembre</option>
+                    <option value="10">Octubre</option>
+                    <option value="11">Noviembre</option>
+                    <option value="12">Diciembre</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label for="yearSelect">Año:</label>
+                <select id="yearSelect" class="filter-select"></select>
+            </div>
+            
+            <button id="generateReport" class="generate-btn">Generar Reporte</button>
+            <button id="exportReport" class="export-btn">Exportar PDF</button>
+        </div>
+
+        <!-- Resumen General -->
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-icon">📈</div>
+                <div class="card-content">
+                    <h3>Stock Inicial</h3>
+                    <span id="initialStock" class="card-value">0</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">📉</div>
+                <div class="card-content">
+                    <h3>Stock Final</h3>
+                    <span id="finalStock" class="card-value">0</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">⬆️</div>
+                <div class="card-content">
+                    <h3>Entradas</h3>
+                    <span id="totalEntries" class="card-value">0</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">⬇️</div>
+                <div class="card-content">
+                    <h3>Salidas</h3>
+                    <span id="totalExits" class="card-value">0</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-icon">💰</div>
+                <div class="card-content">
+                    <h3>Diferencia</h3>
+                    <span id="stockDifference" class="card-value">0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gráficos -->
+        <div class="charts-container">
+            <div class="chart-card">
+                <h3>Comparativo Mensual - Stock</h3>
+                <canvas id="monthlyComparisonChart"></canvas>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Movimiento por Producto</h3>
+                <canvas id="productMovementChart"></canvas>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Top 10 Productos con Más Movimiento</h3>
+                <canvas id="topProductsChart"></canvas>
+            </div>
+            
+            <div class="chart-card">
+                <h3>Entradas vs Salidas</h3>
+                <canvas id="entriesExitsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Tabla Detallada -->
+        <div class="table-section">
+            <h3>Detalle por Producto</h3>
+            <div class="table-container">
+                <table id="detailedReportTable">
+                    <thead>
+                        <tr>
+                            <th>Código</th>
+                            <th>Descripción</th>
+                            <th>Stock Inicial</th>
+                            <th>Entradas</th>
+                            <th>Salidas</th>
+                            <th>Stock Final</th>
+                            <th>Diferencia</th>
+                            <th>Tendencia</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody">
+                        <!-- Datos se cargan dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Reporte de Movimientos -->
+        <div class="movements-section">
+            <h3>Movimientos del Mes</h3>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="entries">Entradas</button>
+                <button class="tab-btn" data-tab="exits">Salidas</button>
+            </div>
+            
+            <div id="entriesTab" class="tab-content active">
+                <table id="entriesTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Responsable</th>
+                            <th>Observaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="entriesTableBody">
+                        <!-- Datos se cargan dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="exitsTab" class="tab-content">
+                <table id="exitsTable">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Código</th>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Responsable</th>
+                            <th>Destino</th>
+                        </tr>
+                    </thead>
+                    <tbody id="exitsTableBody">
+                        <!-- Datos se cargan dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Generando reporte...</p>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="../js/reportes.js"></script>
+</body>
+</html>

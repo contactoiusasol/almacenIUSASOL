@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entradas — Historial</title>
+  <link rel="stylesheet" href="../styles/entradas.css">
+</head>
+<body>
+  <main class="wrap">
+    <!-- Header moderno -->
+    <header class="topbar">
+      <h1>📥 Historial de Entradas</h1>
+      <div class="actions">
+        <input id="qCodigo" placeholder="🔍 Buscar por código..." />
+        <button id="btnBuscar" class="btn secondary">Buscar</button>
+        <button id="btnRegistrar" class="btn primary">➕ Registrar entrada</button>
+      </div>
+    </header>
+
+    <!-- Panel de estadísticas -->
+    <section class="summary-row">
+      <div id="summaryText" class="summary-left">
+        <span id="productInfo">Selecciona un código para ver detalles</span>
+      </div>
+      <div class="summary-right">
+        <span id="totalFound">0</span> entradas encontradas • 
+        Cantidad total: <strong id="totalCantidad">0</strong>
+      </div>
+    </section>
+
+    <!-- Tabla principal -->
+    <section class="card">
+      <div class="table-wrap">
+        <table id="tblEntradas" class="tbl">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th class="numeric">Cantidad</th>
+              <th class="numeric">I069</th>
+              <th class="numeric">I078</th>
+              <th class="numeric">I07F</th>
+              <th class="numeric">I312</th>
+              <th class="numeric">I073</th>
+              <th>Responsable</th>
+              <th class="center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="entradasBody">
+            <tr>
+              <td colspan="11" style="text-align: center; padding: 40px; color: #6b7280;">
+                🔍 Busca entradas por código para ver los resultados
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Navegación de páginas -->
+      <footer class="pager">
+        <div class="pager-left">
+          <small id="pageInfo">Página <span id="pageNum">1</span> de <span id="totalPages">1</span></small>
+        </div>
+        <div class="pager-right">
+          <button id="prevPage" class="btn secondary" disabled>‹ Anterior</button>
+          <button id="nextPage" class="btn secondary" disabled>Siguiente ›</button>
+        </div>
+      </footer>
+    </section>
+
+    <!-- Modal de detalle mejorado -->
+    <div id="modalDetail" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>📋 Detalle de Entrada</h3>
+          <button id="closeDetail" class="btn secondary">✕ Cerrar</button>
+        </div>
+        <div id="detailBody" class="modal-body">
+          <!-- Contenido dinámico del modal -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para registrar nueva entrada -->
+    <div id="modalRegistrar" class="modal-backdrop" aria-hidden="true">
+      <div class="modal-card" style="max-width: 500px;">
+        <div class="modal-header">
+          <h3>➕ Registrar Nueva Entrada</h3>
+          <button id="closeRegistrar" class="btn secondary">✕</button>
+        </div>
+        <div class="modal-body">
+          <form id="formRegistrar">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="inputCodigo">Código</label>
+                <input type="text" id="inputCodigo" required placeholder="Ingresa el código del producto">
+              </div>
+              
+              <div class="form-group full-width">
+                <label>Cantidades por Inventario</label>
+                <div class="inventory-grid">
+                  <input type="number" id="inputI069" placeholder="I069" step="0.001" min="0">
+                  <input type="number" id="inputI078" placeholder="I078" step="0.001" min="0">
+                  <input type="number" id="inputI07F" placeholder="I07F" step="0.001" min="0">
+                  <input type="number" id="inputI312" placeholder="I312" step="0.001" min="0">
+                  <input type="number" id="inputI073" placeholder="I073" step="0.001" min="0">
+                </div>
+              </div>
+              
+              <div class="form-group full-width">
+                <label for="inputResponsable">Responsable</label>
+                <input type="text" id="inputResponsable" required placeholder="Nombre del responsable">
+              </div>
+              
+              <div class="form-actions full-width">
+                <button type="button" id="cancelRegistrar" class="btn secondary">Cancelar</button>
+                <button type="submit" class="btn primary">Guardar Entrada</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="entradas.js"></script>
+</body>
+</html>

@@ -280,3 +280,78 @@ if (verBtn) {
     window.location.href = "movimientomaterial.html";
   });
 }
+// ------------------- SISTEMA DE ALERTAS PERSONALIZADAS -------------------
+function showCustomAlert(message, type = 'success') {
+    // Crear overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-alert-overlay';
+    
+    // Crear alerta
+    const alert = document.createElement('div');
+    alert.className = `custom-alert ${type}`;
+    
+    alert.innerHTML = `
+        <div class="custom-alert-message">${message}</div>
+        <button class="custom-alert-close">Aceptar</button>
+    `;
+    
+    // Agregar al DOM
+    document.body.appendChild(overlay);
+    document.body.appendChild(alert);
+    
+    // Mostrar con animación
+    setTimeout(() => {
+        overlay.classList.add('show');
+        alert.classList.add('show');
+    }, 10);
+    
+    // Configurar botón de cerrar
+    const closeBtn = alert.querySelector('.custom-alert-close');
+    closeBtn.addEventListener('click', () => {
+        hideCustomAlert(alert, overlay);
+    });
+    
+    // Cerrar al hacer clic en el overlay
+    overlay.addEventListener('click', () => {
+        hideCustomAlert(alert, overlay);
+    });
+    
+    // Cerrar automáticamente después de 3 segundos
+    setTimeout(() => {
+        if (document.body.contains(alert)) {
+            hideCustomAlert(alert, overlay);
+        }
+    }, 3000);
+}
+
+function hideCustomAlert(alert, overlay) {
+    alert.classList.remove('show');
+    alert.classList.add('hide');
+    overlay.classList.remove('show');
+    
+    setTimeout(() => {
+        if (document.body.contains(alert)) {
+            document.body.removeChild(alert);
+        }
+        if (document.body.contains(overlay)) {
+            document.body.removeChild(overlay);
+        }
+    }, 400);
+}
+
+// ------------------- MODIFICAR LA FUNCIÓN agregarAMovimiento -------------------
+function agregarAMovimiento(producto) {
+    try {
+        let lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
+        if (!lista.some(item => item.codigo === producto.codigo)) {
+            lista.push(producto);
+            localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
+            showCustomAlert("✅😉 Producto agregado a la lista de movimiento", "success");
+        } else {
+            showCustomAlert("😉 Este producto ya está en la lista de movimiento", "warning");
+        }
+    } catch (e) {
+        console.error("agregarAMovimiento error:", e);
+        showCustomAlert("❌ Error agregando producto", "error");
+    }
+}

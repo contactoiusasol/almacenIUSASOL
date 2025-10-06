@@ -1,69 +1,110 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Panel Administrador</title>
-  <link rel="stylesheet" href="../styles/admin.css">
-  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../styles/admin.css" />
+
 </head>
 <body>
-  <!-- Encabezado -->
-  <header>Panel de Almacén
-  <button id="logoutBtn">Cerrar sesión</button>
+  <div class="welcome-animation" id="welcomeAnimation" aria-hidden="true"></div>
+
+  <header>
+    <div class="header-left">
+      <span class="welcome-msg title-underline">PANEL DE ALMACÉN 📦</span>
+    </div>
+    <div class="header-nav">
+      <a href="admin.html" class="nav-btn">Inicio</a>
+      <a href="inventario.html" class="nav-btn">Ver Inventario</a>
+      <a href="salidas.html" class="nav-btn">Movimientos</a>
+      <a href="reportes.html" class="nav-btn">Reportes</a>
+    </div>
+    <div class="header-right">
+      <button id="logoutBtn">Cerrar sesión</button>
+    </div>
   </header>
 
-  <div class="layout">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <ul>
-         <li><a href="inventario.html">📊 Reportes</a></li>
-        <li><a href="inventario.html">📂 Inventario</a></li>
-        <li><a href="proveedores.html">🚚 Proveedores</a></li>
-        <li><a href="clientes.html">👥 Clientes</a></li>
-        <li><a href="reportes.html">📊 Reportes</a></li>
-      </ul>
-    </aside>
+  <main class="main">
+    <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de Administrador</h2>
 
-    <!-- Contenido principal -->
-    <main class="main">
-      <h2 class="welcome" id="welcomeMessage">Bienvenido al Panel de Administrador</h2>
+    <div class="dashboard">
+      <a href="inventario.html" class="card">
+        <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario" />
+        <h3>Ver Inventario</h3>
+      </a>
 
-      <div class="dashboard">
-        <a href="agregar_producto.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/plus-math.png" alt="Agregar producto">
-          <h3>Agregar Producto</h3>
-        </a>
+      <a href="salidas.html" class="card">
+        <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos" />
+        <h3>Movimientos de Salidas</h3>
+      </a>
 
-        <a href="inventario.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/open-box.png" alt="Inventario">
-          <h3>Ver Inventario</h3>
-        </a>
+      <a href="reportes.html" class="card">
+        <img src="https://img.icons8.com/ios-filled/100/000000/add-file.png" alt="Reportes" />
+        <h3>Reportes</h3>
+      </a>
+    </div>
+  </main>
 
-        <a href="movimiento.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/move-stock.png" alt="Movimientos">
-          <h3>Movimientos</h3>
-        </a>
-
-        <a href="salidas.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/sell-stock.png" alt="Salidas">
-          <h3>Salidas</h3>
-        </a>
-
-        <a href="reportes.html" class="card">
-          <img src="https://img.icons8.com/ios-filled/100/000000/add-file.png" alt="Reportes">
-          <h3>Reportes</h3>
-        </a>
-      </div>
-    </main>
-  </div>
   <script>
-    document.getElementById('logoutBtn').addEventListener('click', () => {
-      // Aquí puedes limpiar el almacenamiento local si guardas el login
-      localStorage.removeItem('usuario'); 
-      // Redirigir al login
+document.addEventListener('DOMContentLoaded', () => {
+  // Enlazar logout de forma segura (si existe)
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+      // Limpiar datos de sesión/local
+      localStorage.removeItem('usuario');
+      sessionStorage.removeItem('welcomeShown_admin');
+      sessionStorage.removeItem('welcomeShown'); // por compatibilidad
+      // redirigir al login
       window.location.href = 'login.html';
     });
-  </script>
+  }
+
+  // Recuperar usuario (si no hay, redirigir)
+  let usuario = null;
+  try { usuario = JSON.parse(localStorage.getItem('usuario')); } catch(e){ usuario = null; }
+
+  if (!usuario || !usuario.role || usuario.role.toLowerCase() !== 'admin') {
+    // si no es admin, limpiar y mandar a login
+    localStorage.removeItem('usuario');
+    // pequeña demora para permitir que el listener del logout se registre si el usuario hace clic muy rápido
+    setTimeout(() => window.location.href = 'login.html', 50);
+    return;
+  }
+
+  // Si llegó aquí, el usuario es admin -> mostrar nombre y animación
+  const nombre = usuario.nombre || usuario.name || 'Administrador';
+  const anim = document.getElementById('welcomeAnimation');
+  function escapeHtml(str) { return String(str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+
+  if (anim) {
+    // Emoji 🙈 como sticker
+  anim.innerHTML = `
+    <div class="avatar" aria-hidden="true">
+      <span class="sticker-emoji" role="img" aria-label="mono tapándose los ojos">🙈</span>
+    </div>
+    <div class="content">
+      <strong>Bienvenido, ${escapeHtml(nombre)} 👋</strong>
+      <div class="subtext">
+        <span class="role-badge"><span class="dot"></span>Administrador</span>
+        <span>Revisa los reportes y movimientos recientes ✨</span>
+      </div>
+    </div>
+  `;
+    const shownKey = 'welcomeShown_admin';
+    if (!sessionStorage.getItem(shownKey)) {
+      anim.classList.add('show');
+      setTimeout(()=> { anim.classList.remove('show'); anim.classList.add('hide'); }, 4000);
+      sessionStorage.setItem(shownKey, 'true');
+    }
+  }
+
+  // Actualizar H2 principal
+  const h2 = document.getElementById('welcomeMessage');
+  if (h2) h2.textContent = `Bienvenido al Panel de Administrador, ${nombre}`;
+});
+</script>
+
 </body>
 </html>

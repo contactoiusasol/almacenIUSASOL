@@ -243,3 +243,119 @@ h1 {
     display: none !important;
   }
 }
+/* Estilos generales */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+/* Botón volver */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #6b7280;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 20px;
+}
+
+.back-btn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+/* Separador de secciones */
+.section-sep {
+  border: none;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+  margin: 40px 0;
+}
+
+/* Contenedor de tabla para historial */
+.table-wrap {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+  
+  .actions-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .btn-confirm-all,
+  .btn-clear-pending {
+    width: 100%;
+  }
+  
+  .back-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Estados de carga */
+#nombreResponsable:placeholder-shown {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .back-btn,
+  .btn-confirm-all,
+  .btn-clear-pending,
+  #pendingTable tbody tr,
+  #salidasTable tbody tr {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Focus states para accesibilidad */
+.back-btn:focus,
+.btn-confirm-all:focus,
+.btn-clear-pending:focus,
+.btn-remove:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Estilos para tablas en móviles */
+@media (max-width: 1024px) {
+  .pending-table-container {
+    max-height: 500px;
+  }
+  
+  #pendingTable,
+  #salidasTable {
+    font-size: 13px;
+  }
+  
+  #pendingTable th,
+  #salidasTable th {
+    padding: 10px 6px;
+    font-size: 12px;
+  }
+  
+  #pendingTable td,
+  #salidasTable td {
+    padding: 8px 6px;
+  }
+}

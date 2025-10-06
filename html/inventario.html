@@ -54,63 +54,81 @@
       </tbody>
     </table>
   </div>
-
-  <!-- Modal para agregar/editar producto -->
+ <!-- Modal para agregar/editar producto -->
+<!-- Modal para agregar/editar producto -->
   <div class="modal" id="modalForm">
     <div class="modal-content">
       <span class="close" id="btnCloseModal">&times;</span>
-      <h2>Agregar Producto</h2>
+      <h2 id="modalTitle">Agregar Producto</h2>
       <form id="productForm">
-        <label>Código:</label>
-        <input type="number" name="codigo" required>
-
-        <label>Descripción:</label>
-        <input type="text" name="descripcion" required>
-
-        <label>UM:</label>
-        <input list="unidades" name="um" required>
-        <datalist id="unidades">
-          <option value="PZA">
-          <option value="M">
-          <option value="M2">
-          <option value="KG">
-          <option value="JGO"> 
-          <option value="L">
-          <option value="MIL">
-          <option value="CAJ">
-          <option value="PAQ">
-        </datalist>
-
-        <label>Inventario I069:</label>
-        <input type="number" name="i069" min="0">
-
-        <label>Inventario I078:</label>
-        <input type="number" name="i078" min="0">
-
-        <label>Inventario I07F:</label>
-        <input type="number" name="i07f" min="0">
-
-        <label>Inventario I312:</label>
-        <input type="number" name="i312" min="0">
-
-        <label>Inventario I073:</label>
-        <input type="number" name="i073" min="0">
-
-        <!-- CHECKBOX para habilitar sumar cantidades al editar -->
-        <div style="margin-top:8px;">
-          <label style="display:inline-flex;align-items:center;gap:8px;">
-            <input type="checkbox" name="sumar" id="sumarCheckbox" />
-            <span>Sumar cantidades al editar (registrar entrada)</span>
-          </label>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Código:</label>
+            <input type="number" name="codigo" required>
+          </div>
+          <div class="form-group">
+            <label>UM:</label>
+            <input list="unidades" name="um" required readonly>
+            <datalist id="unidades">
+              <option value="PZA">
+              <option value="M">
+              <option value="M2">
+              <option value="KG">
+              <option value="JGO"> 
+              <option value="L">
+              <option value="MIL">
+              <option value="CAJ">
+              <option value="PAQ">
+            </datalist>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label>Descripción:</label>
+          <input type="text" name="descripcion" required>
         </div>
 
-        <label>Inventario Físico en Almacén:</label>
-        <input type="number" name="almacen" id="almacen" readonly>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inventario I069:</label>
+            <input type="number" name="i069" min="0" readonly>
+          </div>
+          <div class="form-group">
+            <label>Inventario I078:</label>
+            <input type="number" name="i078" min="0" readonly>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inventario I07F:</label>
+            <input type="number" name="i07f" min="0" readonly>
+          </div>
+          <div class="form-group">
+            <label>Inventario I312:</label>
+            <input type="number" name="i312" min="0" readonly>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label>Inventario I073:</label>
+            <input type="number" name="i073" min="0" readonly>
+          </div>
+          <div class="form-group">
+            <label>Inventario Físico en Almacén:</label>
+            <input type="number" name="almacen" id="almacen" readonly>
+          </div>
+        </div>
 
-        <button type="submit" class="btn-save">💾 Guardar</button>
+        <div class="form-actions">
+          <button type="button" class="btn-cancel" id="btnCancelModal">Cancelar</button>
+          <button type="submit" class="btn-save">💾 Guardar</button>
+        </div>
       </form>
     </div>
   </div>
+
 
   <!-- Notificación personalizada -->
   <div id="toast" class="toast"></div>
@@ -217,6 +235,7 @@
       if (sumar) sumar.checked = false;
     });
   </script>
+  
 
 </body>
 </html>
