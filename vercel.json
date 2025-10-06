@@ -6,15 +6,15 @@
       "use": "@vercel/static"
     },
     {
-      "src": "src/**/*.css",
+      "src": "src/styles/*.css",
       "use": "@vercel/static"
     },
     {
-      "src": "src/**/*.js",
+      "src": "src/js/*.js",
       "use": "@vercel/static"
     },
     {
-      "src": "src/img/**/*",
+      "src": "src/img/*",
       "use": "@vercel/static"
     }
   ],
@@ -24,8 +24,20 @@
       "dest": "/src/html/login.html"
     },
     {
-      "src": "/(.*)",
+      "src": "/(.*\\.html)",
       "dest": "/src/html/$1"
+    },
+    {
+      "src": "/(.*\\.css)",
+      "dest": "/src/styles/$1"
+    },
+    {
+      "src": "/(.*\\.js)",
+      "dest": "/src/js/$1"
+    },
+    {
+      "src": "/(.*\\.(png|jpg|jpeg|gif|svg))",
+      "dest": "/src/img/$1"
     }
   ]
 }
