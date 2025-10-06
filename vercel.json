@@ -28,15 +28,15 @@
       "dest": "/src/html/$1"
     },
     {
-      "src": "/(.*\\.css)",
+      "src": "/styles/(.*)",
       "dest": "/src/styles/$1"
     },
     {
-      "src": "/(.*\\.js)",
+      "src": "/js/(.*)",
       "dest": "/src/js/$1"
     },
     {
-      "src": "/(.*\\.(png|jpg|jpeg|gif|svg))",
+      "src": "/img/(.*)",
       "dest": "/src/img/$1"
     }
   ]
