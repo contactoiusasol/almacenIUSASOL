@@ -120,23 +120,39 @@ async function getMonthlyReport(month, year) {
             throw new Error('No se encontraron productos en el sistema');
         }
         
-        // Obtener movimientos del mes
-        const { data: movements, error: movementsError } = await supabase
-            .from('movimientos')
+        // Obtener entradas del mes - CORREGIDO
+        const { data: entradas, error: entradasError } = await supabase
+            .from('entradas')
             .select('*')
-            .gte('fecha', startDate)
-            .lte('fecha', endDate)
-            .order('fecha', { ascending: true });
+            .gte('fecha_entrada', startDate)
+            .lte('fecha_entrada', endDate)
+            .order('fecha_entrada', { ascending: true });
         
-        if (movementsError) {
-            console.error('Error obteniendo movimientos:', movementsError);
-            throw new Error('Error al cargar los movimientos');
+        if (entradasError) {
+            console.error('Error obteniendo entradas:', entradasError);
+            throw new Error('Error al cargar las entradas');
         }
+        
+        // Obtener salidas del mes - CORREGIDO
+        const { data: salidas, error: salidasError } = await supabase
+            .from('salidas')
+            .select('*')
+            .gte('fecha_salida', startDate)
+            .lte('fecha_salida', endDate)
+            .order('fecha_salida', { ascending: true });
+        
+        if (salidasError) {
+            console.error('Error obteniendo salidas:', salidasError);
+            throw new Error('Error al cargar las salidas');
+        }
+        
+        console.log('Entradas encontradas:', entradas?.length || 0);
+        console.log('Salidas encontradas:', salidas?.length || 0);
         
         // Obtener snapshot inicial del mes anterior
         const initialStock = await getInitialStock(month, year, products);
         
-        return processReportData(products, movements || [], initialStock, month, year);
+        return processReportData(products, entradas || [], salidas || [], initialStock, month, year);
         
     } catch (error) {
         console.error('Error en getMonthlyReport:', error);
@@ -182,7 +198,7 @@ async function getInitialStock(month, year, products) {
     }
 }
 
-function processReportData(products, movements, initialStock, month, year) {
+function processReportData(products, entradas, salidas, initialStock, month, year) {
     const summary = {
         initialStock: 0,
         finalStock: 0,
@@ -199,50 +215,66 @@ function processReportData(products, movements, initialStock, month, year) {
     
     // Procesar cada producto
     products.forEach(product => {
-        const productMovements = movements.filter(m => m.codigo_producto === product.codigo);
+        // Filtrar entradas y salidas por producto
+        const productEntradas = entradas.filter(e => e.codigo_producto === product.codigo);
+        const productSalidas = salidas.filter(s => s.codigo_producto === product.codigo);
+        
         const initialQty = initialStock[product.codigo] || 0;
         
-        let entries = 0;
-        let exits = 0;
+        // Calcular totales
+        const totalEntradas = productEntradas.reduce((sum, entrada) => sum + (entrada.cantidad_entrada || 0), 0);
+        const totalSalidas = productSalidas.reduce((sum, salida) => sum + (salida.cantidad_salida || 0), 0);
         
-        productMovements.forEach(mov => {
-            if (mov.tipo === 'entrada') {
-                entries += mov.cantidad;
-                movementsData.entries.push({
-                    ...mov,
-                    descripcion_producto: product.descripcion
-                });
-            } else if (mov.tipo === 'salida') {
-                exits += mov.cantidad;
-                movementsData.exits.push({
-                    ...mov,
-                    descripcion_producto: product.descripcion
-                });
-            }
-        });
-        
-        const finalQty = initialQty + entries - exits;
+        const finalQty = initialQty + totalEntradas - totalSalidas;
         const difference = finalQty - initialQty;
         
         // Actualizar resumen
         summary.initialStock += initialQty;
         summary.finalStock += finalQty;
-        summary.totalEntries += entries;
-        summary.totalExits += exits;
+        summary.totalEntries += totalEntradas;
+        summary.totalExits += totalSalidas;
         
+        // Agregar a detallado
         detailed.push({
             codigo: product.codigo,
             descripcion: product.descripcion,
             stockInicial: initialQty,
-            entradas: entries,
-            salidas: exits,
+            entradas: totalEntradas,
+            salidas: totalSalidas,
             stockFinal: finalQty,
             diferencia: difference,
             tendencia: difference > 0 ? 'up' : difference < 0 ? 'down' : 'neutral'
         });
+        
+        // Procesar movimientos para las tablas
+        productEntradas.forEach(entrada => {
+            movementsData.entries.push({
+                fecha: entrada.fecha_entrada,
+                codigo_producto: entrada.codigo_producto,
+                descripcion_producto: product.descripcion,
+                cantidad: entrada.cantidad_entrada,
+                responsable: entrada.responsable,
+                observaciones: entrada.observaciones || '-'
+            });
+        });
+        
+        productSalidas.forEach(salida => {
+            movementsData.exits.push({
+                fecha: salida.fecha_salida,
+                codigo_producto: salida.codigo_producto,
+                descripcion_producto: product.descripcion,
+                cantidad: salida.cantidad_salida,
+                responsable: salida.responsable,
+                destino: salida.destino || '-'
+            });
+        });
     });
     
     summary.stockDifference = summary.finalStock - summary.initialStock;
+    
+    // Ordenar movimientos por fecha
+    movementsData.entries.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+    movementsData.exits.sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
     
     return {
         summary,
@@ -308,13 +340,13 @@ function updateMovementsTables(movements) {
     
     if (movements.entries.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="6" class="text-center">No hay entradas registradas</td>`;
+        row.innerHTML = `<td colspan="6" class="text-center">No hay entradas registradas en este período</td>`;
         entriesBody.appendChild(row);
     } else {
         movements.entries.forEach(entry => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${new Date(entry.fecha).toLocaleDateString()}</td>
+                <td>${formatDate(entry.fecha)}</td>
                 <td>${entry.codigo_producto}</td>
                 <td>${entry.descripcion_producto}</td>
                 <td>${entry.cantidad.toLocaleString()}</td>
@@ -331,13 +363,13 @@ function updateMovementsTables(movements) {
     
     if (movements.exits.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="6" class="text-center">No hay salidas registradas</td>`;
+        row.innerHTML = `<td colspan="6" class="text-center">No hay salidas registradas en este período</td>`;
         exitsBody.appendChild(row);
     } else {
         movements.exits.forEach(exit => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${new Date(exit.fecha).toLocaleDateString()}</td>
+                <td>${formatDate(exit.fecha)}</td>
                 <td>${exit.codigo_producto}</td>
                 <td>${exit.descripcion_producto}</td>
                 <td>${exit.cantidad.toLocaleString()}</td>
@@ -346,6 +378,20 @@ function updateMovementsTables(movements) {
             `;
             exitsBody.appendChild(row);
         });
+    }
+}
+
+// Función auxiliar para formatear fecha
+function formatDate(dateString) {
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('es-ES', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    } catch (error) {
+        return dateString;
     }
 }
 
