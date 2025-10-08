@@ -1,0 +1,388 @@
+
+/* Variables globales */
+:root{
+--font-body: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--font-heading: "Poppins", "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--base-font-size: 40px;
+--heading-scale: 1.25;
+--muted: #6b7280;
+--accent: #2563eb;
+}
+
+/* Reset mejorado */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  }
+
+body {
+font-family: var(--font-body);
+font-size: var(--base-font-size);
+background: linear-gradient(-45deg, #ffafcc, #bde0fe, #d4bb83, #ffc8dd);
+background-size: 400% 400%;
+animation: gradient 15s ease infinite;
+color: #2d3047;
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+overflow-x: hidden;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+line-height: 1.45;
+letter-spacing: 0.2px;
+}
+
+/* Keyframes */
+@keyframes gradient {
+0% { background-position: 0% 50%; }
+50% { background-position: 100% 50%; }
+100% { background-position: 0% 50%; }
+}
+
+/* Header con glassmorphism */
+header {
+background: rgba(255, 255, 255, 0.25);
+backdrop-filter: blur(12px);
+-webkit-backdrop-filter: blur(12px);
+border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+color: #2d3047;
+padding: 18px 30px;
+font-size: 1.125rem;
+font-weight: 700;
+display: flex;
+justify-content: space-between;
+align-items: center;
+position: sticky;
+top: 0;
+z-index: 1000;
+font-family: var(--font-heading);
+letter-spacing: 0.6px;
+text-transform: none;
+.negritas {
+  font-weight: bold;
+}
+
+}
+
+/* Botón */
+header button {
+background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+border: none;
+padding: 12px 24px;
+border-radius: 15px;
+cursor: pointer;
+font-weight: 700;
+color: white;
+transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3);
+font-family: var(--font-body);
+letter-spacing: 0.4px;
+}
+
+/* Layout */
+.layout {
+display: flex;
+flex: 1;
+}
+
+/* Sidebar futurista */
+.sidebar {
+width: 250px;
+background: rgba(255, 255, 255, 0.2);
+backdrop-filter: blur(15px);
+-webkit-backdrop-filter: blur(15px);
+padding: 25px 0;
+border-right: 1px solid rgba(255, 255, 255, 0.2);
+font-family: var(--font-body);
+}
+
+/* Links sidebar */
+.sidebar a {
+text-decoration: none;
+color: #2d3047;
+font-weight: 700;
+padding: 15px 25px;
+display: block;
+border-radius: 12px;
+transition: all 0.3s ease;
+font-family: var(--font-body);
+letter-spacing: 0.4px;
+}
+
+/* Main content */
+.main {
+flex: 1;
+padding: 50px;
+text-align: center;
+font-family: var(--font-body);
+}
+
+/* Título de bienvenida */
+.welcome {
+color: #2d3047;
+margin-bottom: 40px;
+font-size: calc(1.75rem * var(--heading-scale));
+font-weight: 800;
+text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+position: relative;
+display: inline-block;
+font-family: var(--font-heading);
+letter-spacing: 1px;
+text-transform: capitalize;
+font-feature-settings: "kern" 1, "liga" 1;
+}
+
+/* Línea decorativa */
+.welcome::after {
+content: '';
+position: absolute;
+bottom: -10px;
+left: 50%;
+transform: translateX(-50%);
+width: 100px;
+height: 4px;
+background: linear-gradient(90deg, #ff6b6b, #4cc9f0);
+border-radius: 2px;
+}
+
+/* Dashboard */
+.dashboard {
+display: flex;
+gap: 30px;
+justify-content: center;
+flex-wrap: wrap;
+perspective: 1000px;
+}
+
+/* Cards */
+.card {
+background: rgba(255, 255, 255, 0.25);
+backdrop-filter: blur(12px);
+-webkit-backdrop-filter: blur(12px);
+border: 1px solid rgba(255, 255, 255, 0.3);
+border-radius: 20px;
+padding: 35px 25px;
+width: 260px;
+text-decoration: none;
+color: #2d3047;
+box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+position: relative;
+overflow: hidden;
+transform-style: preserve-3d;
+font-family: var(--font-body);
+letter-spacing: 0.2px;
+}
+
+/* Cabecera en la card */
+.card h3 {
+margin: 0;
+font-size: 1.125rem;
+font-weight: 700;
+position: relative;
+z-index: 2;
+font-family: var(--font-heading);
+letter-spacing: 0.8px;
+text-transform: none;
+}
+
+/* Otros estilos ya existentes (shimmer, hover, etc.) se mantienen */
+.card::before {
+content: "";
+position: absolute;
+top: 0;
+left: 0;
+right: 0;
+height: 5px;
+background: linear-gradient(90deg, #ff6b6b, #4cc9f0, #7209b7, #3a86ff);
+background-size: 200% 100%;
+animation: shimmer 3s infinite linear;
+}
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+.card img { width: 80px; margin-bottom: 20px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); transition: transform 0.4s ease; }
+.card:hover { transform: translateY(-15px) rotateX(10deg) rotateY(5deg) scale(1.05); box-shadow: 0 20px 40px rgba(0,0,0,0.2), 0 0 80px rgba(59, 130, 246, 0.3); }
+.card:hover img { transform: scale(1.2) rotate(5deg); }
+.card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top right, rgba(255,255,255,0.4) 0%, transparent 50%), radial-gradient(circle at bottom left, rgba(255,255,255,0.3) 0%, transparent 50%); opacity: 0; transition: opacity 0.4s ease; z-index: 1; }
+.card:hover::after { opacity: 1; }
+.card:hover { animation: glow 1.5s ease-in-out infinite alternate; }
+@keyframes glow {
+from { box-shadow: 0 0 20px rgba(59,130,246,0.4), 0 0 30px rgba(59,130,246,0.3), 0 0 40px rgba(59,130,246,0.2); }
+to   { box-shadow: 0 0 25px rgba(59,130,246,0.6), 0 0 35px rgba(59,130,246,0.4), 0 0 45px rgba(59,130,246,0.3); }
+}
+:root{
+--font-body: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+--font-heading: "Lora", "Quicksand", Georgia, serif;
+}
+/* Estilo de botones del header (menos cerrar sesión) */
+header .header-nav .nav-btn {
+  background: linear-gradient(45deg, #d3fbe9ea, #878585e4);
+  color: #111010;
+  padding: 8px 20px;
+  border-radius: 22px;
+  font-weight: 600;
+  text-decoration: none;
+  margin: 0 8px;
+  display: inline-block;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+header .header-nav .nav-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.35);
+  background: linear-gradient(45deg, #f8f0b0, #f8b064);
+}
+    /* Estilo especial para los títulos */
+    .title-underline {
+      font-weight: bold;
+      position: relative;
+      display: inline-block;
+      padding-bottom: 6px;
+    }
+
+    .title-underline::after,
+    .title-underline::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 2px;
+    }
+
+    .title-underline::before {
+      bottom: 0;   /* primera línea */
+    }
+
+    .title-underline::after {
+      bottom: -5px;  /* segunda línea */
+    }
+/* Animación de entrada */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Animación de salida */
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+#admin-welcome {
+  animation: fadeIn 0.8s ease forwards;
+}
+
+#admin-welcome.fade-out {
+  animation: fadeOut 0.8s ease forwards;
+}
+
+
+/* --- Welcome: estilo mejorado para ADMIN --- */
+.welcome-animation {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 14px;
+  z-index: 1600;
+  color: #041024;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.28);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease, transform .35s ease;
+  transform-origin: center top;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(4,16,36,0.12);
+  /* admin gradient (teal -> purple -> magenta) */
+  background: linear-gradient(135deg,
+    rgba(6,214,199,0.96) 0%,
+    rgba(117,91,255,0.96) 52%,
+    rgba(232,83,163,0.95) 100%);
+}
+.welcome-animation::before{
+  content: "";
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(90deg, rgba(6,214,199,0.35), rgba(117,91,255,0.35), rgba(232,83,163,0.35));
+  filter: blur(12px);
+  opacity: 0.45;
+  z-index: 0;
+  pointer-events: none;
+}
+.welcome-animation.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); animation: welcome-subtle 4s ease-in-out forwards; }
+.welcome-animation.hide { opacity: 0; transform: translateX(-50%) translateY(-10px); pointer-events: none; }
+
+@keyframes welcome-subtle {
+  0% { transform: translateX(-50%) translateY(-6px) scale(.995); }
+  30% { transform: translateX(-50%) translateY(0) scale(1); }
+  70% { transform: translateX(-50%) translateY(-2px) scale(1.005); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+.welcome-animation .avatar {
+  position: relative; z-index:2; width:42px; height:42px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  background: rgba(255,255,255,0.18); box-shadow: 0 6px 18px rgba(4,16,36,0.12); overflow:hidden;
+}
+.welcome-animation .avatar img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.welcome-animation .content { z-index:2; display:flex; flex-direction:column; gap:4px; line-height:1; }
+.welcome-animation .content strong { font-size:14px; font-weight:800; color:#041024; letter-spacing:0.2px; }
+.welcome-animation .content .subtext { font-size:12px; color:rgba(4,16,36,0.95); display:flex; gap:10px; align-items:center; }
+
+.role-badge{ padding:3px 8px; border-radius:999px; background: rgba(255,255,255,0.18); font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:6px; color:#041024; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.06); }
+.role-badge .dot{ width:8px; height:8px; border-radius:50%; background: linear-gradient(90deg,#00d2be,#5f3bff); box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+
+@media (prefers-reduced-motion: reduce) { .welcome-animation, .welcome-animation::before { transition:none; animation:none; } }
+/* Sticker-emoji (aplicar en admin y usuario) */
+.welcome-animation .avatar {
+  position: relative;
+  z-index: 2;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.14);
+  box-shadow: 0 6px 18px rgba(4,16,36,0.10);
+  overflow: hidden;
+  padding: 6px;
+}
+
+/* estilo del emoji-sticker */
+.sticker-emoji {
+  font-size: 28px;              /* tamaño del emoji */
+  line-height: 1;
+  display: inline-block;
+  transform-origin: center;
+  filter: drop-shadow(0 6px 10px rgba(4,16,36,0.12));
+  transition: transform .22s ease;
+}
+
+/* bob sutil cuando se muestra la notificación */
+.welcome-animation.show .sticker-emoji {
+  animation: sticker-bob 3s ease-in-out infinite;
+}
+
+@keyframes sticker-bob {
+  0%   { transform: translateY(0) scale(1); }
+  50%  { transform: translateY(-3px) scale(1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* cuando el usuario pasa el mouse, ligero pop */
+.welcome-animation .avatar:hover .sticker-emoji {
+  transform: translateY(-2px) scale(1.06);
+}

@@ -1,0 +1,1135 @@
+
+:root{
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --muted: #666;
+  --accent: #2563eb;
+  --soft: #eef2f7;
+  --shadow: rgba(17,24,39,0.06);
+  --container-padding: 20px;
+}
+
+*{ box-sizing: border-box; }
+html,body{ height:100%; }
+body{
+  font-family: "Quicksand", sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 30px;
+  color: #34495e;
+}
+
+/* Contenedor */
+.container{
+  max-width: 1100px;
+  margin: 32px auto;
+  background: var(--card);
+  padding: var(--container-padding);
+  border-radius: 14px;
+  box-shadow: 0 6px 20px var(--shadow);
+}
+
+/* Botón volver */
+.back-btn{
+  display:inline-block;
+  margin-bottom:12px;
+  padding:8px 14px;
+  background:#c5d7f2;
+  color:#2d3e50;
+  text-decoration:none;
+  border-radius:10px;
+  font-weight:600;
+}
+.back-btn:hover{ background:#a7c3ed; }
+
+/* Títulos y inputs */
+h1{ text-align:center; margin:8px 0 38px; font-size:40px; color:#093f72; }
+.solicitante-box{ display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+.solicitante-box label{ font-weight:600; }
+input[readonly]{ background:#f5f5f5; border:1px solid #ddd; padding:8px 10px; border-radius:6px; width:320px; }
+
+/* Botones */
+.btns{ margin-top:12px; display:flex; gap:8px; align-items:center; }
+button{ padding:8px 12px; border-radius:8px; border:0; cursor:pointer; background:var(--accent); color:#fff; }
+button.secondary{ background:#6b7280; }
+
+/* wrapper para tablas */
+.table-wrap{
+  width:100%;
+  overflow-x:auto;    /* scroll horizontal si no cabe */
+  border-radius:10px;
+  padding: 6px 0;
+}
+
+/* Tablas: permitimos que las columnas se dimensionen por contenido (auto) */
+table{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout: auto;        /* <-- importante: NO fixed, deja que el contenido determine el ancho */
+  min-width:720px;           /* mantiene scroll en pantallas pequeñas */
+  margin-top:12px;
+  background: white;
+}
+
+/* cabecera */
+thead{ background:#d6e4f9; }
+thead th{
+  padding:12px 10px;
+  text-align:left;
+  font-weight:700;
+  color:#2d3e50;
+  font-size:14px;
+  border-bottom:1px solid var(--soft);
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  white-space: nowrap;       /* que los headers no hagan wrap */
+}
+
+/* celdas: permitimos wrap por defecto para que no se corten */
+th, td{
+  padding:10px;
+  font-size:14px;
+  color:#34495e;
+  border-bottom:1px solid #f2f6fb;
+  white-space: normal;       /* importante: permitir wrap */
+  word-break: break-word;    /* rompe palabras largas */
+  overflow: visible;         /* mostrar contenido completo */
+  vertical-align: middle;
+}
+
+/* Columnas que queremos compactas (sin wrap) */
+.col-code, th.col-code, td.col-code,
+.col-um, th.col-um, td.col-um,
+.col-acc, th.col-acc, td.col-acc {
+  white-space: nowrap;
+  width: 1%;                 /* fuerza a que la columna se ajuste al contenido mínimo */
+  max-width: 140px;
+}
+
+/* Ajustes finos por columna (si quieres, mantén o ajusta números) */
+th:nth-child(2), td:nth-child(2){ max-width: 420px; } /* Descripción: ancha pero con wrap */
+th:nth-child(8), td:nth-child(8){ max-width: 380px; } /* Observaciones */
+th:nth-child(7), td:nth-child(7){ max-width: 220px; } /* Destinatario */
+
+/* Inputs / badges dentro de la tabla */
+input.pending-cantidad,
+.pending-resp-name,
+.pending-resp-last,
+.pending-dest,
+.pending-observaciones{
+  padding:6px 8px;
+  font-size:13px;
+  border-radius:6px;
+  border:1px solid #ccc;
+  height:auto;
+  min-height:30px;
+  box-sizing:border-box;
+  background:#fff;
+  width:100%;
+}
+
+/* Estética de badges y botones */
+.badge-inv{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:999px;
+  background:#eef2ff;
+  color:#1e3a8a;
+  border:1px solid #dbeafe;
+  font-size:13px;
+}
+
+button.eliminar-btn{
+  padding:6px 10px;
+  border-radius:8px;
+  border:0;
+  background:#f8c7c7;
+  color:#8b1e1e;
+  cursor:pointer;
+}
+button.eliminar-btn:hover{ background:#f39b9b; }
+
+.empty-note{ color:#777; text-align:center; padding:12px; }
+
+/* HR normalizado */
+.section-sep{
+  border:0;
+  height:1px;
+  background: linear-gradient(90deg, transparent, #e6eefc, transparent);
+  margin:24px 0;
+  border-radius:2px;
+}
+
+/* UTILS: forzar que una celda no haga wrap si la marcas con .no-wrap */
+.no-wrap{ white-space: nowrap !important; overflow: hidden; text-overflow: ellipsis; }
+
+/* Responsive */
+@media (max-width:900px){
+  table{ min-width: 640px; }
+  th:nth-child(2), td:nth-child(2){ max-width: 300px; }
+}
+@media (max-width:640px){
+  thead th, th, td{ padding:8px; font-size:13px; }
+  .solicitante-box input[readonly]{ width:100%; }
+  table{ min-width:620px; }
+}
+/* --- contenedor especial para tabla + panel derecho --- */
+.table-container {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+/* la tabla ocupa todo el espacio disponible */
+.table-container .table-wrap {
+  flex: 1 1 auto;
+  max-width: calc(100% - 200px); /* deja espacio para el panel */
+  overflow-x: auto;
+}
+
+/* panel derecho con acciones / info relacionado a la tabla */
+.table-controls {
+  width: 190px;
+  flex: 0 0 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  position: sticky;
+  top: 24px;            /* se queda visible al hacer scroll */
+  height: fit-content;
+  padding-left: 6px;
+}
+
+/* estilo botones del panel (más compactos verticales) */
+.table-controls button {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 0;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  text-align: left;
+}
+
+/* un botón secundario */
+.table-controls button.secondary {
+  background: #6b7280;
+}
+
+/* pequeño bloque informativo en el panel (ej: cantidad total) */
+.table-controls .info-box {
+  background: #f7fbff;
+  border: 1px solid #e6f2ff;
+  padding: 8px;
+  border-radius: 10px;
+  color: #0f172a;
+  font-size: 13px;
+}
+
+/* iconos/acciones concretas alineadas a la derecha dentro del panel */
+.table-controls .right-actions {
+  display:flex;
+  gap:8px;
+  justify-content:flex-end;
+}
+
+/* en pantallas pequeñas apilamos: tabla arriba, panel abajo */
+@media (max-width: 900px) {
+  .table-container { flex-direction: column-reverse; }
+  .table-container .table-wrap { max-width: 100%; }
+  .table-controls { position: relative; top: 0; width: 100%; flex-direction: row; flex-wrap: wrap; gap:8px; }
+  .table-controls button { flex: 1 1 auto; text-align:center; }
+}
+/* Estilos para el modal de eliminación */
+.delete-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.delete-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  text-align: center;
+  min-width: 400px;
+  max-width: 90%;
+}
+
+.delete-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.delete-modal-message {
+  margin: 25px 0;
+  font-size: 15px;
+  color: #6b7280;
+}
+
+.delete-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.delete-modal-btn-confirm {
+  background: #ef4444 !important;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.delete-modal-btn-cancel {
+  background: #6b7280 !important;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.delete-modal-btn-confirm:hover,
+.delete-modal-btn-cancel:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.delete-modal-btn-confirm:active,
+.delete-modal-btn-cancel:active {
+  transform: translateY(0);
+}
+/* Estilos para el modal de eliminación */
+.delete-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.delete-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  text-align: center;
+  min-width: 400px;
+  max-width: 90%;
+}
+
+.delete-modal-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #1f2937;
+}
+
+.delete-modal-message {
+  margin: 25px 0;
+  font-size: 15px;
+  color: #6b7280;
+}
+
+.delete-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.delete-modal-btn-confirm {
+  background: #ef4444 !important;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.delete-modal-btn-cancel {
+  background: #6b7280 !important;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.delete-modal-btn-confirm:hover,
+.delete-modal-btn-cancel:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.delete-modal-btn-confirm:active,
+.delete-modal-btn-cancel:active {
+  transform: translateY(0);
+}
+
+/* Scrollbar personalizado - LADO DERECHO */
+.salidas-table-container {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.salidas-table-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.salidas-table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 0 8px 8px 0;
+}
+
+.salidas-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+
+.salidas-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.salidas-table-container::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+
+/* Para Firefox */
+.salidas-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+/* Scrollbar personalizado - LADO DERECHO */
+.salidas-table-container {
+  max-height: 400px;
+  overflow-y: auto;
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.salidas-table-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.salidas-table-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 0 8px 8px 0;
+}
+
+.salidas-table-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  border: 2px solid #f1f5f9;
+}
+
+.salidas-table-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.salidas-table-container::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+
+/* Para Firefox */
+.salidas-table-container {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+/* Estilos para el modal de confirmación masiva */
+.confirm-all-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.confirm-all-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  text-align: center;
+  min-width: 450px;
+  max-width: 90%;
+}
+
+.confirm-all-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #1f2937;
+}
+
+.confirm-all-modal-message {
+  margin: 20px 0;
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.confirm-all-modal-checkbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 20px 0;
+  padding: 15px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.confirm-all-modal-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.confirm-all-modal-checkbox label {
+  font-size: 14px;
+  color: #475569;
+  cursor: pointer;
+}
+
+.confirm-all-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 25px;
+}
+
+.confirm-all-modal-btn {
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.confirm-all-modal-btn-inventory {
+  background: #6b7280;
+  color: white;
+}
+
+.confirm-all-modal-btn-accept {
+  background: #10b981;
+  color: white;
+}
+
+.confirm-all-modal-btn-cancel {
+  background: #ef4444;
+  color: white;
+}
+
+.confirm-all-modal-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.confirm-all-modal-btn:active {
+  transform: translateY(0);
+}
+
+/* Estilos para los botones principales */
+.btn-confirm-all {
+  background: #10b981;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-right: 10px;
+}
+
+.btn-clear-pending {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-all:hover {
+  background: #059669;
+  transform: translateY(-1px);
+}
+
+.btn-clear-pending:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.btn-confirm-all:disabled,
+.btn-clear-pending:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Estilo para el área del responsable */
+.responsable-area {
+  background: #f8fafc;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  margin: 20px 0;
+}
+
+.responsable-label {
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.responsable-input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+}
+
+.responsable-input:read-only {
+  background: #f9fafb;
+  color: #6b7280;
+}
+
+/* Estilo para la sección de acciones */
+.actions-section {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin: 20px 0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.actions-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 15px;
+}
+
+.actions-buttons {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Badge para el contador de pendientes */
+#pendingCountBadge {
+  background: #ef4444;
+  color: white;
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+/* Estilos para las secciones */
+.section-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 30px 0 20px 0;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.subsection-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #374151;
+  margin: 25px 0 15px 0;
+}
+
+/* Mejoras adicionales para las tablas */
+#pendingTable th {
+  background: #1e40af;
+  color: white;
+  font-weight: 600;
+  padding: 14px 10px;
+  font-size: 13px;
+  border: none;
+}
+
+#salidasTable th {
+  background: #374151;
+  color: white;
+  font-weight: 600;
+  padding: 14px 10px;
+  font-size: 13px;
+  border: none;
+}
+
+/* Estados de hover mejorados */
+#pendingTable tbody tr:hover {
+  background: #f0f9ff;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.2s ease;
+}
+
+#salidasTable tbody tr:hover {
+  background: #f8fafc;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+/* Estilos generales */
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Quicksand', sans-serif;
+}
+
+/* Botón volver */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #6b7280;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-bottom: 20px;
+}
+
+.back-btn:hover {
+  background: #4b5563;
+  transform: translateY(-1px);
+}
+
+/* Separador de secciones */
+.section-sep {
+  border: none;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+  margin: 40px 0;
+}
+
+/* Contenedor de tabla para historial */
+.table-wrap {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 15px;
+  }
+  
+  .actions-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .btn-confirm-all,
+  .btn-clear-pending {
+    width: 100%;
+  }
+  
+  .back-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* Estados de carga */
+#nombreResponsable:placeholder-shown {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Mejoras de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .back-btn,
+  .btn-confirm-all,
+  .btn-clear-pending,
+  #pendingTable tbody tr,
+  #salidasTable tbody tr {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Focus states para accesibilidad */
+.back-btn:focus,
+.btn-confirm-all:focus,
+.btn-clear-pending:focus,
+.btn-remove:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Estilos para tablas en móviles */
+@media (max-width: 1024px) {
+  .pending-table-container {
+    max-height: 500px;
+  }
+  
+  #pendingTable,
+  #salidasTable {
+    font-size: 13px;
+  }
+  
+  #pendingTable th,
+  #salidasTable th {
+    padding: 10px 6px;
+    font-size: 12px;
+  }
+  
+  #pendingTable td,
+  #salidasTable td {
+    padding: 8px 6px;
+  }
+}
+/* Estilos para el modal de vaciar pendientes */
+.clear-all-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+.clear-all-modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+  text-align: center;
+  min-width: 450px;
+  max-width: 90%;
+}
+
+.clear-all-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 15px;
+  color: #1f2937;
+}
+
+.clear-all-modal-message {
+  margin: 20px 0;
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.5;
+}
+
+.clear-all-modal-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 25px;
+}
+
+.clear-all-modal-btn-confirm {
+  background: #ef4444 !important;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.clear-all-modal-btn-cancel {
+  background: #6b7280 !important;
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.clear-all-modal-btn-confirm:hover,
+.clear-all-modal-btn-cancel:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.clear-all-modal-btn-confirm:active,
+.clear-all-modal-btn-cancel:active {
+  transform: translateY(0);
+}
+/* ===== Custom confirm modal (estilo ilustración 2) ===== */
+:root{
+  --cc-overlay: rgba(8,10,12,0.55);
+  --cc-modal-bg: #ffffff;
+  --cc-radius: 12px;
+  --cc-shadow: 0 18px 40px rgba(10,14,30,0.25);
+  --cc-accent: #e43f3f;
+  --cc-muted: #65748b;
+}
+
+/* Cover overlay */
+.cc-overlay {
+  position: fixed;
+  inset: 0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: var(--cc-overlay);
+  z-index: 9999;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  padding: 20px;
+}
+
+/* Modal card */
+.cc-modal {
+  width: min(720px, calc(100% - 48px));
+  max-width: 760px;
+  background: var(--cc-modal-bg);
+  border-radius: var(--cc-radius);
+  box-shadow: var(--cc-shadow);
+  padding: 28px 30px;
+  border: 1px solid rgba(18,24,40,0.06);
+  text-align: center;
+  transform: translateY(6px);
+  animation: cc-pop 220ms cubic-bezier(.2,.9,.25,1) forwards;
+}
+@keyframes cc-pop { to { transform: translateY(0); } }
+
+.cc-title {
+  font-family: "Quicksand", "Segoe UI", Roboto, sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2d3d;
+  margin: 0 0 8px;
+}
+.cc-desc {
+  color: var(--cc-muted);
+  font-size: 14.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+  padding: 0 6px;
+}
+
+/* Buttons row */
+.cc-actions {
+  display:flex;
+  gap:14px;
+  justify-content:center;
+  align-items:center;
+  margin-top:6px;
+}
+
+.cc-btn {
+  border: none;
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 18px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 6px 18px rgba(20,30,50,0.06);
+}
+
+/* Confirmar (rojo) */
+.cc-btn-danger {
+  background: linear-gradient(180deg,#ff6b68, var(--cc-accent));
+  color: #fff;
+  min-width: 120px;
+  box-shadow: 0 8px 20px rgba(228,63,63,0.18);
+}
+
+/* Cancelar (gris) */
+.cc-btn-secondary {
+  background: linear-gradient(180deg,#6b7178,#51565c);
+  color: #fff;
+  min-width: 110px;
+  opacity: 0.95;
+}
+
+/* Mobile tweak */
+@media (max-width:520px){
+  .cc-modal { padding: 18px; width: calc(100% - 32px); border-radius: 12px; }
+  .cc-btn-danger, .cc-btn-secondary { width: 48%; }
+}
+/* Modal confirm personalizado (estilo parecido a Eliminar) */
+.custom-confirm-backdrop{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.custom-confirm{
+  width: 420px;
+  max-width: calc(100% - 32px);
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  padding: 18px;
+  color: #222;
+  font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
+}
+.custom-confirm .title{font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.custom-confirm .title .dot{width:10px;height:10px;border-radius:50%;background:#0b5ed7}
+.custom-confirm .message{margin:8px 0 16px;color:#444;line-height:1.3}
+.custom-confirm .actions{display:flex;justify-content:flex-end;gap:10px}
+.custom-confirm .btn{padding:8px 14px;border-radius:8px;border:none;font-weight:600;cursor:pointer;min-width:96px}
+.custom-confirm .btn.cancel{background:#f3f4f6;color:#111827}
+.custom-confirm .btn.confirm{background:#0d6efd;color:#fff;box-shadow:0 4px 10px rgba(13,110,253,.18)}
+.custom-confirm.danger .title .dot{background:#d9534f}
+.custom-confirm.danger .btn.confirm{background:#d9534f;box-shadow:0 6px 18px rgba(217,83,79,.25)}
+@media (max-width:480px){.custom-confirm{padding:14px;border-radius:8px}.custom-confirm .btn{min-width:76px;padding:7px 10px}}
+/* ---------- Scroll sidebar para la tabla de historial ---------- */
+
+/* variable: altura máxima visible de la tabla (ajusta a tu gusto) */
+:root { --historial-maxh: 380px; }
+
+/* wrapper existente (no lo renombramos) */
+#historySection .table-wrap {
+  position: relative;            /* necesario para posicionar la barra */
+  max-height: var(--historial-maxh);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 8px;
+  background: transparent;
+}
+
+/* hacer la cabecera sticky dentro del wrapper para que siempre sea visible */
+#historySection .table-wrap table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: rgb(44, 46, 54); /* si tu tema usa otra bg, cámbiala por la variable correspondiente */
+}
+
+/* Barra lateral */
+.table-wrap .table-scrollbar {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  bottom: 8px;
+  width: 46px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  z-index: 40;
+  padding: 6px;
+  border-radius: 10px;
+  pointer-events: auto;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.06);
+  background: rgba(255,255,255,0.03);
+}
+
+/* Botones */
+.table-scrollbar .ss-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-weight: 700;
+  background: #f3f4f6;
+  color: #111827;
+  box-shadow: 0 6px 14px rgba(16,24,40,0.06);
+  transition: transform .08s ease, box-shadow .08s;
+  user-select: none;
+}
+.table-scrollbar .ss-btn:disabled { opacity: .45; cursor: default; transform: none; box-shadow: none; }
+
+/* hover */
+.table-scrollbar .ss-btn:hover:not(:disabled){ transform: translateY(-2px); box-shadow: 0 10px 26px rgba(16,24,40,0.10); }
+
+/* iconos SVG */
+.table-scrollbar .ss-btn svg { width: 14px; height: 14px; fill: currentColor; }
+
+/* ocultar barra si no hay overflow */
+.table-wrap.no-overflow .table-scrollbar { display: none; }
+
+/* móviles: compactar */
+@media (max-width:700px){
+  :root { --historial-maxh: 300px; }
+  .table-wrap .table-scrollbar { width: 38px; right: 6px; padding: 4px; }
+  .table-scrollbar .ss-btn { width: 30px; height: 30px; border-radius: 6px; }
+}
