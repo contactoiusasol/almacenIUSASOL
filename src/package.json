@@ -1,0 +1,16 @@
+{
+  "name": "wscode",
+  "version": "1.0.0",
+  "description": "Sistema de gestión WScode",
+  "main": "html/login.html",
+  "scripts": {
+    "dev": "live-server html --port=3000",
+    "build": "node build.js",
+    "preview": "live-server dist --port=3000"
+  },
+  "devDependencies": {
+    "fs-extra": "^11.3.2",
+    "live-server": "^1.2.2",
+    "shx": "^0.4.0"
+  }
+}
