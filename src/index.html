@@ -4,9 +4,43 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Almacén IUSASOL</title>
+
+  <!-- Redirección automática al login -->
   <meta http-equiv="refresh" content="0; url=html/login.html" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f6f8fa;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      color: #333;
+    }
+    .mensaje {
+      text-align: center;
+    }
+    .spinner {
+      margin: 20px auto;
+      width: 40px;
+      height: 40px;
+      border: 4px solid #ccc;
+      border-top-color: #3498db;
+      border-radius: 50%;
+      animation: girar 1s linear infinite;
+    }
+    @keyframes girar {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 </head>
 <body>
-  <p>Redirigiendo al login...</p>
+  <div class="mensaje">
+    <h2>Cargando Almacén IUSASOL...</h2>
+    <div class="spinner"></div>
+    <p>Redirigiendo al panel de inicio de sesión.</p>
+  </div>
 </body>
 </html>
