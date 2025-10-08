@@ -129,16 +129,16 @@ body {
 }
 
 .generate-btn, .export-btn {
-    padding: 14px 28px;
+    padding: 14px 20px;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     font-family: 'Segoe UI', sans-serif;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 13px;
     box-shadow: var(--shadow-soft);
 }
 
@@ -566,3 +566,342 @@ tbody td {
 .table-scroll-container tbody tr:hover {
   background-color: #f8fafc;
 }
+/* Spinner para botón refresh */
+#refreshReport {
+  display: inline-flex;
+  align-items: center;
+  gap: 18px;
+  padding: 13px 16px;
+  border-radius: 10px;
+}
+
+/* Estado loading: oculta el texto y muestra un spinner a la izquierda */
+#refreshReport.loading {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Pseudo-elemento spinner */
+#refreshReport.loading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-top-color: rgba(255,255,255,1);
+  border-radius: 50%;
+  animation: btn-spin 0.8s linear infinite;
+  margin-right: 6px;
+}
+
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+/* Estilos para la sección de meses */
+.meses-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px;
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.meses-titulo {
+    text-align: center;
+    color: #2d3748;
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.meses-subtitulo {
+    color: #4a5568;
+    font-size: 1.5rem;
+    margin: 30px 0 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e2e8f0;
+    font-weight: 600;
+}
+
+.meses-lista {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+}
+
+.meses-lista li {
+    background: white;
+    padding: 15px 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    font-weight: 500;
+    color: #4a5568;
+    position: relative;
+    overflow: hidden;
+}
+
+.meses-lista li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 4px;
+    background: linear-gradient(to bottom, #4f46e5, #7c3aed);
+}
+
+.meses-lista li:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #fff, #f8fafc);
+}
+
+.separador {
+    height: 2px;
+    background: linear-gradient(to right, transparent, #cbd5e0, transparent);
+    margin: 30px 0;
+    border: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .meses-container {
+        padding: 20px;
+    }
+    
+    .meses-titulo {
+        font-size: 2rem;
+    }
+    
+    .meses-subtitulo {
+        font-size: 1.3rem;
+    }
+    
+    .meses-lista {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+}
+
+/* mensajes de alerta */
+/* ================== TOASTS / NOTIFICACIONES ================== */
+
+/* Contenedor principal (position fixed) */
+.toast-container {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: calc(100% - 36px);
+  pointer-events: none;
+  font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* Toast individual */
+.toast {
+  pointer-events: auto;
+  min-width: 260px;
+  max-width: 420px;
+  background: white;
+  color: #111827; /* gray-900 */
+  padding: 12px 14px;
+  border-radius: 10px;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.12);
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border-left: 6px solid transparent;
+  font-size: 0.95rem;
+  animation: toast-in 220ms ease;
+}
+
+/* Entrada animada */
+@keyframes toast-in {
+  from { transform: translateX(12px); opacity: 0; }
+  to   { transform: translateX(0); opacity: 1; }
+}
+
+/* Icono izquierdo */
+.toast .icon {
+  font-size: 18px;
+  line-height: 1;
+  margin-top: 2px;
+  width: 20px;
+  text-align: center;
+}
+
+/* Contenido */
+.toast .content {
+  flex: 1 1 auto;
+  word-break: break-word;
+}
+
+.toast .title {
+  font-weight: 700;
+  margin-bottom: 2px;
+  font-size: 0.95rem;
+}
+
+/* Botón cerrar */
+.toast .close {
+  background: transparent;
+  border: none;
+  color: #6b7280; /* gray-500 */
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.9;
+}
+.toast .close:hover { opacity: 1; }
+
+/* Tipos (bordes y color del icono) */
+.toast--success { border-left-color: #10b981; }  /* verde */
+.toast--error   { border-left-color: #ef4444; }  /* rojo */
+.toast--warning { border-left-color: #f59e0b; }  /* amarillo */
+.toast--info    { border-left-color: #3b82f6; }  /* azul */
+
+.toast--success .icon { color: #10b981; }
+.toast--error   .icon { color: #ef4444; }
+.toast--warning .icon { color: #f59e0b; }
+.toast--info    .icon { color: #3b82f6; }
+
+/* Responsive: en móviles ocupar anchura */
+@media (max-width: 600px) {
+  .toast-container { left: 12px; right: 12px; top: 12px; }
+  .toast { max-width: 100%; min-width: auto; }
+}
+
+/* ================== CONFIRM MODAL ================== */
+
+.confirm-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none; /* mostrar con JS (flex) */
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(1px);
+}
+
+.confirm-box {
+  position: relative;
+  background: #fff;
+  padding: 18px;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 12px 40px rgba(2,6,23,0.35);
+  z-index: 2;
+  font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: #0f172a; /* gray-900 */
+}
+
+.confirm-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.05rem;
+}
+
+.confirm-body {
+  margin-bottom: 14px;
+  color: #374151; /* gray-700 */
+  line-height: 1.45;
+}
+
+.confirm-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Botones modal (estilos simples que encajan con la UI) */
+.btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #8B5FBF 0%, #6A4C93 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(106,76,147,0.18);
+}
+
+.btn-secondary {
+  background: #eef2ff;
+  color: #1f2937;
+  border: 1px solid #e6e9f8;
+}
+
+/* ================== BOTÓN REFRESH - SPINNER ================== */
+
+#refreshReport {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* Estado loading: cambia opacidad y bloquea clicks */
+#refreshReport.loading {
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+/* Pseudo-elemento spinner */
+#refreshReport.loading::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.6);
+  border-top-color: rgba(255,255,255,1);
+  border-radius: 50%;
+  animation: btn-spin 0.8s linear infinite;
+  margin-right: 6px;
+}
+
+/* Si tu botón es claro, cambia spinner a oscuro con esta variante */
+#refreshReport.light.loading::before {
+  border: 2px solid rgba(0,0,0,0.15);
+  border-top-color: rgba(0,0,0,0.5);
+}
+
+/* Animación */
+@keyframes btn-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ================== UTILIDADES ADICIONALES ================== */
+
+/* helper para mensajes centrados (si quieres mostrar un toast grande) */
+.toast--wide {
+  min-width: 320px;
+  max-width: 680px;
+}
+
+/* ocultar elemento con clase 'hidden' */
+.hidden { display: none !important; }
+
+/* accesibilidad: foco visible */
+:focus { outline: 3px solid rgba(99,102,241,0.18); outline-offset: 2px; }

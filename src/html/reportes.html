@@ -29,7 +29,7 @@
         .table-scroll-container thead th {
             position: sticky;
             top: 0;
-            background: #4f46e5;
+            background: #2d2978;
             color: white;
             z-index: 10;
             padding: 12px 8px;
@@ -101,8 +101,7 @@
                 <label for="yearSelect">Año:</label>
                 <select id="yearSelect" class="filter-select"></select>
             </div>
-            
-            <button id="generateReport" class="generate-btn">Generar Reporte</button>
+            <button id="refreshReport" class="generate-btn" title="Refrescar datos">🔄 Refrescar</button>
             <button id="exportReport" class="export-btn">Exportar PDF</button>
         </div>
 
@@ -251,6 +250,34 @@
         <div class="loading-spinner"></div>
         <p>Generando reporte...</p>
     </div>
+
+<div id="toastContainer" aria-live="polite" aria-atomic="true" class="toast-container"></div>
+
+<div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
+  <div class="confirm-backdrop"></div>
+  <div class="confirm-box" role="document">
+    <header class="confirm-header"><h3 id="confirmTitle"></h3></header>
+    <div class="confirm-body" id="confirmMessage"></div>
+    <footer class="confirm-footer">
+      <button id="confirmCancel" class="btn btn-secondary">Cancelar</button>
+      <button id="confirmOk" class="btn btn-primary">Aceptar</button>
+    </footer>
+  </div>
+</div>
+<div id="toastContainer" aria-live="polite" aria-atomic="true" class="toast-container"></div>
+
+<div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
+  <div class="confirm-backdrop"></div>
+  <div class="confirm-box" role="document">
+    <header class="confirm-header"><h3 id="confirmTitle"></h3></header>
+    <div class="confirm-body" id="confirmMessage"></div>
+    <footer class="confirm-footer">
+      <button id="confirmCancel" class="btn btn-secondary">Cancelar</button>
+      <button id="confirmOk" class="btn btn-primary">Aceptar</button>
+    </footer>
+  </div>
+</div>
+
 
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>

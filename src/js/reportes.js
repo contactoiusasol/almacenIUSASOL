@@ -1,4 +1,4 @@
-// reportes.js - Script corregido para visualización de entradas
+// reportes.js - Archivo completo con toasts y confirm modal integrado
 
 // ------------------- CONFIG SUPABASE -------------------
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
@@ -7,6 +7,128 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let charts = {};
 let currentReportData = null;
+
+// ================== ALERTS (Toasts) & Confirm modal ==================
+(function() {
+  // ensure container exists
+  const container = () => {
+    let c = document.getElementById('toastContainer');
+    if (!c) {
+      c = document.createElement('div');
+      c.id = 'toastContainer';
+      c.className = 'toast-container';
+      document.body.appendChild(c);
+    }
+    return c;
+  };
+
+  function makeIcon(type) {
+    switch (type) {
+      case 'success': return '✅';
+      case 'error': return '❌';
+      case 'warning': return '⚠️';
+      case 'info': default: return 'ℹ️';
+    }
+  }
+
+  // showAlert(message, type = 'info', options = {})
+  // options: title, duration (ms), dismissible (bool)
+  window.showAlert = function(message, type = 'info', options = {}) {
+    const { title = '', duration = 4000, dismissible = true } = options;
+    const c = container();
+
+    const t = document.createElement('div');
+    t.className = `toast toast--${type}`;
+    t.setAttribute('role', 'status');
+    t.setAttribute('aria-live', 'polite');
+
+    const icon = document.createElement('div');
+    icon.className = 'icon';
+    icon.innerText = makeIcon(type);
+
+    const content = document.createElement('div');
+    content.className = 'content';
+
+    if (title) {
+      const h = document.createElement('div');
+      h.className = 'title';
+      h.innerText = title;
+      content.appendChild(h);
+    }
+
+    const p = document.createElement('div');
+    p.innerText = message;
+    content.appendChild(p);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close';
+    closeBtn.setAttribute('aria-label', 'Cerrar notificación');
+    closeBtn.innerHTML = '&times;';
+
+    closeBtn.addEventListener('click', () => {
+      if (t.timeout) clearTimeout(t.timeout);
+      t.remove();
+    });
+
+    t.appendChild(icon);
+    t.appendChild(content);
+    if (dismissible) t.appendChild(closeBtn);
+
+    c.prepend(t);
+
+    // auto dismiss
+    if (duration && duration > 0) {
+      t.timeout = setTimeout(() => {
+        t.remove();
+      }, duration);
+    }
+
+    return t;
+  };
+
+  // clear all toasts
+  window.clearAlerts = function() {
+    const c = container();
+    c.innerHTML = '';
+  };
+
+  // ================== Confirm modal (returns Promise<boolean>) ==================
+  window.showConfirm = function(title = 'Confirmar', message = '¿Estás seguro?') {
+    return new Promise(resolve => {
+      const modal = document.getElementById('confirmModal');
+      if (!modal) {
+        // if missing HTML fallback to native confirm
+        const ok = window.confirm(message);
+        resolve(ok);
+        return;
+      }
+      const titleEl = document.getElementById('confirmTitle');
+      const msgEl = document.getElementById('confirmMessage');
+      const okBtn = document.getElementById('confirmOk');
+      const cancelBtn = document.getElementById('confirmCancel');
+
+      titleEl.innerText = title;
+      msgEl.innerText = message;
+
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden', 'false');
+
+      function cleanup(result) {
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+
+      function onOk() { cleanup(true); }
+      function onCancel() { cleanup(false); }
+
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  };
+})();
 
 // ------------------- HELPERS MEJORADOS -------------------
 function getField(record, candidates = []) {
@@ -152,30 +274,90 @@ document.addEventListener('DOMContentLoaded', function() {
 function initializeYearSelect() {
   const yearSelect = document.getElementById('yearSelect');
   if (!yearSelect) return;
-  const currentYear = new Date().getFullYear();
+
+  const startYear = 2025;
+  const endYear = 2030;
+
   yearSelect.innerHTML = '';
-  for (let y = currentYear; y >= currentYear - 5; y--) {
+  for (let y = endYear; y >= startYear; y--) {
     const opt = document.createElement('option');
     opt.value = y;
     opt.textContent = y;
     yearSelect.appendChild(opt);
   }
-  yearSelect.value = currentYear;
+
+  // Seleccionar el año por defecto: si el año actual está en el rango, seleccionarlo; si no, 2025
+  const nowYear = new Date().getFullYear();
+  yearSelect.value = (nowYear >= startYear && nowYear <= endYear) ? nowYear : startYear;
+
   const monthElem = document.getElementById('monthSelect');
   if (monthElem) monthElem.value = new Date().getMonth() + 1;
 }
 
+async function loadCurrentMonthReport() {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const yearSelect = document.getElementById('yearSelect');
+
+  const defaultYear = yearSelect ? yearSelect.value : (now.getFullYear() >= 2025 && now.getFullYear() <= 2030 ? now.getFullYear() : 2025);
+
+  const ms = document.getElementById('monthSelect');
+  const ys = document.getElementById('yearSelect');
+  if (ms) ms.value = month;
+  if (ys) ys.value = defaultYear;
+
+  await generateReport();
+}
+
+// ------------------ UTILIDAD: DEBOUNCE ------------------
+function debounce(fn, wait = 600) {
+  let t;
+  return function(...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), wait);
+  };
+}
+
+// ------------------- SETUP EVENT LISTENERS (actualizada) -------------------
 function setupEventListeners() {
   const generateBtn = document.getElementById('generateReport');
   const exportBtn = document.getElementById('exportReport');
+  const refreshBtn = document.getElementById('refreshReport');
+
   if (generateBtn) generateBtn.addEventListener('click', generateReport);
-  if (exportBtn) exportBtn.addEventListener('click', exportToPDF);
+  if (exportBtn) exportBtn.addEventListener('click', exportToPDFIfAllowed);
+  if (refreshBtn) refreshBtn.addEventListener('click', refreshReport);
+
+  // selects que disparan generación automática al cambiar
+  const monthSelect = document.getElementById('monthSelect');
+  const yearSelect  = document.getElementById('yearSelect');
+
+  // Debounced generator — evitar llamadas demasiadas veces seguidas
+  const debouncedGenerate = debounce(() => {
+    // Si el usuario cambiara el select varias veces, solo se llamará una vez
+    generateReport().catch(err => {
+      console.error('Error generando reporte automático:', err);
+      showAlert('Error al actualizar el reporte automáticamente', 'error');
+    });
+  }, 600);
+
+  if (monthSelect) {
+    // generar al cambiar (o al moverse con teclado)
+    monthSelect.addEventListener('change', debouncedGenerate);
+    monthSelect.addEventListener('input', debouncedGenerate);
+  }
+  if (yearSelect) {
+    yearSelect.addEventListener('change', debouncedGenerate);
+    yearSelect.addEventListener('input', debouncedGenerate);
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() { 
       switchTab(this.dataset.tab); 
     });
   });
 }
+
 
 function switchTab(tabName) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -206,24 +388,14 @@ async function generateReport() {
         salidas: reportData.movements.exits.length
       });
     } else {
-      alert("No se pudieron obtener datos para el reporte");
+      showAlert("No se pudieron obtener datos para el reporte", 'error');
     }
   } catch (e) {
     console.error("❌ Error generando reporte:", e);
-    alert("Error: " + e.message);
+    showAlert("Error: " + (e.message || e), 'error');
   } finally {
     showLoading(false);
   }
-}
-
-async function loadCurrentMonthReport() {
-  const month = new Date().getMonth() + 1;
-  const year = new Date().getFullYear();
-  const ms = document.getElementById('monthSelect');
-  const ys = document.getElementById('yearSelect');
-  if (ms) ms.value = month;
-  if (ys) ys.value = year;
-  await generateReport();
 }
 
 // ------------------- OBTENER DATOS CORREGIDO -------------------
@@ -253,9 +425,11 @@ async function getMonthlyReport(month, year) {
       console.log(`📦 Productos mapeados: ${products.length}`);
     } else {
       console.error("Error productos:", error);
+      showAlert("Error obteniendo productos: " + (error?.message || error), 'error');
     }
   } catch (e) {
     console.error("Excepción productos:", e);
+    showAlert("Error obteniendo productos: " + (e.message || e), 'error');
   }
 
   // 2. OBTENER ENTRADAS - CORREGIDO
@@ -283,9 +457,11 @@ async function getMonthlyReport(month, year) {
       }
     } else {
       console.error("Error entradas:", error);
+      showAlert("Error obteniendo entradas: " + (error?.message || error), 'error');
     }
   } catch (e) {
     console.error("Excepción entradas:", e);
+    showAlert("Error obteniendo entradas: " + (e.message || e), 'error');
   }
 
   // 3. OBTENER SALIDAS - CORREGIDO
@@ -303,9 +479,11 @@ async function getMonthlyReport(month, year) {
       console.log(`📤 Salidas obtenidas: ${salidas.length} (de ${data.length} totales)`);
     } else {
       console.error("Error salidas:", error);
+      showAlert("Error obteniendo salidas: " + (error?.message || error), 'error');
     }
   } catch (e) {
     console.error("Excepción salidas:", e);
+    showAlert("Error obteniendo salidas: " + (e.message || e), 'error');
   }
 
   console.log(`📊 DATOS OBTENIDOS: ${products.length} productos, ${entradas.length} entradas, ${salidas.length} salidas`);
@@ -559,12 +737,12 @@ function generateMonthlyComparisonChart(reportData) {
     type: 'bar',
     data: {
       labels: ['Stock Inicial', 'Stock Final'],
-      datasets: [{
+      datasets: [({
         label: 'Cantidad',
         data: [reportData.summary.initialStock, reportData.summary.finalStock],
         backgroundColor: ['#667eea', '#764ba2'],
         borderWidth: 2
-      }]
+      })]
     },
     options: {
       responsive: true,
@@ -639,42 +817,202 @@ function generateEntriesExitsChart(reportData) {
 
 // ------------------- EXPORTAR PDF -------------------
 async function exportToPDF() {
-  if (!currentReportData) { alert('Primero genera un reporte'); return; }
+  if (!currentReportData) { showAlert('Primero genera un reporte', 'warning'); return; }
   showLoading(true);
   try {
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.text('Reporte de Inventario', 105, 15, { align: 'center' });
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    const topMargin = 15;
+    const bottomMargin = 15;
+    const usableWidth = pageWidth - margin * 2;
+
+    // Tipos y tamaños
+    const titleSize = 16;
+    const subtitleSize = 10;
+    const summarySize = 10;
+    const headerFontSize = 9;
+    const rowFontSize = 8;
+    const lineHeightMultiplier = 1.2;
+    const mmPerPt = 0.352778;
+
     const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-    doc.text(`Período: ${monthNames[currentReportData.month-1]} ${currentReportData.year}`, 105, 25, { align: 'center' });
-    doc.text('Resumen General', 20, 40);
-    let y = 50;
-    doc.text(`Stock Inicial: ${currentReportData.summary.initialStock.toLocaleString()}`, 20, y);
-    doc.text(`Stock Final: ${currentReportData.summary.finalStock.toLocaleString()}`, 20, y+7);
-    doc.text(`Entradas: ${currentReportData.summary.totalEntries.toLocaleString()}`, 20, y+14);
-    doc.text(`Salidas: ${currentReportData.summary.totalExits.toLocaleString()}`, 20, y+21);
-    doc.text(`Diferencia: ${currentReportData.summary.stockDifference.toLocaleString()}`, 20, y+28);
-    doc.text('Detalle por Producto', 20, 90);
-    const headers = ['Código','Descripción','Inicial','Entradas','Salidas','Final','Dif.'];
-    let x = 20;
-    headers.forEach(h => { doc.text(h, x, 100); x += 25; });
-    y = 107;
-    currentReportData.detailed.slice(0,30).forEach(item => {
-      if (y > 270) { doc.addPage(); y = 20; }
-      x = 20;
-      doc.text(String(item.codigo), x, y);
-      doc.text(String(item.descripcion).substring(0,15), x+25, y);
-      doc.text(String(item.stockInicial), x+50, y);
-      doc.text(String(item.entradas), x+75, y);
-      doc.text(String(item.salidas), x+100, y);
-      doc.text(String(item.stockFinal), x+125, y);
-      doc.text(String(item.diferencia), x+150, y);
-      y += 7;
+
+    // Construir el array de productos con movimiento: entradas>0 o salidas>0
+    const detailed = Array.isArray(currentReportData.detailed) ? currentReportData.detailed : [];
+    const filtered = detailed.filter(it => {
+      const entradas = Number(it.entradas ?? it.entrada ?? 0);
+      const salidas = Number(it.salidas ?? it.salida ?? 0);
+      return entradas > 0 || salidas > 0;
     });
-    doc.save(`reporte_${currentReportData.month}_${currentReportData.year}.pdf`);
+
+    // Si no hay productos con movimiento, avisar y salir
+    if (!filtered.length) {
+      showAlert('No hay productos con movimientos (entradas o salidas) en este reporte.', 'info');
+      showLoading(false);
+      return;
+    }
+
+    // Helper pie de página
+    function addFooter(pageNumber) {
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(`Página ${pageNumber}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
+    }
+
+    // Título + subtítulo + resumen (igual formato que muestras)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(titleSize);
+    doc.text('Reporte de Inventario', pageWidth / 2, topMargin, { align: 'center' });
+
+    // Período (manejar si month es string o number)
+    const monthIndex = Number(currentReportData.month) ? Number(currentReportData.month) - 1 : (currentReportData.month ? (monthNames.indexOf(String(currentReportData.month))>=0?monthNames.indexOf(String(currentReportData.month)):0) : 0);
+    const monthLabel = monthNames[monthIndex] ?? '';
+    doc.setFontSize(subtitleSize);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Período: ${monthLabel} ${currentReportData.year ?? ''}`, pageWidth / 2, topMargin + 8, { align: 'center' });
+
+    // Resumen general (mantener exactamente estilo)
+    let cursorY = topMargin + 18;
+    doc.setFontSize(summarySize);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumen General', margin, cursorY);
+    cursorY += 6;
+    doc.setFont('helvetica', 'normal');
+    const s = currentReportData.summary || {};
+    // Mostrar en una línea dos columnas como en tu ejemplo
+    const leftSummary = `Stock Inicial: ${Number(s.initialStock ?? s.stockInicial ?? 0).toLocaleString()}`;
+    const rightSummary = `Stock Final: ${Number(s.finalStock ?? s.stockFinal ?? 0).toLocaleString()}`;
+    doc.text(leftSummary, margin, cursorY);
+    doc.text(rightSummary, margin + 90, cursorY); // ajustar posición si quieres más espacio
+    cursorY += 6;
+    const leftSummary2 = `Entradas: ${Number(s.totalEntries ?? s.entradas ?? 0).toLocaleString()}`;
+    const rightSummary2 = `Salidas: ${Number(s.totalExits ?? s.salidas ?? 0).toLocaleString()}`;
+    doc.text(leftSummary2, margin, cursorY);
+    doc.text(rightSummary2, margin + 90, cursorY);
+    cursorY += 8;
+
+    // Definir columnas para "Detalle por Producto"
+    const cols = [
+      { key: 'codigo', title: 'Código', widthPct: 12 },
+      { key: 'descripcion', title: 'Descripción', widthPct: 36 },
+      { key: 'stockInicial', title: 'Inicial', widthPct: 12 },
+      { key: 'entradas', title: 'Entradas', widthPct: 10 },
+      { key: 'salidas', title: 'Salidas', widthPct: 10 },
+      { key: 'stockFinal', title: 'Final', widthPct: 10 },
+      { key: 'diferencia', title: 'Dif.', widthPct: 10 }
+    ];
+    cols.forEach(c => c.width = Math.round((c.widthPct / 100) * usableWidth));
+
+    // Dibujar cabecera de tabla (se repite en páginas nuevas)
+    function drawTableHeader(y) {
+      const headerHeight = (headerFontSize * mmPerPt) * lineHeightMultiplier + 4;
+      doc.setFillColor(41, 38, 96);
+      doc.rect(margin, y - (headerHeight - 2), usableWidth, headerHeight, 'F');
+      doc.setFontSize(headerFontSize);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      let x = margin;
+      const paddingLeft = 2;
+      cols.forEach(col => {
+        doc.text(col.title, x + paddingLeft, y);
+        x += col.width;
+      });
+      doc.setDrawColor(200);
+      doc.setLineWidth(0.2);
+      doc.line(margin, y + 1.5, margin + usableWidth, y + 1.5);
+      doc.setTextColor(0);
+      return y + headerHeight + 1;
+    }
+
+    // Empezar la tabla
+    cursorY = drawTableHeader(cursorY + 4);
+
+    doc.setFontSize(rowFontSize);
+    doc.setFont('helvetica', 'normal');
+
+    let pageNumber = 1;
+    function addNewPageAndHeader() {
+      doc.addPage();
+      pageNumber++;
+      cursorY = topMargin;
+      // título pequeño en páginas siguientes
+      doc.setFontSize(subtitleSize);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Reporte de Inventario', pageWidth / 2, cursorY, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.text(`${monthLabel} ${currentReportData.year ?? ''}`, pageWidth / 2, cursorY + 6, { align: 'center' });
+      cursorY = cursorY + 12;
+      cursorY = drawTableHeader(cursorY + 2);
+    }
+
+    const padding = 2;
+    // Iterar solo los productos filtrados
+    for (let i = 0; i < filtered.length; i++) {
+      const item = filtered[i];
+
+      const cellTexts = {
+        codigo: String(item.codigo ?? item.Codigo ?? item.code ?? ''),
+        descripcion: String(item.descripcion ?? item.Descripcion ?? item.nombre ?? ''),
+        stockInicial: String(item.stockInicial ?? item.inicial ?? item.stock_inicial ?? 0),
+        entradas: String(item.entradas ?? item.entrada ?? item.cantidad_entrada ?? 0),
+        salidas: String(item.salidas ?? item.salida ?? item.cantidad_salida ?? 0),
+        stockFinal: String(item.stockFinal ?? item.final ?? item.stock_final ?? 0),
+        diferencia: String(item.diferencia ?? item.diff ?? ( (item.stockFinal ?? 0) - (item.stockInicial ?? 0) ) ?? 0)
+      };
+
+      // calcular wrap por columna (descripcion genera wrap)
+      const linesPerCol = {};
+      cols.forEach(col => {
+        const w = col.width - padding * 2;
+        const raw = cellTexts[col.key] ?? '';
+        const lines = doc.splitTextToSize(raw, w);
+        linesPerCol[col.key] = lines;
+      });
+
+      const maxLines = Math.max(...Object.values(linesPerCol).map(l => l.length || 1));
+      const rowHeight = Math.max( (rowFontSize * mmPerPt) * lineHeightMultiplier * maxLines + 4, 6 );
+
+      // nueva página si no cabe
+      if (cursorY + rowHeight > pageHeight - bottomMargin) {
+        addFooter(pageNumber);
+        addNewPageAndHeader();
+      }
+
+      // dibujar fila
+      let x = margin;
+      const startY = cursorY + (rowFontSize * mmPerPt) * lineHeightMultiplier;
+      cols.forEach(col => {
+        const lines = linesPerCol[col.key];
+        const isNumeric = ['stockInicial','entradas','salidas','stockFinal','diferencia'].includes(col.key);
+        if (isNumeric) {
+          const text = lines.join(' ');
+          doc.text(text, x + col.width - padding, startY, { align: 'right' });
+        } else {
+          doc.text(lines, x + padding, startY);
+        }
+        x += col.width;
+      });
+
+      // separador
+      cursorY += rowHeight;
+      doc.setDrawColor(220);
+      doc.setLineWidth(0.1);
+      doc.line(margin, cursorY - 1, margin + usableWidth, cursorY - 1);
+    }
+
+    // pie final y guardar
+    addFooter(pageNumber);
+    const filename = `reporte_movimientos_productos_${currentReportData.month ?? 'mes'}_${currentReportData.year ?? 'anio'}.pdf`;
+    doc.save(filename);
+
   } catch (e) {
     console.error("Error PDF:", e);
-    alert('Error al exportar');
+    showAlert('Error al exportar', 'error');
   } finally {
     showLoading(false);
   }
@@ -686,6 +1024,35 @@ function showLoading(show) {
   if (ov) ov.style.display = show ? 'flex' : 'none';
 }
 
+// ------------------- REFRESH (botón) -------------------
+let _refreshLock = false;
+
+async function refreshReport() {
+  if (_refreshLock) return; // evita pulsaciones repetidas
+  _refreshLock = true;
+
+  const btn = document.getElementById('refreshReport');
+  if (btn) {
+    btn.classList.add('loading');
+    btn.disabled = true;
+  }
+
+  try {
+    await generateReport();
+    console.log("🔄 Datos refrescados");
+    showAlert('Datos actualizados', 'success', { duration: 2500 });
+  } catch (e) {
+    console.error("Error al refrescar:", e);
+    showAlert("Error al refrescar datos: " + (e.message || e), 'error');
+  } finally {
+    if (btn) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+    _refreshLock = false;
+  }
+}
+
 // Debug functions
 window.debugEntradas = async () => {
   const { data } = await supabase.from('entradas').select('*').limit(5);
@@ -695,3 +1062,26 @@ window.debugEntradas = async () => {
 
 window.debugReport = () => console.log("📊 Reporte actual:", currentReportData);
 window.diagnosticarEstructuraCompleta = diagnosticarEstructuraCompleta;
+
+// ------------------- PROTECCIÓN DE EXPORT (USAR seguridad si está implementada) -------------------
+async function exportToPDFIfAllowed() {
+  try {
+    // si existe security module, verificar role
+    if (window.security && typeof window.security.getCurrentUserAndRole === 'function') {
+      const { user, role } = await window.security.getCurrentUserAndRole();
+      if (!user) {
+        showAlert('Inicia sesión para exportar', 'warning');
+        return;
+      }
+      if (role !== 'admin') {
+        showAlert('No tienes permisos para exportar este informe.', 'warning');
+        return;
+      }
+    }
+    // si no hay módulo security asumimos permisos (retrocompatibilidad)
+    await exportToPDF();
+  } catch (e) {
+    console.error("Error exportToPDFIfAllowed:", e);
+    showAlert("Error verificando permisos: " + (e.message || e), 'error');
+  }
+}
