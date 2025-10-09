@@ -2878,58 +2878,59 @@ function clearAllPendings() {
   showToast("Lista de salidas pendientes vaciada", true);
 }
 
-// ------------------- Try to set responsable from usuarios table
+// ------------------- Asignar responsable desde tabla usuarios -------------------
 async function setResponsableFromAuth() {
   try {
-    console.info("setResponsableFromAuth - consultando auth");
     const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr) {
-      console.warn("setResponsableFromAuth - supabase.auth.getUser error:", authErr);
-    }
+    if (authErr) console.warn("setResponsableFromAuth - supabase.auth.getUser error:", authErr);
+
     const user = authData?.user ?? null;
 
-    // 1) si auth trae email, lo usamos inmediatamente
+    // 1) Si el auth trae email, úsalo directamente
     if (user && user.email) {
-      if (typeof responsableField !== "undefined" && responsableField) responsableField.value = user.email;
-      console.info("setResponsableFromAuth - email desde auth:", user.email);
+      if (typeof responsableField !== "undefined" && responsableField)
+        responsableField.value = user.email;
       return user.email;
     }
 
-    // 2) si user.id existe, buscar SOLO columnas seguras en tabla usuarios
+    // 2) Buscar en tabla usuarios
     if (user && user.id) {
       const { data: uData, error: uErr } = await supabase
-        .from('usuarios')
-        .select('email,nombre,apellido') // <-- solo columnas seguras
-        .eq('id', user.id)
+        .from("usuarios")
+        .select("email,nombre,apellido")
+        .eq("id", user.id)
         .maybeSingle();
 
-      if (uErr) {
-        console.warn("setResponsableFromAuth - error consultando usuarios:", uErr);
-      } else if (uData) {
+      if (!uErr && uData) {
         const email = uData.email || null;
-        const nombreCompleto = `${(uData.nombre||"").trim()} ${(uData.apellido||"").trim()}`.trim();
+        const nombreCompleto = `${(uData.nombre || "").trim()} ${(uData.apellido || "").trim()}`.trim();
+
         if (email) {
-          if (typeof responsableField !== "undefined" && responsableField) responsableField.value = email;
-          console.info("setResponsableFromAuth - email desde tabla usuarios:", email);
+          if (typeof responsableField !== "undefined" && responsableField)
+            responsableField.value = email;
           return email;
         } else if (nombreCompleto) {
-          if (typeof responsableField !== "undefined" && responsableField) responsableField.value = nombreCompleto;
-          console.info("setResponsableFromAuth - nombre completado desde usuarios:", nombreCompleto);
+          if (typeof responsableField !== "undefined" && responsableField)
+            responsableField.value = nombreCompleto;
           return nombreCompleto;
         }
       }
     }
 
-    // 3) fallback
-    if (typeof responsableField !== "undefined" && responsableField) responsableField.value = CURRENT_USER_FULLNAME || "";
+    // 3) Fallback
+    if (typeof responsableField !== "undefined" && responsableField)
+      responsableField.value = CURRENT_USER_FULLNAME || "";
     return null;
   } catch (ex) {
     console.error("setResponsableFromAuth - excepción:", ex);
-    if (typeof responsableField !== "undefined" && responsableField) responsableField.value = CURRENT_USER_FULLNAME || "";
+    if (typeof responsableField !== "undefined" && responsableField)
+      responsableField.value = CURRENT_USER_FULLNAME || "";
     return null;
   }
 }
-async function cargarInventario() {
+
+// ------------------- Cargar inventario -------------------
+async function cargarInventario({ showErrors = false } = {}) {
   try {
     const { data, error } = await supabase
       .from("productos")
@@ -2950,9 +2951,9 @@ async function cargarInventario() {
     data.forEach((p) => {
       const tr = document.createElement("tr");
 
-      // Determinar color según stock total
       const totalStock =
         (p.i069 || 0) + (p.i078 || 0) + (p.i07f || 0) + (p.i312 || 0) + (p.i073 || 0);
+
       let colorClass = "";
       if (totalStock > 10) colorClass = "green";
       else if (totalStock >= 2) colorClass = "yellow";
@@ -2978,21 +2979,19 @@ async function cargarInventario() {
     });
   } catch (err) {
     console.error("Error al cargar inventario:", err);
-    showToast("Error al cargar inventario", false);
+    if (showErrors) showToast("Error al cargar inventario", false);
   }
 }
 
 // ------------------- BOTÓN REFRESCAR -------------------
 if (refreshBtn) {
-  refreshBtn.addEventListener("click", async () => {
+  refreshBtn.addEventListener("click", () => {
     refreshBtn.disabled = true;
-    refreshBtn.textContent = "⏳ Actualizando...";
-    await cargarInventario();
-    refreshBtn.textContent = "🔄 Refrescar";
-    refreshBtn.disabled = false;
-    showToast("Inventario actualizado correctamente ✅", true);
+    refreshBtn.textContent = "⏳ Recargando página...";
+    location.reload(); // recarga toda la página
   });
 }
+
 
 // ------------------- FUNCIÓN PARA NOTIFICACIONES -------------------
 function showToast(msg, ok = true) {
