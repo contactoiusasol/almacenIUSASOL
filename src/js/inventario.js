@@ -2358,41 +2358,252 @@ const btnRefreshEl = document.getElementById('btnRefresh');
 if (btnRefreshEl) btnRefreshEl.addEventListener('click', () => refreshAllInventarios({ confirmBefore: true, truncateDecimals: true }));
 
 // ------------------- Filtro de búsqueda -------------------
-if (searchInput) {
-  searchInput.addEventListener("keyup", async () => {
-    const search = searchInput.value.trim().toLowerCase();
+// ------------------- BÚSQUEDA CLIENTE ROBUSTA - VERSIÓN MEJORADA -------------------
+let allProducts = null;
 
-    if (search === "") {
-      loadProducts();
-      return;
+function debounce(fn, delay = 120) {
+  let t;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), delay);
+  };
+}
+
+function normalizeText(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^a-z0-9]/g, ""); // Solo mantener letras y números
+}
+
+// Helper mejorado: prueba varias claves posibles
+function getFieldValue(item, keys) {
+  if (!item) return "";
+  
+  for (const k of keys) {
+    // Verificar si la clave existe y tiene valor
+    if (item[k] != null && item[k] !== "") {
+      const value = item[k];
+      // Convertir a string y limpiar
+      return String(value).trim();
     }
+  }
+  return "";
+}
 
-    if (!supabase) {
-      console.error("Supabase no inicializado para búsqueda");
-      return;
-    }
-
-    // usamos select('*') para evitar fallos por columnas que cambiaron de nombre
+// Función mejorada para cargar productos
+async function fetchAllProductsFromServer() {
+  if (!supabase) {
+    console.error("Supabase no inicializado");
+    return [];
+  }
+  
+  try {
+    console.log("🔄 Cargando productos desde Supabase...");
     const { data, error } = await supabase
       .from("productos")
       .select("*")
-      .limit(200);
+      .order("CODIGO", { ascending: true });
 
     if (error) {
-      console.error("Error en búsqueda:", error);
+      console.error("❌ Error al cargar productos:", error);
+      showToast("Error al cargar productos", false);
+      return [];
+    }
+    
+    console.log(`✅ ${data?.length || 0} productos cargados exitosamente`);
+    
+    // Debug: verificar si el producto 4501 está en los datos
+    if (data) {
+      const producto4501 = data.find(p => 
+        String(p.CODIGO).trim() === "4501" || 
+        String(p.codigo).trim() === "4501"
+      );
+      if (producto4501) {
+        console.log("🔍 Producto 4501 encontrado en datos:", producto4501);
+      } else {
+        console.warn("⚠️ Producto 4501 NO encontrado en los datos cargados");
+        // Listar algunos códigos para debug
+        const primerosCodigos = data.slice(0, 5).map(p => p.CODIGO || p.codigo);
+        console.log("Primeros códigos cargados:", primerosCodigos);
+      }
+    }
+    
+    return data || [];
+  } catch (e) {
+    console.error("❌ Excepción al cargar productos:", e);
+    return [];
+  }
+}
+
+// Función de búsqueda mejorada
+if (searchInput) {
+  const handleSearch = debounce(async () => {
+    const raw = String(searchInput.value || "");
+    const q = raw.trim();
+
+    console.log(`🔍 Buscando: "${q}"`);
+
+    // Si está vacío, mostrar todos los productos
+    if (q === "") {
+      try {
+        if (allProducts === null) {
+          allProducts = await fetchAllProductsFromServer();
+        }
+        renderTable(allProducts);
+        console.log(`📋 Mostrando todos los ${allProducts.length} productos`);
+      } catch (e) {
+        console.error("Error mostrando todos los productos:", e);
+        renderTable([]);
+      }
       return;
     }
 
-    const filtered = (data || []).filter(
-      (p) =>
-        String((p["CODIGO"] || "")).toLowerCase().includes(search) ||
-        (String(p["DESCRIPCION"] || "")).toLowerCase().includes(search)
+    // Asegurar que tenemos datos
+    try {
+      if (allProducts === null) {
+        allProducts = await fetchAllProductsFromServer();
+      }
+    } catch (e) {
+      console.error("No se pudieron cargar productos para búsqueda:", e);
+      renderTable([]);
+      return;
+    }
+
+    if (!allProducts || allProducts.length === 0) {
+      console.warn("⚠️ No hay productos para buscar");
+      renderTable([]);
+      return;
+    }
+
+    const tokens = q
+      .split(/\s+/)
+      .map((t) => normalizeText(t))
+      .filter(Boolean);
+
+    console.log("Tokens de búsqueda:", tokens);
+
+    // Columnas ampliadas para búsqueda
+    const codigoKeys = ["CODIGO", "codigo", "Codigo", "CÓDIGO", "código", "Código", "CODE", "code"];
+    const descKeys = ["DESCRIPCION", "descripcion", "Descripcion", "DESCRIPCIÓN", "descripción", "Descripción", "DESC", "desc", "descripcion_producto", "producto"];
+
+    const filtered = allProducts.filter((p) => {
+      const rawCodigo = getFieldValue(p, codigoKeys);
+      const rawDesc = getFieldValue(p, descKeys);
+
+      // Normalizar ambos campos por separado
+      const normalizedCodigo = normalizeText(rawCodigo);
+      const normalizedDesc = normalizeText(rawDesc);
+
+      // Buscar en código Y descripción por separado
+      const matchCodigo = tokens.every(tk => normalizedCodigo.includes(tk));
+      const matchDesc = tokens.every(tk => normalizedDesc.includes(tk));
+
+      // También buscar en el texto combinado como fallback
+      const combined = normalizedCodigo + " " + normalizedDesc;
+      const matchCombined = tokens.every(tk => combined.includes(tk));
+
+      const matches = matchCodigo || matchDesc || matchCombined;
+
+      // Debug para el producto 4501
+      if (rawCodigo === "4501" || rawCodigo === "4501") {
+        console.log("🔍 Debug producto 4501:", {
+          rawCodigo,
+          rawDesc,
+          normalizedCodigo,
+          normalizedDesc,
+          tokens,
+          matchCodigo,
+          matchDesc,
+          matchCombined,
+          matches
+        });
+      }
+
+      return matches;
+    });
+
+    console.log(`✅ Búsqueda: "${q}" -> ${filtered.length} resultados`);
+    
+    // Debug: verificar si el producto 4501 está en los resultados
+    const producto4501EnResultados = filtered.find(p => 
+      String(getFieldValue(p, codigoKeys)) === "4501"
     );
+    if (producto4501EnResultados) {
+      console.log("🎯 Producto 4501 encontrado en resultados de búsqueda");
+    } else if (q.includes("4501")) {
+      console.warn("⚠️ Producto 4501 NO encontrado en resultados a pesar de buscar por 4501");
+    }
 
     renderTable(filtered);
+  }, 150); // Aumenté ligeramente el debounce para mejor rendimiento
+
+  searchInput.addEventListener("input", handleSearch);
+
+  // También buscar al presionar Enter
+  searchInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      handleSearch();
+    }
   });
+
+  // Precarga de productos al inicio
+  (async () => {
+    try {
+      console.log("🔄 Precargando productos...");
+      if (allProducts === null) {
+        allProducts = await fetchAllProductsFromServer();
+        renderTable(allProducts);
+        console.log(`✅ Precarga completada: ${allProducts.length} productos`);
+      }
+    } catch (e) {
+      console.error("❌ Error en precarga:", e);
+    }
+  })();
 }
 
+// Función auxiliar para forzar recarga de productos
+window.recargarProductos = async function() {
+  console.log("🔄 Forzando recarga de productos...");
+  allProducts = null;
+  searchInput.value = "";
+  await loadProducts();
+};
+
+// También mejorar la función loadProducts existente para que sincronice con allProducts
+async function loadProducts() {
+  if (!supabase) {
+    console.error("Supabase no inicializado");
+    showToast("Supabase no está inicializado", false);
+    return;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .order("CODIGO", { ascending: true });
+
+    if (error) {
+      console.error("❌ Error al cargar productos:", error);
+      showToast("Error al cargar productos", false);
+      return;
+    }
+
+    // Sincronizar con allProducts
+    allProducts = data || [];
+    
+    await ensureProductosColumnMap();
+    renderTable(allProducts);
+    updatePendingCount();
+    
+    console.log(`✅ loadProducts: ${allProducts.length} productos cargados`);
+  } catch (ex) {
+    console.error("loadProducts exception:", ex);
+    showToast("Error cargando productos", false);
+  }
+}
 // ------------------- Cargar productos -------------------
 async function loadProducts() {
   if (!supabase) {

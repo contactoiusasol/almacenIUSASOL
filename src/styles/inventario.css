@@ -944,3 +944,12 @@ label {
     padding: 8px 6px;
   }
 }
+/* Estilos básicos para el botón de refresh */
+#btnRefresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+#btnRefresh {
+  transition: opacity 0.3s ease;
+}
