@@ -1168,6 +1168,14 @@ console.log("🔍 [RPC] Enviando:", rpcPayload);
 }
 
 async function clearAllPendings() {
+  const list = getPendingSalidas();
+  
+  // Verificar si no hay productos en la lista
+  if (!list || list.length === 0) {
+    showAlert("No hay productos en la lista de salidas pendientes", false, 3000);
+    return;
+  }
+
   const okClear = await showConfirmModal({
     title: "Vaciar pendientes",
     message: "¿Eliminar todas las salidas pendientes?",
@@ -1181,7 +1189,6 @@ async function clearAllPendings() {
   updatePendingCountBadge();
   showAlert("Lista de salidas pendientes vaciada", true, 1800);
 }
-
 
 // ------------------- responsable from usuarios -------------------
 async function setResponsableFromAuth() {
