@@ -1028,3 +1028,43 @@ label {
     transform: rotate(360deg);
   }
 }
+/* Overlay (fondo oscuro) */
+.salidaModalOverlay {
+  position: fixed;
+  inset: 0;                    /* top:0; right:0; bottom:0; left:0; */
+  display: flex;
+  align-items: center;         /* centra verticalmente */
+  justify-content: center;     /* centra horizontalmente */
+  background: rgba(0,0,0,0.45);
+  z-index: 10000;
+  padding: 20px;               /* espacio para pantallas pequeñas */
+  box-sizing: border-box;
+  overflow-y: auto;            /* si el modal + padding supera la altura, el overlay se puede scrollear */
+}
+
+/* Caja del modal */
+.salida-modal {
+  width: min(95%, 760px);                /* se adapta: nunca mayor que 760px ni mayor que 95% */
+  max-width: 95%;
+  max-height: calc(100vh - 48px);        /* deja 24px arriba y abajo como margen */
+  overflow-y: auto;                      /* scroll interno si el contenido es alto */
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.985);   /* o tu color */
+  border-radius: 8px;
+  padding: 18px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  position: relative;
+}
+
+/* Opcional: botón cerrar en esquina superior */
+.salida-modal .close-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+/* Si quieres que el overlay NO centre verticalmente cuando el modal es muy alto,
+   puedes usar align-items: flex-start; en pantallas menores */
+@media (max-height: 600px) {
+  .salidaModalOverlay { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
+}
