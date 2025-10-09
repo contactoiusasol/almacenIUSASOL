@@ -401,7 +401,7 @@ button.eliminar-btn:hover{ background:#f39b9b; }
   max-height: 400px;
   overflow-y: auto;
   overflow-x: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #012e86;
   border-radius: 28px;
   margin-bottom: 20px;
 }
@@ -1201,7 +1201,7 @@ button.eliminar-btn:hover{ background:#f39b9b; }
   position: sticky;
   top: 0;
   z-index: 2;
-  background: rgb(44, 46, 54); /* si tu tema usa otra bg, cámbiala por la variable correspondiente */
+  background: rgb(2, 19, 85); /* si tu tema usa otra bg, cámbiala por la variable correspondiente */
 }
 
 /* Barra lateral */
