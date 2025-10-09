@@ -18,8 +18,12 @@ body {
 h1 {
   text-align: center;
   margin-bottom: 40px;
-  font-size: 34px;
+  font-size: 36px;
   color: #0b195a;
+  font-family: "Poppins", "Quicksand", "Segoe UI", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(11, 25, 90, 0.1);
 }
 
 .back-btn {
@@ -836,24 +840,47 @@ label {
   font-family: 'Quicksand', sans-serif;
 }
 
-/* Botón volver */
+/* 🔙 Botón volver - estilo moderno */
 .back-btn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #6b7280;
-  color: white;
+  gap: 10px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #cce5ff, #e2f0fb);
+  color: #003366;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
-  margin-bottom: 20px;
+  font-size: 15px;
+  box-shadow: 0 2px 6px rgba(0, 51, 102, 0.2);
+  border: 1px solid rgba(0, 102, 204, 0.15);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.back-btn::before {
+  font-size: 16px;
+  transition: transform 0.3s ease;
 }
 
 .back-btn:hover {
-  background: #4b5563;
+  background: linear-gradient(135deg, #b3daff, #d6ecff);
+  color: #85bab3;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(119, 163, 206, 0.748);
+}
+
+.back-btn:hover::before {
+  transform: translateX(-4px);
+}
+
+.back-btn:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 3px rgba(11, 11, 11, 0.818);
+}
+
+.back-btn:hover {
+  background: #b0c0d7d1;
   transform: translateY(-1px);
 }
 
