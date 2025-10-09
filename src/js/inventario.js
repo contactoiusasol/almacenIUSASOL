@@ -15,6 +15,7 @@ const btnOpenModal = document.getElementById("btnOpenModal");
 const btnCloseModal = document.getElementById("btnCloseModal");
 const productForm = document.getElementById("productForm");
 const btnCancelModal = document.querySelector('#btnCancelModal');
+const refreshBtn = document.getElementById("refreshReport");
 
 const tablaPendientesBody = document.querySelector("#pendingTable tbody"); // usado en renderPendingList
 const tablaHistorialBody = document.querySelector("#salidasTable tbody"); // usado por historial
@@ -2928,8 +2929,79 @@ async function setResponsableFromAuth() {
     return null;
   }
 }
+async function cargarInventario() {
+  try {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .order("codigo", { ascending: true });
 
+    if (error) throw error;
 
+    // Limpiar tabla
+    tableBody.innerHTML = "";
+
+    if (!data || data.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Sin productos registrados</td></tr>`;
+      return;
+    }
+
+    // Renderizar filas
+    data.forEach((p) => {
+      const tr = document.createElement("tr");
+
+      // Determinar color según stock total
+      const totalStock =
+        (p.i069 || 0) + (p.i078 || 0) + (p.i07f || 0) + (p.i312 || 0) + (p.i073 || 0);
+      let colorClass = "";
+      if (totalStock > 10) colorClass = "green";
+      else if (totalStock >= 2) colorClass = "yellow";
+      else colorClass = "red";
+
+      tr.innerHTML = `
+        <td>${p.codigo}</td>
+        <td>${p.descripcion}</td>
+        <td>${p.um}</td>
+        <td>${p.i069 ?? 0}</td>
+        <td>${p.i078 ?? 0}</td>
+        <td>${p.i07f ?? 0}</td>
+        <td>${p.i312 ?? 0}</td>
+        <td>${p.i073 ?? 0}</td>
+        <td class="${colorClass}">${totalStock}</td>
+        <td>
+          <button class="btn-edit" data-id="${p.id}">✏️</button>
+          <button class="btn-delete" data-id="${p.id}">🗑️</button>
+        </td>
+      `;
+
+      tableBody.appendChild(tr);
+    });
+  } catch (err) {
+    console.error("Error al cargar inventario:", err);
+    showToast("Error al cargar inventario", false);
+  }
+}
+
+// ------------------- BOTÓN REFRESCAR -------------------
+if (refreshBtn) {
+  refreshBtn.addEventListener("click", async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = "⏳ Actualizando...";
+    await cargarInventario();
+    refreshBtn.textContent = "🔄 Refrescar";
+    refreshBtn.disabled = false;
+    showToast("Inventario actualizado correctamente ✅", true);
+  });
+}
+
+// ------------------- FUNCIÓN PARA NOTIFICACIONES -------------------
+function showToast(msg, ok = true) {
+  const toast = document.getElementById("toast");
+  toast.textContent = msg;
+  toast.className = `toast show ${ok ? "ok" : "error"}`;
+  setTimeout(() => (toast.className = "toast"), 2500);
+}
+document.addEventListener("DOMContentLoaded", cargarInventario);
 // ------------------- Init -------------------
 document.addEventListener("DOMContentLoaded", async () => {
   await setResponsableFromAuth();

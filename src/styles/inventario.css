@@ -953,3 +953,51 @@ label {
 #btnRefresh {
   transition: opacity 0.3s ease;
 }
+/* ---------- BOTÓN REFRESCAR ---------- */
+#refreshReport {
+  background-color: #007bff; /* azul vibrante */
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: "Quicksand", sans-serif;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(0, 123, 255, 0.3);
+}
+
+#refreshReport:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+#refreshReport:active {
+  transform: scale(0.96);
+}
+
+#refreshReport:disabled {
+  background-color: #a6a6a6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 🔄 Animación giratoria opcional */
+#refreshReport.spin::before {
+  content: "🔄";
+  display: inline-block;
+  animation: girar 1s linear infinite;
+}
+
+@keyframes girar {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
