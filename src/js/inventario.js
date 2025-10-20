@@ -1,3 +1,10 @@
+// Prevenir carga duplicada
+if (window.inventarioJsCargado) {
+  console.warn("inventario.js ya fue cargado anteriormente");
+  throw new Error("inventario.js ya está cargado");
+}
+window.inventarioJsCargado = true;
+
 // ------------------- CONFIG SUPABASE -------------------
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
 const SUPABASE_KEY =
@@ -7,7 +14,6 @@ const supabase = window.supabase?.createClient
   : null;
 
 // ------------------- Selectores DOM (si existen) -------------------
-// --- Referencias DOM (una única vez, sin duplicados) ---
 const tableBody = document.querySelector("#inventoryTable tbody");
 const searchInput = document.getElementById("searchInput");
 const modal = document.getElementById("modalForm"); // modal para agregar/editar producto
@@ -1045,7 +1051,6 @@ async function openSalidaModal(producto) {
 
 
 /* Modal dinámico para buscar entradas */
-/* Modal dinámico para buscar entradas por código - VERSIÓN SIMPLIFICADA */
 async function openEntradaLookupModal(prefillCodigo = "") {
   const existing = document.getElementById("entradaLookupOverlay");
   if (existing) existing.remove();
@@ -1233,17 +1238,6 @@ async function openEntradaLookupModal(prefillCodigo = "") {
     listWrap.appendChild(tableEl);
   }
 
-  // Helper para formatear fecha
-  function formatDate(dateString) {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('es-ES');
-    } catch (e) {
-      return String(dateString).slice(0, 10);
-    }
-  }
-
   // Registrar nueva entrada - MANTENIENDO LA FUNCIONALIDAD COMPLETA
   async function abrirRegistrarEntrada() {
     const codigo = String(codigoInput.value || "").trim();
@@ -1400,7 +1394,7 @@ async function openEntradaLookupModal(prefillCodigo = "") {
           i312: q312,
           i073: q073,
           responsable: responsableField.value || CURRENT_USER_FULLNAME || "Sistema",
-          fecha: new Date().toISOString().split('T')[0]
+         fecha: getCurrentLocalDate()  // ← NUEVA FUNCIÓN
         };
 
         // Insertar en tabla entradas
@@ -1432,7 +1426,58 @@ async function openEntradaLookupModal(prefillCodigo = "") {
       }
     });
   }
+// ------------------- FUNCIÓN CORREGIDA PARA FECHAS -------------------
+function getCurrentLocalDate() {
+  const now = new Date();
+  
+  // Obtener componentes de fecha local (no UTC)
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
 
+// ---------------- Helper global mejorado para formatear fechas ----------------
+window.formatDate = function(dateInput) {
+  if (!dateInput) return "";
+
+  // Si ya es Date -> formatear a locale
+  if (dateInput instanceof Date) {
+    if (isNaN(dateInput)) return "";
+    return dateInput.toLocaleDateString('es-MX');
+  }
+
+  const s = String(dateInput).trim();
+
+  // 1) Caso 'YYYY-MM-DD' (solo fecha) -> formatear directamente
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const mYmd = s.match(ymd);
+  if (mYmd) {
+    const [, yyyy, mm, dd] = mYmd;
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  // 2) Para fechas con tiempo/timezone, usar Date pero forzar visualización local
+  try {
+    // Si incluye 'T' (formato ISO) o tiene tiempo, parsear como UTC pero mostrar local
+    if (s.includes('T') || s.includes(':')) {
+      const parsed = new Date(s);
+      if (!isNaN(parsed)) {
+        // Usamos toLocaleDateString para mostrar en formato local
+        return parsed.toLocaleDateString('es-MX');
+      }
+    }
+    
+    // 3) Otros casos: intentar parsear (si es 'YYYY-MM-DD' sin match anterior, añadimos T00:00)
+    const tryIso = s.length === 10 ? `${s}T00:00:00` : s;
+    const parsed = new Date(tryIso);
+    if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
+  } catch (e) { /* noop */ }
+
+  // 4) Fallback visual: primeros 10 chars (YYYY-MM-DD) o la cadena completa si es corta
+  return s.length >= 10 ? s.slice(0,10) : s;
+};
   // Función para actualizar el producto con las nuevas entradas
   async function actualizarProductoConEntradas(codigo, q069, q078, q07f, q312, q073) {
     try {
@@ -2935,24 +2980,36 @@ async function cargarInventario({ showErrors = false } = {}) {
     const { data, error } = await supabase
       .from("productos")
       .select("*")
-      .order("codigo", { ascending: true });
+      .order("CODIGO", { ascending: true }); // ← CAMBIADO A "CODIGO" en mayúsculas
 
     if (error) throw error;
 
     // Limpiar tabla
-    tableBody.innerHTML = "";
+    if (tableBody) {
+      tableBody.innerHTML = "";
+    }
 
     if (!data || data.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Sin productos registrados</td></tr>`;
+      if (tableBody) {
+        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Sin productos registrados</td></tr>`;
+      }
       return;
     }
 
     // Renderizar filas
     data.forEach((p) => {
+      if (!tableBody) return;
+      
       const tr = document.createElement("tr");
 
-      const totalStock =
-        (p.i069 || 0) + (p.i078 || 0) + (p.i07f || 0) + (p.i312 || 0) + (p.i073 || 0);
+      // Usar las funciones helper para obtener los valores correctamente
+      const i069 = getStockFromProduct(p, 'I069') ?? 0;
+      const i078 = getStockFromProduct(p, 'I078') ?? 0;
+      const i07f = getStockFromProduct(p, 'I07F') ?? 0;
+      const i312 = getStockFromProduct(p, 'I312') ?? 0;
+      const i073 = getStockFromProduct(p, 'I073') ?? 0;
+
+      const totalStock = i069 + i078 + i07f + i312 + i073;
 
       let colorClass = "";
       if (totalStock > 10) colorClass = "green";
@@ -2960,18 +3017,18 @@ async function cargarInventario({ showErrors = false } = {}) {
       else colorClass = "red";
 
       tr.innerHTML = `
-        <td>${p.codigo}</td>
-        <td>${p.descripcion}</td>
-        <td>${p.um}</td>
-        <td>${p.i069 ?? 0}</td>
-        <td>${p.i078 ?? 0}</td>
-        <td>${p.i07f ?? 0}</td>
-        <td>${p.i312 ?? 0}</td>
-        <td>${p.i073 ?? 0}</td>
+        <td>${p.CODIGO || p.codigo || ''}</td>
+        <td>${p.DESCRIPCION || p.descripcion || ''}</td>
+        <td>${p.UM || p.um || ''}</td>
+        <td>${i069}</td>
+        <td>${i078}</td>
+        <td>${i07f}</td>
+        <td>${i312}</td>
+        <td>${i073}</td>
         <td class="${colorClass}">${totalStock}</td>
         <td>
-          <button class="btn-edit" data-id="${p.id}">✏️</button>
-          <button class="btn-delete" data-id="${p.id}">🗑️</button>
+          <button class="btn-edit" data-id="${p.CODIGO || p.codigo}">✏️</button>
+          <button class="btn-delete" data-id="${p.CODIGO || p.codigo}">🗑️</button>
         </td>
       `;
 

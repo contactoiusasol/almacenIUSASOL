@@ -17,7 +17,8 @@
     'inventario.html',
     'entradas.html',
     'salidas.html',
-    'reportes.html'
+    'reportes.html',
+    'usuarios.html'
   ];
 
   const LS_USER = 'usuario';
@@ -82,16 +83,13 @@
     sessionStorage.removeItem(SS_SESSION);
   }
 
-  // redirige al login; intenta la ruta primaria absoluta primero
   function redirectToLoginImmediate() {
     try {
       clearSession();
       const candidate = new URL(PRIMARY_LOGIN, location.origin).href;
-      // si ya estamos en el login no hacer nada
       if (location.href === candidate) return;
       location.replace(candidate);
     } catch (e) {
-      // fallback: tratar con ruta relativa
       try {
         location.replace('login.html');
       } catch (err) {
@@ -104,7 +102,7 @@
   const currentPath = location.pathname || location.href;
   const shouldProtect = isProtectedPage(currentPath);
   if (shouldProtect) {
-    try { document.documentElement.style.visibility = 'hidden'; } catch (e) { /* ignore */ }
+    try { document.documentElement.style.visibility = 'hidden'; } catch (e) {}
   }
 
   // Intercepta clicks en enlaces para bloquear navegación a páginas protegidas
@@ -120,13 +118,10 @@
           ev.preventDefault();
           redirectToLoginImmediate();
         }
-      } catch (e) {
-        // URL inválida: no hacemos nada
-      }
+      } catch (e) {}
     }, true);
   }
 
-  // Vigila back/forward para impedir mostrar páginas protegidas sin auth
   function watchHistory() {
     window.addEventListener('popstate', function () {
       if (isProtectedPage(location.pathname) && !checkAuth('admin')) {
@@ -135,7 +130,6 @@
     });
   }
 
-  // Acción principal: proteger ahora mismo
   function protectNow() {
     const pathname = location.pathname || location.href;
 
@@ -150,43 +144,38 @@
           try { location.replace(new URL('/src/html/usuario.html', location.origin).href); } catch (e) { location.replace('/src/html/usuario.html'); }
         }
       } else {
-        // Si es login y NO hay sesión, permitir ver el login: mostrar página
         try { document.documentElement.style.visibility = ''; } catch (e) {}
       }
       return;
     }
 
-    // Si la página actual es protegida -> requiere admin o redirigir
+    // Página protegida
     if (isProtectedPage(pathname)) {
       if (!checkAuth('admin')) {
-        // redirigir ya
         redirectToLoginImmediate();
         return;
       }
-      // sesión válida: mostrar la página y ejecutar hooks si existen
       try { document.documentElement.style.visibility = ''; } catch (e) {}
       if (typeof displayUserInfo === 'function') {
-        try { displayUserInfo(); } catch (e) { /* no crítico */ }
+        try { displayUserInfo(); } catch (e) {}
       }
       if (typeof setupActivityCheck === 'function') {
-        try { setupActivityCheck(); } catch (e) { /* no crítico */ }
+        try { setupActivityCheck(); } catch (e) {}
       }
       return;
     }
 
-    // Página no protegida: mostrar la página
+    // Página no protegida
     try { document.documentElement.style.visibility = ''; } catch (e) {}
   }
 
-  // Ejecutar interceptores lo antes posible
+  // Ejecutar interceptores
   try {
     interceptLinks();
     watchHistory();
 
     if (document.readyState === 'loading') {
-      // Ejecutar pronto
       setTimeout(protectNow, 10);
-      // También correr protectNow en DOMContentLoaded por si acaso
       document.addEventListener('DOMContentLoaded', protectNow, { once: true });
     } else {
       protectNow();
@@ -200,5 +189,14 @@
     console.error('Error en seguridad:', err);
     try { document.documentElement.style.visibility = ''; } catch (e) {}
   }
+
+  // ------------------ EXPONER protectPage ------------------
+  window.protectPage = function(requiredRole = 'admin') {
+    if (!checkAuth(requiredRole)) {
+      redirectToLoginImmediate();
+      return false;
+    }
+    return true;
+  };
 
 })();
