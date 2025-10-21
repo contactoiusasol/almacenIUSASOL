@@ -9,7 +9,7 @@ const modal = document.getElementById("modal");
 const modalConfirmacion = document.getElementById("modalConfirmacion");
 const modalNotificacion = document.getElementById("modalNotificacion");
 const closeModal = document.getElementById("closeModal");
-const btnNuevo = document.getElementById("btnNuevo");
+// const btnNuevo = document.getElementById("btnNuevo"); // eliminado (ya no existe en el HTML)
 const formUsuario = document.getElementById("formUsuario");
 const modalTitle = document.getElementById("modalTitle");
 const btnCancelarForm = document.getElementById("cancelarForm");
@@ -32,17 +32,16 @@ let usuarioEliminando = null;
 document.addEventListener('DOMContentLoaded', function() {
     cargarUsuarios();
     
-    // Event Listeners
-    btnNuevo.addEventListener('click', abrirModalNuevo);
-    closeModal.addEventListener('click', cerrarModal);
-    btnCancelarForm.addEventListener('click', cerrarModal);
-    btnCancelarEliminar.addEventListener('click', cerrarModalConfirmacion);
-    btnConfirmarEliminar.addEventListener('click', confirmarEliminacion);
-    closeConfirmacion.addEventListener('click', cerrarModalConfirmacion);
+    // Event Listeners (sin btnNuevo)
+    if (closeModal) closeModal.addEventListener('click', cerrarModal);
+    if (btnCancelarForm) btnCancelarForm.addEventListener('click', cerrarModal);
+    if (btnCancelarEliminar) btnCancelarEliminar.addEventListener('click', cerrarModalConfirmacion);
+    if (btnConfirmarEliminar) btnConfirmarEliminar.addEventListener('click', confirmarEliminacion);
+    if (closeConfirmacion) closeConfirmacion.addEventListener('click', cerrarModalConfirmacion);
     
     // Notificaciones
-    aceptarNotificacion.addEventListener('click', cerrarNotificacion);
-    closeNotificacion.addEventListener('click', cerrarNotificacion);
+    if (aceptarNotificacion) aceptarNotificacion.addEventListener('click', cerrarNotificacion);
+    if (closeNotificacion) closeNotificacion.addEventListener('click', cerrarNotificacion);
     
     // Cerrar modales al hacer clic fuera
     window.addEventListener('click', function(event) {
@@ -56,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Envío del formulario
-    formUsuario.addEventListener('submit', guardarUsuario);
+    if (formUsuario) formUsuario.addEventListener('submit', guardarUsuario);
 });
 
 // ---------------- MOSTRAR USUARIOS ----------------
@@ -82,10 +81,10 @@ async function cargarUsuarios() {
         data.forEach(u => {
             const fila = document.createElement('tr');
             fila.innerHTML = `
-                <td>${u.nombre}</td>
-                <td>${u.apellido}</td>
-                <td>${u.email}</td>
-                <td><span class="role-badge ${u.role}">${u.role}</span></td>
+                <td>${escapeHtml(u.nombre)}</td>
+                <td>${escapeHtml(u.apellido)}</td>
+                <td>${escapeHtml(u.email)}</td>
+                <td><span class="role-badge ${escapeHtml(u.role)}">${escapeHtml(u.role)}</span></td>
                 <td class="password-cell">${'*'.repeat(u.password?.length || 0)}</td>
                 <td>
                     <button class="edit-btn" onclick="editarUsuario(${u.id})">Editar</button>
@@ -100,29 +99,42 @@ async function cargarUsuarios() {
     }
 }
 
+// ---------------- ESCAPAR HTML (evita inyección al renderizar) ----------------
+function escapeHtml(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
 
 // ---------------- ABRIR MODAL NUEVO USUARIO ----------------
 function abrirModalNuevo() {
+    // Esta función puede seguir usándose si desde otra parte quieres abrir el modal
+    if (!formUsuario) return;
     formUsuario.reset();
-    document.getElementById("usuarioId").value = "";
-    modalTitle.textContent = "Nuevo Usuario";
-    modal.style.display = "block";
+    const usuarioIdInput = document.getElementById("usuarioId");
+    if (usuarioIdInput) usuarioIdInput.value = "";
+    if (modalTitle) modalTitle.textContent = "Nuevo Usuario";
+    if (modal) modal.style.display = "block";
 }
 
 // ---------------- CERRAR MODAL ----------------
 function cerrarModal() {
-    modal.style.display = "none";
+    if (modal) modal.style.display = "none";
 }
 
 // ---------------- ABRIR MODAL CONFIRMACIÓN ELIMINAR ----------------
 function abrirModalConfirmacion(id) {
     usuarioEliminando = id;
-    modalConfirmacion.style.display = "block";
+    if (modalConfirmacion) modalConfirmacion.style.display = "block";
 }
 
 // ---------------- CERRAR MODAL CONFIRMACIÓN ----------------
 function cerrarModalConfirmacion() {
-    modalConfirmacion.style.display = "none";
+    if (modalConfirmacion) modalConfirmacion.style.display = "none";
     usuarioEliminando = null;
 }
 
@@ -141,7 +153,7 @@ async function confirmarEliminacion() {
         }
         
         mostrarNotificacion("Usuario eliminado correctamente", "exito");
-        cargarUsuarios();
+        await cargarUsuarios();
     } catch (error) {
         console.error("Error al eliminar usuario:", error);
         mostrarNotificacion("Error al eliminar usuario", "error");
@@ -151,17 +163,17 @@ async function confirmarEliminacion() {
 }
 
 // ---------------- GUARDAR USUARIO ----------------
-// ---------------- GUARDAR USUARIO ----------------
 async function guardarUsuario(e) {
     e.preventDefault();
 
     const id = document.getElementById("usuarioId").value;
-    const nuevoUsuario = {
-        nombre: document.getElementById("nombre").value.trim(),
-        apellido: document.getElementById("apellido").value.trim(),
-        email: document.getElementById("email").value.trim().toLowerCase(),
-        role: document.getElementById("role").value
-    };
+    const nombre = document.getElementById("nombre").value.trim();
+    const apellido = document.getElementById("apellido").value.trim();
+    const email = document.getElementById("email").value.trim().toLowerCase();
+    const password = document.getElementById("password").value; // puede estar vacío en edición
+    const role = document.getElementById("role").value;
+
+    const nuevoUsuario = { nombre, apellido, email, role };
 
     // Validaciones básicas
     if (!nuevoUsuario.nombre || !nuevoUsuario.apellido || !nuevoUsuario.email) {
@@ -176,44 +188,56 @@ async function guardarUsuario(e) {
     }
 
     try {
-        // Si es edición, actualiza como siempre
+        // Verificar email único (excluyendo al usuario que editamos)
+        const esUnico = await verificarEmailUnico(nuevoUsuario.email, id || null);
+        if (!esUnico) {
+            mostrarNotificacion("El email ya está en uso por otro usuario", "error");
+            return;
+        }
+
         if (id) {
+            // Edición: construir objeto de update (no sobreescribir contraseña si está vacía)
+            const updateObj = { nombre, apellido, email, role };
+            if (password && password.length > 0) {
+                updateObj.password = password;
+            }
+
             const { error } = await supabase
                 .from("usuarios")
-                .update(nuevoUsuario)
+                .update(updateObj)
                 .eq("id", id);
 
             if (error) throw error;
 
             mostrarNotificacion("Usuario actualizado correctamente", "exito");
         } else {
-            // Si es nuevo usuario, manda invitación por correo
-            const response = await fetch("/api/invite", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(nuevoUsuario)
-            });
+            // Nuevo usuario: insertar directamente en la tabla
+            // (Si deseas hashear la contraseña en el servidor, cambia la lógica;
+            // aquí guardamos la contraseña tal cual según el diseño actual)
+            const insertObj = {
+                nombre,
+                apellido,
+                email,
+                role,
+                password: password || "" // si deseas forzar contraseña, valida antes
+            };
 
-            const data = await response.json();
+            const { error } = await supabase
+                .from("usuarios")
+                .insert([insertObj]);
 
-            if (!response.ok) {
-                throw new Error(data.error || "Error al enviar invitación");
-            }
+            if (error) throw error;
 
-            mostrarNotificacion(
-                "Invitación enviada. El usuario recibirá un correo para registrarse.",
-                "exito"
-            );
+            mostrarNotificacion("Usuario creado correctamente", "exito");
         }
 
         cerrarModal();
-        cargarUsuarios();
+        await cargarUsuarios();
     } catch (error) {
         console.error("Error al guardar usuario:", error);
         mostrarNotificacion(error.message || "Error al procesar la solicitud", "error");
     }
 }
-
 
 // ---------------- EDITAR USUARIO ----------------
 async function editarUsuario(id) {
@@ -247,6 +271,7 @@ async function editarUsuario(id) {
         mostrarNotificacion("Error al cargar el usuario: " + (error.message || "Error desconocido"), "error");
     }
 }
+
 // ---------------- VERIFICAR EMAIL ÚNICO ----------------
 async function verificarEmailUnico(email, usuarioId = null) {
     try {
@@ -266,7 +291,7 @@ async function verificarEmailUnico(email, usuarioId = null) {
             throw error;
         }
 
-        return data.length === 0; // true si el email es único
+        return !data || data.length === 0; // true si el email es único o no hay resultados
     } catch (error) {
         console.error("Error al verificar email:", error);
         return false;
@@ -295,15 +320,15 @@ function mostrarNotificacion(mensaje, tipo = "exito") {
     const { titulo, clase, icono } = config[tipo] || config.error;
 
     // Aplicar configuración
-    notificacionHeader.className = "notificacion-header " + clase;
-    notificacionIcon.innerHTML = icono;
-    notificacionTitulo.textContent = titulo;
-    notificacionMensaje.textContent = mensaje;
+    if (notificacionHeader) notificacionHeader.className = "notificacion-header " + clase;
+    if (notificacionIcon) notificacionIcon.innerHTML = icono;
+    if (notificacionTitulo) notificacionTitulo.textContent = titulo;
+    if (notificacionMensaje) notificacionMensaje.textContent = mensaje;
 
     // Mostrar modal
-    modalNotificacion.style.display = "block";
+    if (modalNotificacion) modalNotificacion.style.display = "block";
 }
 
 function cerrarNotificacion() {
-    modalNotificacion.style.display = "none";
+    if (modalNotificacion) modalNotificacion.style.display = "none";
 }

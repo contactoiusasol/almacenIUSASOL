@@ -12,7 +12,6 @@
   <header>
     <a href="admin.html" class="back-btn">⬅ Volver al Panel</a>
     <h1>Gestión de Usuarios</h1>
-    <button id="btnNuevo" class="btn">+ Invitación</button>
   </header>
 
   <section id="tablaUsuarios">
@@ -32,7 +31,7 @@
   </section>
 
   <!-- Modal para editar -->
-<div id="modal" class="modal">
+  <div id="modal" class="modal">
     <div class="modal-content">
         <div class="modal-header">
             <h2 id="modalTitle">Nuevo Usuario</h2>
@@ -76,78 +75,46 @@
             </div>
         </form>
     </div>
-</div>
-<!-- Modal de invitación -->
-<div id="inviteModal" class="modal" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2>Invitar Usuario</h2>
-      <button class="close" id="closeInvite">&times;</button>
-    </div>
-    <form id="inviteForm">
-      <div class="form-group">
-        <label for="inviteNombre">Nombre:</label>
-        <input type="text" id="inviteNombre" name="inviteNombre" required placeholder="Ingrese el nombre">
-      </div>
-      <div class="form-group">
-        <label for="inviteApellido">Apellido:</label>
-        <input type="text" id="inviteApellido" name="inviteApellido" required placeholder="Ingrese el apellido">
-      </div>
-      <div class="form-group">
-        <label for="inviteEmail">Email:</label>
-        <input type="email" id="inviteEmail" name="inviteEmail" required placeholder="Ingrese el email">
-      </div>
-      <div class="form-group">
-        <label for="inviteRole">Rol:</label>
-        <select id="inviteRole" name="inviteRole" required>
-          <option value="cliente">Cliente</option>
-          <option value="admin">Administrador</option>
-        </select>
-      </div>
-      <div class="form-actions">
-        <button type="button" class="cancel-btn" id="cancelInvite">Cancelar</button>
-        <button type="submit" class="btn" id="sendInviteBtn">Enviar invitación</button>
-      </div>
-    </form>
   </div>
-</div>
 
-   <!-- Modal de confirmación para eliminar usuario -->
-    <div id="modalConfirmacion" class="modal confirmation-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Confirmar Eliminación</h2>
-                <span class="close confirm-close">&times;</span>
-            </div>
-            <div class="confirmation-body">
-                <p>¿Seguro que deseas eliminar este usuario?</p>
-                <div class="confirmation-actions">
-                    <button class="cancel-btn" id="cancelarEliminar">Cancelar</button>
-                    <button class="delete-btn" id="confirmarEliminar">Eliminar</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- Modal de Notificación -->
-<div id="modalNotificacion" class="modal notificacion-modal">
-    <div class="modal-content">
-        <div class="notificacion-header" id="notificacionHeader">
-            <div class="notificacion-icon" id="notificacionIcon"></div>
-            <h3 id="notificacionTitulo">Éxito</h3>
-            <button class="close notificacion-close">&times;</button>
-        </div>
-        <div class="notificacion-body">
-            <p id="notificacionMensaje">Usuario actualizado correctamente</p>
-            <button class="btn notificacion-btn" id="aceptarNotificacion">Aceptar</button>
-        </div>
-    </div>
-</div>
-<script src="../js/seguridad.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        protectPage('admin');
-    });
-</script>
+  <!-- Modal de confirmación para eliminar usuario -->
+  <div id="modalConfirmacion" class="modal confirmation-modal">
+      <div class="modal-content">
+          <div class="modal-header">
+              <h2>Confirmar Eliminación</h2>
+              <span class="close confirm-close">&times;</span>
+          </div>
+          <div class="confirmation-body">
+              <p>¿Seguro que deseas eliminar este usuario?</p>
+              <div class="confirmation-actions">
+                  <button class="cancel-btn" id="cancelarEliminar">Cancelar</button>
+                  <button class="delete-btn" id="confirmarEliminar">Eliminar</button>
+              </div>
+          </div>
+      </div>
+  </div>
+
+  <!-- Modal de Notificación -->
+  <div id="modalNotificacion" class="modal notificacion-modal">
+      <div class="modal-content">
+          <div class="notificacion-header" id="notificacionHeader">
+              <div class="notificacion-icon" id="notificacionIcon"></div>
+              <h3 id="notificacionTitulo">Éxito</h3>
+              <button class="close notificacion-close">&times;</button>
+          </div>
+          <div class="notificacion-body">
+              <p id="notificacionMensaje">Usuario actualizado correctamente</p>
+              <button class="btn notificacion-btn" id="aceptarNotificacion">Aceptar</button>
+          </div>
+      </div>
+  </div>
+
+  <script src="../js/seguridad.js"></script>
+  <script>
+      document.addEventListener('DOMContentLoaded', function() {
+          protectPage('admin');
+      });
+  </script>
   <script src="../js/usuarios.js"></script>
   
 </body>
