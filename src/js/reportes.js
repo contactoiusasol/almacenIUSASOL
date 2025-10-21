@@ -1,4 +1,3 @@
-// reportes.js - Archivo completo con toasts y confirm modal integrado
 
 // ------------------- CONFIG SUPABASE -------------------
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
