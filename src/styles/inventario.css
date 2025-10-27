@@ -7,8 +7,8 @@ body {
 }
 
 .container {
-  max-width: 1200px;
-  margin: 30px auto;
+  max-width: 15000px;
+  margin: 10px auto;
   background: transparent;
   padding: 20px;
   border-radius: 10px;
@@ -1068,3 +1068,323 @@ label {
 @media (max-height: 600px) {
   .salidaModalOverlay { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
 }
+/* Estilos para la paginación */
+#paginationControls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    flex-wrap: wrap;
+    border: 1px solid #e9ecef;
+}
+
+.pagination-btn {
+    padding: 10px 16px;
+    border: 1px solid #007bff;
+    background: #007bff;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    min-width: 100px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: #0056b3;
+    border-color: #0056b3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,123,255,0.3);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #6c757d;
+    border-color: #6c757d;
+    transform: none;
+    box-shadow: none;
+}
+
+#pageInput {
+    width: 70px;
+    padding: 6px;
+    text-align: center;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+#pageInput:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+/* Indicador de carga */
+#loadingIndicator {
+    text-align: center;
+    padding: 20px;
+    color: #666;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Botones flotantes */
+#showAllBtn, #forceRefreshBtn {
+    position: fixed;
+    right: 10px;
+    z-index: 10000;
+    color: white;
+    border: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+#showAllBtn {
+    bottom: 140px;
+    background: #28a745;
+}
+
+#showAllBtn:hover {
+    background: #218838;
+    transform: translateY(-2px);
+}
+
+#forceRefreshBtn {
+    bottom: 20px;
+    background: #ff6b35;
+}
+
+#forceRefreshBtn:hover {
+    background: #e55a2b;
+    transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #paginationControls {
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .pagination-btn {
+        min-width: 80px;
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    #showAllBtn, #forceRefreshBtn {
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+}
+
+
+/* ------------------- CONTENEDOR CON SCROLL PARA TABLA ANCHA ------------------- */
+.table-scroll-container {
+  max-height: 70vh;
+  overflow: auto;
+  border: 1px solid #e1e5e9;
+  border-radius: 10px;
+  margin-top: 15px;
+  background: white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  position: relative;
+}
+
+/* Header fijo verticalmente */
+.table-scroll-container thead th {
+  position: sticky;
+  top: 0;
+  background: #061a6ad7;
+  color: white;
+  padding: 14px 8px;
+  font-weight: 700;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid #05155e;
+  z-index: 100;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Columnas específicas - más compactas para inventarios */
+.table-scroll-container th:nth-child(4),  /* I069 */
+.table-scroll-container th:nth-child(5),  /* I078 */
+.table-scroll-container th:nth-child(6),  /* I07F */
+.table-scroll-container th:nth-child(7),  /* I312 */
+.table-scroll-container th:nth-child(8),  /* I073 */
+.table-scroll-container th:nth-child(9) { /* Físico */
+  min-width: 100px;
+  max-width: 120px;
+  font-size: 12px;
+}
+
+/* Columnas principales más anchas */
+.table-scroll-container th:nth-child(1) { /* Código */
+  min-width: 100px;
+}
+.table-scroll-container th:nth-child(2) { /* Descripción */
+  min-width: 250px;
+  text-align: left;
+}
+.table-scroll-container th:nth-child(3) { /* UM */
+  min-width: 60px;
+}
+
+/* Columna de acciones */
+.table-scroll-container th:nth-child(10) { /* Acciones */
+  min-width: 200px;
+  position: sticky;
+  right: 0;
+  background: #061a6ad7;
+}
+
+/* Celdas del cuerpo */
+.table-scroll-container td {
+  padding: 10px 8px;
+  text-align: center;
+  border-bottom: 1px solid #eee;
+  white-space: nowrap;
+}
+
+/* Alineación específica para celdas */
+.table-scroll-container td:nth-child(2) { /* Descripción */
+  text-align: left;
+  white-space: normal;
+  max-width: 250px;
+  min-width: 250px;
+}
+
+/* Columna de acciones fija a la derecha */
+.table-scroll-container td.acciones {
+  position: sticky;
+  right: 0;
+  background: inherit;
+  z-index: 5;
+  box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+}
+
+/* Scroll personalizado */
+.table-scroll-container::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 0 10px 10px 0;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #adb5bd;
+  border-radius: 6px;
+  border: 3px solid #f1f3f5;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #6c757d;
+}
+
+/* Para Firefox */
+.table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #adb5bd #f1f3f5;
+}
+
+/* Asegurar que los colores de stock se mantengan */
+.table-scroll-container .stock-high td {
+  background-color: rgba(153, 250, 182, 0.775);
+}
+
+.table-scroll-container .stock-medium td {
+  background-color: rgba(255, 255, 179, 0.8);
+}
+
+.table-scroll-container .stock-low td {
+  background-color: rgba(245, 127, 139, 0.75);
+}
+
+/* Efecto hover mejorado */
+.table-scroll-container tbody tr:hover {
+  background-color: #e3f2fd !important;
+  transform: translateX(2px);
+  transition: all 0.2s ease;
+}
+
+/* Responsive */
+@media (max-width: 1400px) {
+  .table-scroll-container {
+    max-height: 65vh;
+  }
+}
+
+@media (max-width: 1200px) {
+  .table-scroll-container th:nth-child(2) { /* Descripción */
+    min-width: 200px;
+    max-width: 200px;
+  }
+  
+  .table-scroll-container td:nth-child(2) {
+    min-width: 200px;
+    max-width: 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .table-scroll-container {
+    max-height: 60vh;
+    border-radius: 8px;
+  }
+  
+  .table-scroll-container thead th {
+    padding: 10px 6px;
+    font-size: 11px;
+  }
+  
+  .table-scroll-container th:nth-child(4),
+  .table-scroll-container th:nth-child(5),
+  .table-scroll-container th:nth-child(6),
+  .table-scroll-container th:nth-child(7),
+  .table-scroll-container th:nth-child(8),
+  .table-scroll-container th:nth-child(9) {
+    min-width: 80px;
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-scroll-container {
+    max-height: 55vh;
+  }
+}
+/* Estilos para botón de productos sin código */
+.btn-add.no-code {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  border: 1px solid #7c3aed;
+}
+
+.btn-add.no-code:hover {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+}
+
+/* Ajustes para la tabla de productos sin código */
+#noCodeTable th:nth-child(1) { width: 80px; }  /* ID */
+#noCodeTable th:nth-child(2) { width: 250px; } /* Descripción */
+#noCodeTable th:nth-child(3) { width: 80px; }  /* UM */
+#noCodeTable th:nth-child(10) { width: 120px; } /* Fecha */

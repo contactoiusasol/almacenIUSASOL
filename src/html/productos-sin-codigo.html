@@ -11,7 +11,8 @@
 <body>
   <div class="container">
     <a href="admin.html" class="back-btn">⬅ Volver al Panel</a>
-    <h1>Inventario de Productos</h1>
+    <a href="inventario.html" class="back-btn">⬅ Volver al Panel de inventario</a>
+    <h1>Inventario de Productos sin código</h1>
 
     <!-- Leyenda de colores -->
     <div class="color-legend">
@@ -30,11 +31,10 @@
     </div>
 
     <div class="actions-header">
-      <input type="text" id="searchInput" placeholder="Buscar por código o descripción...">
+      <input type="text" id="searchInput" placeholder="Buscar por descripción...">
       <button class="btn-add" id="btnOpenModal">➕ Agregar Producto</button>
       <button id="refreshReport" class="generate-btn" title="Refrescar datos">🔄 Refrescar</button>
       <button class="btn-salidas" id="btnVerSalidas">📋 Ver Salidas</button> 
-      <a href="productos-sin-codigo.html" class="btn-add no-code" title="Agregar producto sin código">➕ Agregar sin código</a>
     </div>
     
     <div class="table-scroll-container">
@@ -49,7 +49,7 @@
             <th>INVENTARIO I07F</th>
             <th>INVENTARIO I312</th>
             <th>INVENTARIO I073</th>
-            <th>INVENTARIO FÍSICO EN ALMACÉN</th>
+            <th>TOTAL STOCK</th>
             <th class="acciones-head">Acciones</th>
           </tr>
         </thead>
@@ -76,14 +76,15 @@
       <span class="close" id="btnCloseModal">&times;</span>
       <h2 id="modalTitle">Agregar Producto</h2>
       <form id="productForm">
+        <!-- ELIMINADO EL CAMPO CÓDIGO -->
         <div class="form-row">
           <div class="form-group">
-            <label>Código:</label>
-            <input type="number" name="codigo" required>
+            <label>Descripción:</label>
+            <input type="text" name="descripcion" required>
           </div>
           <div class="form-group">
             <label>UM:</label>
-            <input list="unidades" name="um" required readonly>
+            <input list="unidades" name="um" required>
             <datalist id="unidades">
               <option value="PZA">
               <option value="M">
@@ -97,42 +98,40 @@
             </datalist>
           </div>
         </div>
-        
-        <div class="form-group">
-          <label>Descripción:</label>
-          <input type="text" name="descripcion" required>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group">
-            <label>Inventario I069:</label>
-            <input type="number" name="i069" min="0" readonly>
+        <!-- CAMPOS DE INVENTARIO OCULTOS (se llenan automáticamente con 0) -->
+        <div style="display: none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Inventario I069:</label>
+              <input type="number" name="i069" min="0" value="0" readonly>
+            </div>
+            <div class="form-group">
+              <label>Inventario I078:</label>
+              <input type="number" name="i078" min="0" value="0" readonly>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Inventario I078:</label>
-            <input type="number" name="i078" min="0" readonly>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Inventario I07F:</label>
+              <input type="number" name="i07f" min="0" value="0" readonly>
+            </div>
+            <div class="form-group">
+              <label>Inventario I312:</label>
+              <input type="number" name="i312" min="0" value="0" readonly>
+            </div>
           </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>Inventario I07F:</label>
-            <input type="number" name="i07f" min="0" readonly>
-          </div>
-          <div class="form-group">
-            <label>Inventario I312:</label>
-            <input type="number" name="i312" min="0" readonly>
-          </div>
-        </div>
-        
-        <div class="form-row">
-          <div class="form-group">
-            <label>Inventario I073:</label>
-            <input type="number" name="i073" min="0" readonly>
-          </div>
-          <div class="form-group">
-            <label>Inventario Físico en Almacén:</label>
-            <input type="number" name="almacen" id="almacen" readonly>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Inventario I073:</label>
+              <input type="number" name="i073" min="0" value="0" readonly>
+            </div>
+            <div class="form-group">
+              <label>Inventario Físico en Almacén:</label>
+              <input type="number" name="almacen" id="almacen" value="0" readonly>
+            </div>
           </div>
         </div>
 
@@ -169,9 +168,13 @@
           <tr>
             <th>Código</th>
             <th>Descripción</th>
+            <th>UM</th>
+            <th>Inventario Origen</th>
             <th>Cantidad</th>
-            <th>Observaciones</th>
             <th>Fecha</th>
+            <th>Responsable</th>
+            <th>Destinatario</th>
+            <th>Observaciones</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -205,8 +208,13 @@
         </div>
 
         <div class="field">
-          <label for="salidaResponsableInput">Responsable (Nombre y Apellido)</label>
+          <label for="salidaResponsableInput">Responsable</label>
           <input id="salidaResponsableInput" type="text" placeholder="Ej. Juan Pérez" required />
+        </div>
+
+        <div class="field">
+          <label for="salidaDestinatarioInput">Destinatario</label>
+          <input id="salidaDestinatarioInput" type="text" placeholder="Ej. Cliente XYZ" required />
         </div>
 
         <div class="field">
@@ -224,7 +232,8 @@
 
   <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="../js/inventario.js"></script>
+  <!-- CAMBIADO EL SCRIPT A productos-sin-codigo.js -->
+  <script src="../js/productos-sin-codigo.js"></script>
 
   <script>
     // 🔹 Calcula automáticamente el Inventario Físico en Almacén

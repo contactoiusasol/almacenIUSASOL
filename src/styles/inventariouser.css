@@ -61,7 +61,7 @@ h1 {
 }
 
 #inventoryTable th {
-  background: #061a6ad7;
+  background: #092cbbd7;
   color: white;
   padding: 12px;
   text-align: left;
@@ -1563,5 +1563,217 @@ label {
     .agregar-btn::after {
         font-size: 13px;
         margin-left: 4px;
+    }
+}
+
+/* ===== SCROLL PARA TABLA ===== */
+.table-scroll-container {
+  width: 100%;
+  max-height: 70vh; /* 70% del alto de la ventana */
+  overflow: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  background: white;
+}
+
+/* Headers fijos */
+.table-scroll-container thead {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.table-scroll-container thead th {
+  background: #2c3e50 !important;
+  color: white;
+  position: relative;
+  border-bottom: 2px solid #34495e;
+}
+
+/* Asegurar que la tabla ocupe todo el ancho */
+.table-scroll-container table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+/* Scrollbar personalizado */
+.table-scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Para Firefox */
+.table-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+/* Ajustar el alto máximo en pantallas pequeñas */
+@media (max-height: 800px) {
+  .table-scroll-container {
+    max-height: 60vh;
+  }
+}
+
+@media (max-height: 600px) {
+  .table-scroll-container {
+    max-height: 50vh;
+  }
+}
+/* Contenedor principal de paginación */
+.pagination-container {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    margin: 20px 0;
+    border: 1px solid #e9ecef;
+}
+
+/* Botones de paginación */
+.pagination-btn {
+    padding: 10px 16px;
+    border: 2px solid #007bff;
+    background: white;
+    color: #007bff;
+    cursor: pointer;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+    background: #007bff;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+}
+
+.pagination-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.pagination-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: #6c757d;
+    color: #6c757d;
+}
+
+/* Contenedor de entrada de página */
+.page-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.page-input-container span {
+    font-weight: 600;
+    color: #495057;
+}
+
+/* Input de número de página */
+#pageInput {
+    width: 80px;
+    padding: 8px;
+    text-align: center;
+    border: 2px solid #ced4da;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+#pageInput:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Contenedor de información de productos */
+.products-info {
+    margin-left: 10px;
+    font-weight: 600;
+    color: #495057;
+    background: white;
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: 2px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.products-info strong {
+    color: #007bff;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pagination-container {
+        gap: 10px;
+        padding: 15px;
+    }
+    
+    .pagination-btn {
+        padding: 8px 12px;
+        font-size: 12px;
+    }
+    
+    .page-input-container,
+    .products-info {
+        padding: 8px 12px;
+    }
+    
+    #pageInput {
+        width: 60px;
+        padding: 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .pagination-container {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .pagination-btn {
+        justify-content: center;
+    }
+    
+    .page-input-container {
+        justify-content: center;
+    }
+    
+    .products-info {
+        text-align: center;
+        margin-left: 0;
     }
 }

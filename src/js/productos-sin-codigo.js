@@ -37,7 +37,7 @@ let editingCodigo = null;
 let CURRENT_USER_FULLNAME = "";
 let CURRENT_USER_NOMBRE = "";
 let CURRENT_USER_APELLIDO = "";
-let PRODUCTOS_COLUMN_MAP = null; // map: normalizedKey -> realColumnName
+let PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null; // map: normalizedKey -> realColumnName
 
 // ------------------- VARIABLES PARA CARGA PROGRESIVA -------------------
 let currentOffset = 0;
@@ -228,42 +228,42 @@ if (typeof btnCancelModal !== 'undefined' && btnCancelModal && !btnCancelModal.d
 }
 
 // ------------------- CONFIGURACIÓN ESPECÍFICA PARA TU ESTRUCTURA -------------------
-async function ensureProductosColumnMap() {
-  if (PRODUCTOS_COLUMN_MAP) return PRODUCTOS_COLUMN_MAP;
-  PRODUCTOS_COLUMN_MAP = {};
-  if (!supabase) return PRODUCTOS_COLUMN_MAP;
+async function ensureProductosSinCodigoColumnMap() {
+  if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
+  PRODUCTOS_SIN_CODIGO_COLUMN_MAP = {};
+  if (!supabase) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
   
   try {
-    console.log("🔍 Detectando estructura de columnas...");
-    const { data, error } = await supabase.from("productos").select("*").limit(5);
+    console.log("🔍 Detectando estructura de columnas de productos_sin_codigo...");
+    const { data, error } = await supabase.from("productos_sin_codigo").select("*").limit(5);
     
     if (error) {
       console.warn("Error al detectar columnas:", error);
-      return PRODUCTOS_COLUMN_MAP;
+      return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
     }
     
     if (data && data.length > 0) {
       const sampleRow = data[0];
-      console.log("📋 Columnas reales en tu BD:", Object.keys(sampleRow));
+      console.log("📋 Columnas reales en tu BD productos_sin_codigo:", Object.keys(sampleRow));
       
       // Mapear todas las columnas encontradas
       Object.keys(sampleRow).forEach((key) => {
-        PRODUCTOS_COLUMN_MAP[normalizeKeyName(key)] = key;
+        PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(key)] = key;
       });
       
-      console.log("🗺️ Mapa de columnas normalizado:", PRODUCTOS_COLUMN_MAP);
+      console.log("🗺️ Mapa de columnas normalizado:", PRODUCTOS_SIN_CODIGO_COLUMN_MAP);
     }
     
-    return PRODUCTOS_COLUMN_MAP;
+    return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
   } catch (e) {
-    console.error("Error en ensureProductosColumnMap:", e);
-    return PRODUCTOS_COLUMN_MAP;
+    console.error("Error en ensureProductosSinCodigoColumnMap:", e);
+    return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
   }
 }
 
 // ------------------- FUNCIÓN ESPECÍFICA PARA TUS COLUMNAS -------------------
 function getRealColForInventoryLabel(invLabel) {
-  if (!PRODUCTOS_COLUMN_MAP) return null;
+  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
   
   console.log(`🔍 Buscando columna para: ${invLabel}`);
   
@@ -279,8 +279,8 @@ function getRealColForInventoryLabel(invLabel) {
 
   // Primero intentar con el mapeo directo
   const directMap = columnMapping[invLabel];
-  if (directMap && PRODUCTOS_COLUMN_MAP[normalizeKeyName(directMap)]) {
-    const realKey = PRODUCTOS_COLUMN_MAP[normalizeKeyName(directMap)];
+  if (directMap && PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(directMap)]) {
+    const realKey = PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(directMap)];
     console.log(`✅ Columna encontrada por mapeo directo: ${realKey} para ${invLabel}`);
     return realKey;
   }
@@ -297,9 +297,9 @@ function getRealColForInventoryLabel(invLabel) {
 
   for (const variant of variants) {
     const normVariant = normalizeKeyName(variant);
-    if (PRODUCTOS_COLUMN_MAP[normVariant]) {
-      console.log(`✅ Columna encontrada por variante: ${PRODUCTOS_COLUMN_MAP[normVariant]} para ${invLabel}`);
-      return PRODUCTOS_COLUMN_MAP[normVariant];
+    if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant]) {
+      console.log(`✅ Columna encontrada por variante: ${PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant]} para ${invLabel}`);
+      return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant];
     }
   }
   
@@ -307,6 +307,129 @@ function getRealColForInventoryLabel(invLabel) {
   return null;
 }
 
+// ------------------- RENDER TABLE CORREGIDA CON COLUMNA CÓDIGO -------------------
+function renderTable(products) {
+  if (!tableBody) {
+    console.error("❌ tableBody no encontrado en el DOM");
+    return;
+  }
+  
+  // Asegurarse de que products es un array válido
+  if (!products || !Array.isArray(products)) {
+    console.warn("⚠️ renderTable recibió datos inválidos, usando array vacío");
+    products = [];
+  }
+  
+  console.log("🎨 Renderizando tabla con", products.length, "productos");
+  tableBody.innerHTML = "";
+
+  if (products.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No hay productos que coincidan con la búsqueda</td></tr>`;
+    return;
+  }
+
+  products.forEach((p, index) => {
+    // Obtener el código S/C - ESTA ES LA PARTE IMPORTANTE
+    const codigoSC = extraerCodigoSC(p);
+    
+    // Obtener stocks usando las columnas específicas de tu BD
+    const i069 = getStockFromProduct(p, "I069");
+    const i078 = getStockFromProduct(p, "I078");
+    const i07f = getStockFromProduct(p, "I07F");
+    const i312 = getStockFromProduct(p, "I312");
+    const i073 = getStockFromProduct(p, "I073");
+
+    // Calcular total
+    const stockReal = i069 + i078 + i07f + i312 + i073;
+    
+    // Debug para los primeros 2 productos
+    if (index < 2) {
+      console.log(`📊 Producto ${index + 1}: Código=${codigoSC}, I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
+    }
+
+    // Determinar clase de stock
+    let stockClass = "stock-high";
+    if (stockReal <= 1) stockClass = "stock-low";
+    else if (stockReal <= 10) stockClass = "stock-medium";
+
+    // Crear fila
+    const row = document.createElement("tr");
+    row.className = stockClass;
+
+    // Usar las columnas reales de tu BD
+    const descripcion = p.DESCRIPCION || "";
+    const um = p.UM || "";
+
+    row.innerHTML = `
+      <td>${escapeHtml(codigoSC)}</td>
+      <td>${escapeHtml(descripcion)}</td>
+      <td>${um}</td>
+      <td>${formatShowValue(i069)}</td>
+      <td>${formatShowValue(i078)}</td>
+      <td>${formatShowValue(i07f)}</td>
+      <td>${formatShowValue(i312)}</td>
+      <td>${formatShowValue(i073)}</td>
+      <td>${formatShowValue(stockReal)}</td>
+      <td class="acciones">
+        <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+          <span class="icon-wrap" aria-hidden>✏️</span>
+          <span class="label">Editar</span>
+        </button>
+        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
+          <span class="icon-wrap" aria-hidden>🗑️</span>
+          <span class="label">Eliminar</span>
+        </button>
+        <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+          <span class="icon-wrap" aria-hidden>📦</span>
+          <span class="label">Salida</span>
+        </button>
+      </td>
+    `;
+
+    tableBody.appendChild(row);
+  });
+
+  console.log("✅ Tabla renderizada correctamente con columna de código");
+}
+// ------------------- FUNCIÓN DE DIAGNÓSTICO PARA VER COLUMNAS -------------------
+async function diagnosticarColumnas() {
+  console.log("🔍 DIAGNÓSTICO DE COLUMNAS - Iniciando...");
+  
+  try {
+    // Obtener un producto de muestra para ver todas las columnas
+    const { data: productoMuestra, error } = await supabase
+      .from("productos_sin_codigo")
+      .select("*")
+      .limit(1)
+      .single();
+    
+    if (error) {
+      console.error("❌ Error al obtener producto de muestra:", error);
+      return;
+    }
+    
+    if (productoMuestra) {
+      console.log("📋 TODAS LAS COLUMNAS DISPONIBLES en productos_sin_codigo:");
+      console.log("---------------------------------------------------");
+      Object.keys(productoMuestra).forEach((columna, index) => {
+        console.log(`${index + 1}. ${columna}: ${productoMuestra[columna]}`);
+      });
+      console.log("---------------------------------------------------");
+      
+      // Probar la extracción de código
+      const codigoExtraido = extraerCodigoSC(productoMuestra);
+      console.log(`🔍 Código extraído: "${codigoExtraido}"`);
+    }
+    
+  } catch (err) {
+    console.error("❌ Error en diagnóstico de columnas:", err);
+  }
+}
+
+// Ejecutar el diagnóstico cuando se cargue la página
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(diagnosticarColumnas, 2000);
+});
 // ------------------- DIAGNÓSTICO COMPLETO -------------------
 async function diagnosticarProblemaCompleto() {
   console.log("🔧 DIAGNÓSTICO COMPLETO INICIADO");
@@ -314,7 +437,7 @@ async function diagnosticarProblemaCompleto() {
   try {
     // 1. Contar productos totales
     const { count, error: countError } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*", { count: 'exact', head: true });
     
     if (countError) {
@@ -325,9 +448,8 @@ async function diagnosticarProblemaCompleto() {
 
     // 2. Obtener muestra de productos
     const { data: productos, error: productosError } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*")
-      .order("CODIGO", { ascending: true })
       .limit(10);
 
     if (productosError) {
@@ -353,7 +475,7 @@ async function diagnosticarProblemaCompleto() {
     // 4. Verificar valores de stock para los primeros productos
     console.log("📊 Verificando stocks para primeros 3 productos:");
     productos.slice(0, 3).forEach((producto, index) => {
-      console.log(`   Producto ${index + 1} (CODIGO: ${producto.CODIGO}):`);
+      console.log(`   Producto ${index + 1}:`);
       inventarios.forEach(inv => {
         const stock = getStockFromProduct(producto, inv);
         console.log(`     ${inv}: ${stock}`);
@@ -364,6 +486,7 @@ async function diagnosticarProblemaCompleto() {
     console.error("❌ Error en diagnóstico completo:", error);
   }
 }
+
 function showLoadingIndicator(show, message = "Cargando más productos...") {
   let indicator = document.getElementById('loadingIndicator');
   
@@ -405,9 +528,8 @@ async function loadAllProductsAtOnce() {
     showLoadingIndicator(true, "Cargando todos los productos...");
     
     const { data, error } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*")
-      .order("CODIGO", { ascending: true })
       .limit(2000); // Aumentar límite
     
     if (error) throw error;
@@ -426,6 +548,7 @@ async function loadAllProductsAtOnce() {
     showLoadingIndicator(false);
   }
 }
+
 // ------------------- BÚSQUEDA MEJORADA -------------------
 function setupSearch() {
   if (searchInput) {
@@ -446,11 +569,10 @@ function setupSearch() {
       try {
         // Búsqueda en Supabase para resultados completos
         const { data, error } = await supabase
-          .from("productos")
+          .from("productos_sin_codigo")
           .select("*")
-          .or(`CODIGO.ilike.%${term}%,DESCRIPCION.ilike.%${term}%`)
-          .limit(100)
-          .order("CODIGO", { ascending: true });
+          .or(`DESCRIPCION.ilike.%${term}%`)
+          .limit(100);
           
         if (error) throw error;
         
@@ -461,15 +583,15 @@ function setupSearch() {
         console.error("Error en búsqueda:", error);
         // Fallback a búsqueda local
         const localResults = allLoadedProducts.filter(producto => {
-          const codigo = String(producto.CODIGO || "").toLowerCase();
           const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-          return codigo.includes(term.toLowerCase()) || descripcion.includes(term.toLowerCase());
+          return descripcion.includes(term.toLowerCase());
         });
         renderTable(localResults);
       }
     }, 300));
   }
 }
+
 // ------------------- CARGA PROGRESIVA OPTIMIZADA -------------------
 async function loadMoreProducts() {
   if (!supabase || isLoading || !hasMoreData) return;
@@ -481,9 +603,8 @@ async function loadMoreProducts() {
     console.log(`🔄 Cargando productos — offset ${currentOffset} (lote ${BATCH_SIZE})...`);
 
     const { data, error, count } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*", { count: 'exact' })
-      .order("CODIGO", { ascending: true })
       .range(currentOffset, currentOffset + BATCH_SIZE - 1);
 
     if (error) throw error;
@@ -514,6 +635,7 @@ async function loadMoreProducts() {
     showLoadingIndicator(false);
   }
 }
+
 // ------------------- BÚSQUEDA HÍBRIDA (LOCAL + SERVIDOR) -------------------
 let searchTimeout = null;
 let lastSearchTerm = "";
@@ -528,11 +650,10 @@ function performHybridSearch(term) {
   
   // Búsqueda inmediata en datos locales
   const localResults = allLoadedProducts.filter(producto => {
-    const codigo = String(producto.CODIGO || "").toLowerCase();
     const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
     const searchTerm = term.toLowerCase();
     
-    return codigo.includes(searchTerm) || descripcion.includes(searchTerm);
+    return descripcion.includes(searchTerm);
   });
   
   console.log(`🔍 Búsqueda local: ${localResults.length} resultados`);
@@ -554,11 +675,10 @@ async function performServerSearch(term) {
     console.log(`🌐 Buscando en servidor: "${term}"`);
     
     const { data, error } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*")
-      .or(`CODIGO.ilike.%${term}%,DESCRIPCION.ilike.%${term}%`)
-      .limit(200)
-      .order("CODIGO", { ascending: true });
+      .or(`DESCRIPCION.ilike.%${term}%`)
+      .limit(200);
       
     if (error) throw error;
     
@@ -567,17 +687,16 @@ async function performServerSearch(term) {
       
       // Combinar con resultados locales y eliminar duplicados
       const combinedResults = [...data];
-      const existingCodes = new Set(data.map(p => p.CODIGO));
+      const existingIds = new Set(data.map(p => p.id));
       
       allLoadedProducts.forEach(producto => {
-        if (!existingCodes.has(producto.CODIGO)) {
-          const codigo = String(producto.CODIGO || "").toLowerCase();
+        if (!existingIds.has(producto.id)) {
           const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
           const searchTerm = term.toLowerCase();
           
-          if (codigo.includes(searchTerm) || descripcion.includes(searchTerm)) {
+          if (descripcion.includes(searchTerm)) {
             combinedResults.push(producto);
-            existingCodes.add(producto.CODIGO);
+            existingIds.add(producto.id);
           }
         }
       });
@@ -589,6 +708,7 @@ async function performServerSearch(term) {
     // Mantener resultados locales en caso de error
   }
 }
+
 function setupSearch() {
   if (searchInput) {
     searchInput.replaceWith(searchInput.cloneNode(true));
@@ -608,6 +728,7 @@ function setupSearch() {
     });
   }
 }
+
 function showLoadingIndicator(show, message = "Cargando más productos...") {
   let indicator = document.getElementById('loadingIndicator');
   
@@ -642,6 +763,7 @@ function showLoadingIndicator(show, message = "Cargando más productos...") {
     indicator.style.display = 'none';
   }
 }
+
 // ------------------- DEBOUNCE HELPER -------------------
 function debounce(func, wait, immediate) {
   let timeout;
@@ -656,6 +778,7 @@ function debounce(func, wait, immediate) {
     if (callNow) func.apply(this, args);
   };
 }
+
 // Función para cargar inicialmente
 function loadInitialProducts() {
   currentOffset = 0;
@@ -766,7 +889,11 @@ function renderTable(products) {
   }
 
   products.forEach((p, index) => {
+    // Obtener el código S/C
+    const codigoSC = extraerCodigoSC(p);
     // Obtener stocks usando las columnas específicas de tu BD
+
+
     const i069 = getStockFromProduct(p, "I069");
     const i078 = getStockFromProduct(p, "I078");
     const i07f = getStockFromProduct(p, "I07F");
@@ -778,7 +905,7 @@ function renderTable(products) {
     
     // Debug para los primeros 2 productos
     if (index < 2) {
-      console.log(`📊 Producto ${p.CODIGO}: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
+      console.log(`📊 Producto: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
     }
 
     // Determinar clase de stock
@@ -791,12 +918,11 @@ function renderTable(products) {
     row.className = stockClass;
 
     // Usar las columnas reales de tu BD
-    const codigo = p.CODIGO || "";
     const descripcion = p.DESCRIPCION || "";
     const um = p.UM || "";
 
     row.innerHTML = `
-      <td>${codigo}</td>
+      <td>${escapeHtml(codigoSC)}</td>  
       <td>${escapeHtml(descripcion)}</td>
       <td>${um}</td>
       <td>${formatShowValue(i069)}</td>
@@ -810,7 +936,7 @@ function renderTable(products) {
           <span class="icon-wrap" aria-hidden>✏️</span>
           <span class="label">Editar</span>
         </button>
-        <button class="btn btn-delete" onclick="eliminarProducto('${codigo}')">
+        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
           <span class="icon-wrap" aria-hidden>🗑️</span>
           <span class="label">Eliminar</span>
         </button>
@@ -888,7 +1014,7 @@ function editarProducto(producto) {
   // Tu implementación existente
 }
 
-function eliminarProducto(codigo) {
+function eliminarProducto(id) {
   // Tu implementación existente
 }
 
@@ -907,9 +1033,9 @@ function escapeHtml(text) {
 }
 
 function getRealColForName(preferredName) {
-  if (!PRODUCTOS_COLUMN_MAP) return null;
+  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
   const norm = normalizeKeyName(preferredName);
-  return PRODUCTOS_COLUMN_MAP[norm] || null;
+  return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm] || null;
 }
 
 // Inicializar cuando el DOM esté listo
@@ -920,8 +1046,9 @@ if (document.readyState === 'loading') {
 }
 
 function init() {
-  console.log("🚀 Inicializando sistema de inventario con carga progresiva...");
+  console.log("🚀 Inicializando sistema de inventario con carga progresiva para productos sin código...");
 }
+
 // ------------------- RENDER TABLE MEJORADA -------------------
 function renderTable(products) {
   if (!tableBody) {
@@ -933,7 +1060,7 @@ function renderTable(products) {
   tableBody.innerHTML = "";
 
   if (!products || products.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No hay productos</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No hay productos</td></tr>`;
     return;
   }
 
@@ -950,7 +1077,7 @@ function renderTable(products) {
     
     // Debug para los primeros 2 productos
     if (index < 2) {
-      console.log(`📊 Producto ${p.CODIGO}: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
+      console.log(`📊 Producto: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
     }
 
     // Determinar clase de stock
@@ -963,12 +1090,10 @@ function renderTable(products) {
     row.className = stockClass;
 
     // Usar las columnas reales de tu BD
-    const codigo = p.CODIGO || "";
     const descripcion = p.DESCRIPCION || "";
     const um = p.UM || "";
 
     row.innerHTML = `
-      <td>${codigo}</td>
       <td>${escapeHtml(descripcion)}</td>
       <td>${um}</td>
       <td>${formatShowValue(i069)}</td>
@@ -982,7 +1107,7 @@ function renderTable(products) {
           <span class="icon-wrap" aria-hidden>✏️</span>
           <span class="label">Editar</span>
         </button>
-        <button class="btn btn-delete" onclick="eliminarProducto('${codigo}')">
+        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
           <span class="icon-wrap" aria-hidden>🗑️</span>
           <span class="label">Eliminar</span>
         </button>
@@ -998,6 +1123,7 @@ function renderTable(products) {
 
   console.log("✅ Tabla renderizada correctamente");
 }
+
 // ------------------- CONFIGURACIÓN DE PAGINACIÓN MEJORADA -------------------
 let currentPage = 1;
 const ITEMS_PER_PAGE = 500;
@@ -1178,136 +1304,185 @@ function renderCurrentPage() {
     // Actualizar información en consola
     console.log(`🎨 Renderizando página ${currentPage}: ${currentItems.length} productos`);
 }
-////////////////////////////////////////////////////////
 
-function updatePaginationControls() {
-    const paginationContainer = document.getElementById('paginationControls');
-    if (!paginationContainer) return;
-    
-    const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
-    const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
-    
-    paginationContainer.innerHTML = `
-        <div class="pagination-left">
-            <button id="firstPage" class="pagination-btn-compact" ${currentPage === 1 ? 'disabled' : ''}>
-                ⏮️
-            </button>
-            <button id="prevPage" class="pagination-btn-compact" ${currentPage === 1 ? 'disabled' : ''}>
-                ◀️
-            </button>
-            
-            <div style="display: flex; align-items: center; gap: 5px;">
-                <span style="font-weight: 600; color: #495057;">Pág.</span>
-                <input 
-                    type="number" 
-                    id="pageInputCompact" 
-                    value="${currentPage}" 
-                    min="1" 
-                    max="${totalPages}" 
-                    style="width: 45px; padding: 4px; text-align: center; border: 1px solid #ced4da; border-radius: 3px; font-size: 12px;"
-                >
-                <span style="font-weight: 600; color: #495057;">de ${totalPages}</span>
-            </div>
-            
-            <button id="nextPage" class="pagination-btn-compact" ${currentPage === totalPages ? 'disabled' : ''}>
-                ▶️
-            </button>
-            <button id="lastPage" class="pagination-btn-compact" ${currentPage === totalPages ? 'disabled' : ''}>
-                ⏭️
-            </button>
-        </div>
+// ------------------- CARGA COMPLETA DE TODOS LOS PRODUCTOS -------------------
+async function loadAllProductsWithPagination() {
+    if (!supabase) {
+        console.error("Supabase no inicializado");
+        showToast("Supabase no está inicializado", false);
+        return;
+    }
+
+    try {
+        console.log("🔄 Cargando TODOS los productos de Supabase desde productos_sin_codigo...");
+        showToast("Cargando todos los productos...", true);
         
-        <div class="pagination-right">
-            <span class="pagination-info">
-                📊 ${startItem}-${endItem} de ${totalProducts}
-            </span>
-        </div>
-    `;
-    
-    // Event listeners compactos
-    document.getElementById('firstPage').addEventListener('click', () => goToPage(1));
-    document.getElementById('prevPage').addEventListener('click', () => goToPage(currentPage - 1));
-    document.getElementById('nextPage').addEventListener('click', () => goToPage(currentPage + 1));
-    document.getElementById('lastPage').addEventListener('click', () => goToPage(totalPages));
-    
-    const pageInput = document.getElementById('pageInputCompact');
-    pageInput.addEventListener('change', (e) => {
-        const page = parseInt(e.target.value);
-        if (page >= 1 && page <= totalPages) {
-            goToPage(page);
-        } else {
-            e.target.value = currentPage;
-        }
-    });
-    
-    pageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const page = parseInt(e.target.value);
-            if (page >= 1 && page <= totalPages) {
-                goToPage(page);
+        // Forzar recreación del mapa de columnas
+        PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
+        await ensureProductosSinCodigoColumnMap();
+        
+        // Primero obtener el conteo total
+        const { count, error: countError } = await supabase
+            .from("productos_sin_codigo")
+            .select("*", { count: 'exact', head: true });
+        
+        if (countError) throw countError;
+        
+        console.log(`📊 Total de productos en BD: ${count}`);
+        
+        // Cargar todos los productos usando paginación interna
+        const allProducts = [];
+        const BATCH_SIZE = 1000;
+        let hasMore = true;
+        let from = 0;
+        
+        while (hasMore) {
+            console.log(`📦 Cargando lote desde ${from}...`);
+            
+            const { data, error } = await supabase
+                .from("productos_sin_codigo")
+                .select("*")
+                .range(from, from + BATCH_SIZE - 1);
+            
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                allProducts.push(...data);
+                console.log(`✅ Lote cargado: ${data.length} productos`);
+                
+                if (data.length < BATCH_SIZE) {
+                    hasMore = false;
+                    console.log("🏁 Último lote alcanzado");
+                } else {
+                    from += BATCH_SIZE;
+                }
+            } else {
+                hasMore = false;
+                console.log("🏁 No hay más productos");
             }
         }
-    });
+        
+        // Actualizar variables globales
+        window.allProducts = allProducts;
+        allProductsFromServer = [...allProducts];
+        paginatedProducts = [...allProducts];
+        totalProducts = allProducts.length;
+        
+        console.log(`🎉 CARGA COMPLETADA: ${totalProducts} productos cargados`);
+        
+        // CONFIGURAR PAGINACIÓN AUTOMÁTICAMENTE
+        setupPagination();
+        
+        // Mostrar primera página
+        currentPage = 1;
+        renderCurrentPage();
+        updatePendingCount();
+        
+        showToast(`✅ ${totalProducts} productos cargados - Página 1 de ${Math.ceil(totalProducts / ITEMS_PER_PAGE)}`, true);
+        
+    } catch (ex) {
+        console.error("❌ Error cargando productos:", ex);
+        showToast("Error cargando todos los productos", false);
+    }
 }
 
-// Botones flotantes compactos
-function addForceRefreshButton() {
-    const btn = document.createElement('button');
-    btn.innerHTML = '🔄 Recargar';
-    btn.style.cssText = `
-        position: fixed;
-        bottom: 80px;
-        right: 10px;
-        z-index: 10000;
-        background: #ff6b35;
-        color: white;
-        border: none;
-        padding: 12px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    `;
-    
-    btn.addEventListener('mouseenter', () => {
-        btn.style.background = '#e55a2b';
-        btn.style.transform = 'translateY(-2px)';
-    });
-    
-    btn.addEventListener('mouseleave', () => {
-        btn.style.background = '#ff6b35';
-        btn.style.transform = 'translateY(0)';
-    });
-    
-    btn.addEventListener('click', async () => {
-        console.log("💥 Forzando recarga completa de todos los productos...");
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Cargando...';
+// ------------------- BÚSQUEDA COMPATIBLE CON PAGINACIÓN -------------------
+function setupSearchWithPagination() {
+    if (searchInput) {
+        searchInput.replaceWith(searchInput.cloneNode(true));
+        const newSearchInput = document.getElementById("searchInput");
         
-        PRODUCTOS_COLUMN_MAP = null;
-        allProductsFromServer = [];
-        paginatedProducts = [];
+        newSearchInput.addEventListener('input', debounce(async (e) => {
+            const term = e.target.value.trim();
+            
+            if (term === '') {
+                // Restaurar todos los productos con paginación
+                paginatedProducts = [...allProductsFromServer];
+                totalProducts = paginatedProducts.length;
+                currentPage = 1;
+                renderCurrentPage();
+                updatePaginationControls();
+                console.log("🔄 Búsqueda limpiada - Mostrando todos los productos");
+                return;
+            }
+            
+            console.log(`🔍 Buscando: "${term}" en ${allProductsFromServer.length} productos`);
+            
+            try {
+                // Búsqueda en los datos locales (más rápido)
+                const searchResults = allProductsFromServer.filter(producto => {
+                    const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
+                    const searchTerm = term.toLowerCase();
+                    
+                    return descripcion.includes(searchTerm);
+                });
+                
+                console.log(`✅ Búsqueda local: ${searchResults.length} resultados`);
+                
+                // Actualizar productos paginados con resultados de búsqueda
+                paginatedProducts = searchResults;
+                totalProducts = paginatedProducts.length;
+                currentPage = 1;
+                renderCurrentPage();
+                updatePaginationControls();
+                
+                if (searchResults.length === 0) {
+                    showToast("No se encontraron productos con ese criterio", false);
+                } else {
+                    showToast(`Encontrados ${searchResults.length} productos`, true);
+                }
+                
+            } catch (error) {
+                console.error("Error en búsqueda:", error);
+                showToast("Error en la búsqueda", false);
+            }
+        }, 300));
         
-        await loadAllProductsWithPagination();
-        
-        btn.disabled = false;
-        btn.innerHTML = '🔄 Recargar Todos';
-        setTimeout(() => {
-            btn.innerHTML = '🔄 Recargar';
-        }, 2000);
-    });
-    
-    document.body.appendChild(btn);
+        // Enter para búsqueda en servidor como respaldo
+        newSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const term = e.target.value.trim();
+                if (term) performServerSearchWithPagination(term);
+            }
+        });
+    }
 }
+
+async function performServerSearchWithPagination(term) {
+    try {
+        console.log(`🌐 Búsqueda en servidor: "${term}"`);
+        
+        const { data, error } = await supabase
+            .from("productos_sin_codigo")
+            .select("*", { count: 'exact' })
+            .or(`DESCRIPCION.ilike.%${term}%`)
+            .order("id", { ascending: true });
+            
+        if (error) throw error;
+        
+        console.log(`✅ Resultados servidor: ${data?.length || 0}`);
+        
+        if (data && data.length > 0) {
+            paginatedProducts = data;
+            totalProducts = data.length;
+            currentPage = 1;
+            renderCurrentPage();
+            updatePaginationControls();
+            showToast(`Encontrados ${data.length} productos en servidor`, true);
+        }
+    } catch (error) {
+        console.error("Error en búsqueda servidor:", error);
+        // Mantener resultados locales en caso de error
+    }
+}
+
+// ------------------- BOTÓN MOSTRAR TODOS TEMPORALMENTE -------------------
 function addShowAllButton() {
     const showAllBtn = document.createElement('button');
     showAllBtn.innerHTML = '📋 Ver Todos los Productos';
     showAllBtn.id = 'showAllBtn';
     showAllBtn.style.cssText = `
-        position: up;
+        position: fixed;
         bottom: 140px;
         right: 10px;
         z-index: 10000;
@@ -1500,220 +1675,16 @@ function renderCurrentPage() {
     console.log(`🎨 Renderizando página ${currentPage}: ${currentItems.length} productos`);
 }
 
-//7//////////////////////////------------------- CARGA COMPLETA DE TODOS LOS PRODUCTOS -------------------
-// ------------------- CARGA COMPLETA DE TODOS LOS PRODUCTOS -------------------
-async function loadAllProductsWithPagination() {
-    if (!supabase) {
-        console.error("Supabase no inicializado");
-        showToast("Supabase no está inicializado", false);
-        return;
-    }
-
-    try {
-        console.log("🔄 Cargando TODOS los productos de Supabase...");
-        showToast("Cargando todos los productos...", true);
-        
-        // Forzar recreación del mapa de columnas
-        PRODUCTOS_COLUMN_MAP = null;
-        await ensureProductosColumnMap();
-        
-        // Primero obtener el conteo total
-        const { count, error: countError } = await supabase
-            .from("productos")
-            .select("*", { count: 'exact', head: true });
-        
-        if (countError) throw countError;
-        
-        console.log(`📊 Total de productos en BD: ${count}`);
-        
-        // Cargar todos los productos usando paginación interna
-        const allProducts = [];
-        const BATCH_SIZE = 1000;
-        let hasMore = true;
-        let from = 0;
-        
-        while (hasMore) {
-            console.log(`📦 Cargando lote desde ${from}...`);
-            
-            const { data, error } = await supabase
-                .from("productos")
-                .select("*")
-                .order("CODIGO", { ascending: true })
-                .range(from, from + BATCH_SIZE - 1);
-            
-            if (error) throw error;
-            
-            if (data && data.length > 0) {
-                allProducts.push(...data);
-                console.log(`✅ Lote cargado: ${data.length} productos`);
-                
-                if (data.length < BATCH_SIZE) {
-                    hasMore = false;
-                    console.log("🏁 Último lote alcanzado");
-                } else {
-                    from += BATCH_SIZE;
-                }
-            } else {
-                hasMore = false;
-                console.log("🏁 No hay más productos");
-            }
-        }
-        
-        // Actualizar variables globales
-        window.allProducts = allProducts;
-        allProductsFromServer = [...allProducts];
-        paginatedProducts = [...allProducts];
-        totalProducts = allProducts.length;
-        
-        console.log(`🎉 CARGA COMPLETADA: ${totalProducts} productos cargados`);
-        
-        // CONFIGURAR PAGINACIÓN AUTOMÁTICAMENTE
-        setupPagination();
-        
-        // Mostrar primera página
-        currentPage = 1;
-        renderCurrentPage();
-        updatePendingCount();
-        
-        showToast(`✅ ${totalProducts} productos cargados - Página 1 de ${Math.ceil(totalProducts / ITEMS_PER_PAGE)}`, true);
-        
-    } catch (ex) {
-        console.error("❌ Error cargando productos:", ex);
-        showToast("Error cargando todos los productos", false);
-    }
-}
-
-///////------------------- BÚSQUEDA COMPATIBLE CON PAGINACIÓN -------------------
-function setupSearchWithPagination() {
-    if (searchInput) {
-        searchInput.replaceWith(searchInput.cloneNode(true));
-        const newSearchInput = document.getElementById("searchInput");
-        
-        newSearchInput.addEventListener('input', debounce(async (e) => {
-            const term = e.target.value.trim();
-            
-            if (term === '') {
-                // Restaurar todos los productos con paginación
-                paginatedProducts = [...allProductsFromServer];
-                totalProducts = paginatedProducts.length;
-                currentPage = 1;
-                renderCurrentPage();
-                updatePaginationControls();
-                console.log("🔄 Búsqueda limpiada - Mostrando todos los productos");
-                return;
-            }
-            
-            console.log(`🔍 Buscando: "${term}" en ${allProductsFromServer.length} productos`);
-            
-            try {
-                // Búsqueda en los datos locales (más rápido)
-                const searchResults = allProductsFromServer.filter(producto => {
-                    const codigo = String(producto.CODIGO || "").toLowerCase();
-                    const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-                    const searchTerm = term.toLowerCase();
-                    
-                    return codigo.includes(searchTerm) || descripcion.includes(searchTerm);
-                });
-                
-                console.log(`✅ Búsqueda local: ${searchResults.length} resultados`);
-                
-                // Actualizar productos paginados con resultados de búsqueda
-                paginatedProducts = searchResults;
-                totalProducts = paginatedProducts.length;
-                currentPage = 1;
-                renderCurrentPage();
-                updatePaginationControls();
-                
-                if (searchResults.length === 0) {
-                    showToast("No se encontraron productos con ese criterio", false);
-                } else {
-                    showToast(`Encontrados ${searchResults.length} productos`, true);
-                }
-                
-            } catch (error) {
-                console.error("Error en búsqueda:", error);
-                showToast("Error en la búsqueda", false);
-            }
-        }, 300));
-        
-        // Enter para búsqueda en servidor como respaldo
-        newSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const term = e.target.value.trim();
-                if (term) performServerSearchWithPagination(term);
-            }
-        });
-    }
-}
-
-async function performServerSearchWithPagination(term) {
-    try {
-        console.log(`🌐 Búsqueda en servidor: "${term}"`);
-        
-        const { data, error } = await supabase
-            .from("productos")
-            .select("*", { count: 'exact' })
-            .or(`CODIGO.ilike.%${term}%,DESCRIPCION.ilike.%${term}%`)
-            .order("CODIGO", { ascending: true });
-            
-        if (error) throw error;
-        
-        console.log(`✅ Resultados servidor: ${data?.length || 0}`);
-        
-        if (data && data.length > 0) {
-            paginatedProducts = data;
-            totalProducts = data.length;
-            currentPage = 1;
-            renderCurrentPage();
-            updatePaginationControls();
-            showToast(`Encontrados ${data.length} productos en servidor`, true);
-        }
-    } catch (error) {
-        console.error("Error en búsqueda servidor:", error);
-        // Mantener resultados locales en caso de error
-    }
-}
-//////////////////////////
-
-async function performServerSearchWithPagination(term) {
-    try {
-        console.log(`🌐 Búsqueda en servidor: "${term}"`);
-        
-        const { data, error } = await supabase
-            .from("productos")
-            .select("*", { count: 'exact' })
-            .or(`CODIGO.ilike.%${term}%,DESCRIPCION.ilike.%${term}%`)
-            .order("CODIGO", { ascending: true });
-            
-        if (error) throw error;
-        
-        console.log(`✅ Resultados servidor: ${data?.length || 0}`);
-        
-        if (data && data.length > 0) {
-            paginatedProducts = data;
-            totalProducts = data.length;
-            currentPage = 1;
-            renderCurrentPage();
-            updatePaginationControls();
-            showToast(`Encontrados ${data.length} productos en servidor`, true);
-        }
-    } catch (error) {
-        console.error("Error en búsqueda servidor:", error);
-        // Mantener resultados locales en caso de error
-    }
-}
-
-// ------------------- BOTÓN MOSTRAR TODOS TEMPORALMENTE -------------------
-function addShowAllButton() {
-    const showAllBtn = document.createElement('button');
-    showAllBtn.innerHTML = '📋 Ver Todos los Productos';
-    showAllBtn.id = 'showAllBtn';
-    showAllBtn.style.cssText = `
+// Botones flotantes compactos
+function addForceRefreshButton() {
+    const btn = document.createElement('button');
+    btn.innerHTML = '🔄 Recargar';
+    btn.style.cssText = `
         position: fixed;
-        bottom: 140px;
+        bottom: 80px;
         right: 10px;
         z-index: 10000;
-        background: #28a745;
+        background: #ff6b35;
         color: white;
         border: none;
         padding: 12px 16px;
@@ -1725,41 +1696,35 @@ function addShowAllButton() {
         transition: all 0.3s ease;
     `;
     
-    showAllBtn.addEventListener('mouseenter', () => {
-        showAllBtn.style.background = '#218838';
-        showAllBtn.style.transform = 'translateY(-2px)';
+    btn.addEventListener('mouseenter', () => {
+        btn.style.background = '#e55a2b';
+        btn.style.transform = 'translateY(-2px)';
     });
     
-    showAllBtn.addEventListener('mouseleave', () => {
-        showAllBtn.style.background = '#28a745';
-        showAllBtn.style.transform = 'translateY(0)';
+    btn.addEventListener('mouseleave', () => {
+        btn.style.background = '#ff6b35';
+        btn.style.transform = 'translateY(0)';
     });
     
-    showAllBtn.addEventListener('click', () => {
-        // Mostrar todos los productos sin paginación
-        renderTable(allProductsFromServer);
+    btn.addEventListener('click', async () => {
+        console.log("💥 Forzando recarga completa de todos los productos...");
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Cargando...';
         
-        // Ocultar controles de paginación
-        const paginationControls = document.getElementById('paginationControls');
-        if (paginationControls) {
-            paginationControls.style.display = 'none';
-        }
+        PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
+        allProductsFromServer = [];
+        paginatedProducts = [];
         
-        showAllBtn.innerHTML = '✅ Todos Visibles';
-        showToast(`Mostrando todos los ${allProductsFromServer.length} productos`, true);
+        await loadAllProductsWithPagination();
         
-        // Restaurar paginación después de 8 segundos automáticamente
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Recargar Todos';
         setTimeout(() => {
-            renderCurrentPage();
-            if (paginationControls) {
-                paginationControls.style.display = 'flex';
-            }
-            showAllBtn.innerHTML = '📋 Ver Todos los Productos';
-            showToast("Paginación restaurada", true);
-        }, 8000);
+            btn.innerHTML = '🔄 Recargar';
+        }, 2000);
     });
     
-    document.body.appendChild(showAllBtn);
+    document.body.appendChild(btn);
 }
 
 // ------------------- FUNCIÓN LOADPRODUCTS CON PAGINACIÓN AUTOMÁTICA -------------------
@@ -1774,17 +1739,13 @@ function setupSearch() {
 
 // ------------------- INICIALIZACIÓN -------------------
 document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM cargado - Iniciando con paginación automática...");
+    console.log("📄 DOM cargado - Iniciando con paginación automática para productos sin código...");
     
     // Configurar búsqueda con paginación
     setupSearchWithPagination();
     
     // CARGAR PRODUCTOS CON PAGINACIÓN AUTOMÁTICAMENTE
     loadAllProductsWithPagination();
-    
-    // Eliminar estos botones flotantes que ya no son necesarios
-    // addForceRefreshButton();
-    // addShowAllButton();
 });
 
 // Mantener compatibilidad con funciones existentes
@@ -1792,18 +1753,14 @@ function reloadAllProducts() {
     loadAllProductsWithPagination();
 }
 
-// Mantener compatibilidad con funciones existentes
-function reloadAllProducts() {
-    loadAllProductsWithPagination();
-}
 // ------------------- INIT COMPLETO -------------------
 async function initializeApp() {
-  console.log("🚀 Inicializando aplicación...");
+  console.log("🚀 Inicializando aplicación para productos sin código...");
   
   try {
     // Paso 1: Forzar detección de columnas
-    PRODUCTOS_COLUMN_MAP = null;
-    await ensureProductosColumnMap();
+    PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
+    await ensureProductosSinCodigoColumnMap();
     
     // Paso 2: Diagnóstico completo
     await diagnosticarProblemaCompleto();
@@ -1825,7 +1782,7 @@ async function initializeApp() {
 
 // ------------------- REEMPLAZAR EL EVENTO DOMContentLoaded -------------------
 document.addEventListener("DOMContentLoaded", async () => {
-  console.log("📄 DOM cargado, iniciando aplicación...");
+  console.log("📄 DOM cargado, iniciando aplicación para productos sin código...");
   
   await setResponsableFromAuth();
   await initializeApp();
@@ -1836,9 +1793,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
 });
 
-
 // Agregar el botón después de que cargue la página
 setTimeout(addForceRefreshButton, 2000);
+
 // Función para escapar HTML (si no la tienes)
 function escapeHtml(text) {
   if (text === null || text === undefined) return "";
@@ -1848,13 +1805,13 @@ function escapeHtml(text) {
 }
 
 function getRealColForName(preferredName) {
-  if (!PRODUCTOS_COLUMN_MAP) return null;
+  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
   const norm = normalizeKeyName(preferredName);
-  return PRODUCTOS_COLUMN_MAP[norm] || null;
+  return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm] || null;
 }
 
 function getRealColForInventoryLabel(invLabel) {
-  if (!PRODUCTOS_COLUMN_MAP) return null;
+  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
 
   const variants = inventoryKeyVariants(invLabel);
 
@@ -1868,11 +1825,11 @@ function getRealColForInventoryLabel(invLabel) {
 
   for (const v of variants) {
     const norm = normalizeKeyName(v);
-    if (PRODUCTOS_COLUMN_MAP[norm]) return PRODUCTOS_COLUMN_MAP[norm];
+    if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm]) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
   }
   // fallback: primera columna que contenga 'inventario' o 'almacen'
-  for (const norm in PRODUCTOS_COLUMN_MAP) {
-    if (norm.includes("inventario") || norm.includes("almacen")) return PRODUCTOS_COLUMN_MAP[norm];
+  for (const norm in PRODUCTOS_SIN_CODIGO_COLUMN_MAP) {
+    if (norm.includes("inventario") || norm.includes("almacen")) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
   }
   return null;
 }
@@ -1880,7 +1837,7 @@ function getRealColForInventoryLabel(invLabel) {
 // ------------------- Helpers para 'salidas pendientes' en localStorage -------------------
 function getPendingSalidas() {
   try {
-    const raw = localStorage.getItem("salidas_pendientes");
+    const raw = localStorage.getItem("salidas_pendientes_sin_codigo");
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -1888,15 +1845,15 @@ function getPendingSalidas() {
 }
 
 function savePendingSalidas(list) {
-  localStorage.setItem("salidas_pendientes", JSON.stringify(list));
+  localStorage.setItem("salidas_pendientes_sin_codigo", JSON.stringify(list));
 }
 
 function addPendingSalida(pendiente) {
   const list = getPendingSalidas();
-  // Si ya existe el mismo código+origen+responsable, sumar cantidades en vez de duplicar
+  // Si ya existe el mismo id+origen+responsable, sumar cantidades en vez de duplicar
   const idx = list.findIndex(
     (s) =>
-      s.CODIGO === pendiente.CODIGO &&
+      s.id === pendiente.id &&
       s.INVENTARIO_ORIGEN === pendiente.INVENTARIO_ORIGEN &&
       ((s.RESPONSABLE_NOMBRE ?? "") === (pendiente.RESPONSABLE_NOMBRE ?? "")) &&
       ((s.RESPONSABLE_APELLIDO ?? "") === (pendiente.RESPONSABLE_APELLIDO ?? ""))
@@ -1921,7 +1878,7 @@ function removePendingSalida(index) {
 }
 
 function clearPendingSalidas() {
-  localStorage.removeItem("salidas_pendientes");
+  localStorage.removeItem("salidas_pendientes_sin_codigo");
 }
 
 // ------------------- Render tabla pendientes (en salidas.html) -------------------
@@ -1935,8 +1892,7 @@ function renderPendingTable() {
   list.forEach((s, idx) => {
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${s.ICONO_COLOR} ${escapeHtml(s.CODIGO)}</td>
-      <td>${escapeHtml(s.DESCRIPCION)}</td>
+      <td>${s.ICONO_COLOR} ${escapeHtml(s.DESCRIPCION)}</td>
       <td>${escapeHtml(s.UM)}</td>
       <td>${escapeHtml(s.INVENTARIO_ORIGEN)}</td>
       <td>${escapeHtml(String(s.CANTIDAD))}</td>
@@ -2005,6 +1961,7 @@ function normalizeInventoryKey(orig) {
   // corto -> prefijo INVENTARIO
   return `INVENTARIO ${s.toUpperCase()}`;
 }
+
 function invColorFor(name) {
   if (!name) return "#6b7280";
   const long = normalizeInventoryKey(name);
@@ -2012,15 +1969,15 @@ function invColorFor(name) {
 }
 
 // ------------------- fetchStockForProduct (robusto) -------------------
-async function fetchStockForProduct(codigo, inventoryCol) {
+async function fetchStockForProduct(id, inventoryCol) {
   try {
     if (!supabase) return null;
-    await ensureProductosColumnMap();
+    await ensureProductosSinCodigoColumnMap();
 
     const { data: prodRow, error } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .select("*")
-      .eq("CODIGO", codigo)
+      .eq("id", id)
       .maybeSingle();
 
     if (error) {
@@ -2074,7 +2031,7 @@ async function openSalidaModal(producto) {
   modalDiv.style.position = "relative"; // para posicionar toasts dentro
 
   modalDiv.innerHTML = `
-    <h3 class="modal-title" style="margin:0 0 8px 0">Salida: ${escapeHtml(producto.CODIGO)} — ${escapeHtml(producto.DESCRIPCION || "")}</h3>
+    <h3 class="modal-title" style="margin:0 0 8px 0">Salida: ${escapeHtml(producto.DESCRIPCION || "")}</h3>
 
     <!-- Contenedor para mensajes locales dentro del modal (banner grande) -->
     <div id="modalInlineMsg" style="position:relative;margin-bottom:12px;"></div>
@@ -2536,7 +2493,7 @@ async function openSalidaModal(producto) {
     if (origenes.length === 1) {
       const o = origenes[0];
       const pendiente = {
-        CODIGO: producto.CODIGO,
+        id: producto.id,
         DESCRIPCION: producto.DESCRIPCION,
         UM: producto.UM ?? "",
         INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN,
@@ -2553,7 +2510,7 @@ async function openSalidaModal(producto) {
       addPendingSalida(pendiente);
     } else {
       const pendiente = {
-        CODIGO: producto.CODIGO,
+        id: producto.id,
         DESCRIPCION: producto.DESCRIPCION,
         UM: producto.UM ?? "",
         ORIGENES: origenes.map(o => ({ INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN, CANTIDAD: o.CANTIDAD, AVAILABLE: o.AVAILABLE })),
@@ -2619,9 +2576,9 @@ async function openSalidaModal(producto) {
     try {
       if (typeof supabase !== "undefined") {
         const { data, error } = await supabase
-          .from('productos')
+          .from('productos_sin_codigo')
           .select('*')
-          .eq('CODIGO', producto.CODIGO)
+          .eq('id', producto.id)
           .limit(1)
           .maybeSingle();
         if (!error && data) return data;
@@ -2638,531 +2595,6 @@ async function openSalidaModal(producto) {
   updateConfirmState();
 }
 
-/* ------------------ Botón / Modal para "Buscar Entradas por Código" ------------------ */
-(function initEntradaLookupFeature() {
-  // crear botón y colocarlo junto a btnOpenModal si existe
-  const wrap = document.createElement("span");
-  wrap.style.marginLeft = "8px";
-  const btnEntradaLookup = document.createElement("button");
-  btnEntradaLookup.id = "btnEntradaLookup";
-  btnEntradaLookup.className = "btn-secondary";
-  btnEntradaLookup.textContent = "📥Entradas";
-  wrap.appendChild(btnEntradaLookup);
-  if (btnOpenModal && btnOpenModal.parentNode) btnOpenModal.parentNode.insertBefore(wrap, btnOpenModal.nextSibling);
-
-  btnEntradaLookup.addEventListener("click", () => openEntradaLookupModal());
-})();
-
-
-/* Modal dinámico para buscar entradas */
-async function openEntradaLookupModal(prefillCodigo = "") {
-  const existing = document.getElementById("entradaLookupOverlay");
-  if (existing) existing.remove();
-
-  const overlay = document.createElement("div");
-  overlay.id = "entradaLookupOverlay";
-  Object.assign(overlay.style, {
-    position: "fixed", inset: "0", display: "flex", alignItems: "center", justifyContent: "center",
-    background: "rgba(0,0,0,0.45)", zIndex: "11000",
-  });
-
-  const modal = document.createElement("div");
-  modal.className = "entrada-lookup-modal";
-  Object.assign(modal.style, {
-    width: "720px", maxWidth: "96%", background: "#fff", borderRadius: "8px", padding: "16px",
-    boxShadow: "0 12px 36px rgba(0,0,0,0.28)", fontFamily: "'Quicksand', sans-serif", color: "#111",
-  });
-
-  modal.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <h3 style="margin:0">Buscar entradas por código</h3>
-      <button id="entradaCloseBtn" aria-label="Cerrar" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
-    </div>
-
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <input id="entradaCodigoInput" placeholder="Escribe el código (ej: 12345)" value="${escapeHtml(prefillCodigo)}" style="flex:1;padding:8px;border:1px solid #ddd;border-radius:6px" />
-      <button id="entradaBuscarBtn" class="btn-primary">Buscar</button>
-      <button id="entradaRegistrarBtn" class="btn-secondary">Registrar entrada</button>
-    </div>
-
-    <div id="entradaInfo" style="margin-bottom:10px;font-size:13px;color:#333"></div>
-
-    <div id="entradaSummary" style="margin-bottom:10px"></div>
-
-    <div id="entradaListWrap" style="max-height:320px;overflow:auto;border-top:1px solid #f1f1f1;padding-top:8px"></div>
-
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-      <button id="entradaCerrarFooter" class="btn-cancel">Cerrar</button>
-    </div>
-  `;
-
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
-
-  const codigoInput = modal.querySelector("#entradaCodigoInput");
-  const buscarBtn = modal.querySelector("#entradaBuscarBtn");
-  const registrarBtn = modal.querySelector("#entradaRegistrarBtn");
-  const closeBtn = modal.querySelector("#entradaCloseBtn");
-  const cerrarFooter = modal.querySelector("#entradaCerrarFooter");
-  const infoDiv = modal.querySelector("#entradaInfo");
-  const listWrap = modal.querySelector("#entradaListWrap");
-  const summaryDiv = modal.querySelector("#entradaSummary");
-
-  // Buscar en tabla entradas específica
-  async function fetchEntradasTable(codigo) {
-    if (!supabase) return { data: null, error: "Supabase no inicializado" };
-
-    try {
-      const codigoNum = parseInt(codigo);
-      if (isNaN(codigoNum)) {
-        return { data: [], error: null };
-      }
-
-      const { data, error } = await supabase
-        .from('entradas')
-        .select("*")
-        .eq("codigo", codigoNum)
-        .order("fecha", { ascending: false })
-        .limit(500);
-
-      if (error) {
-        console.error("Error fetching entradas:", error);
-        return { data: null, error };
-      }
-
-      return { data: data || [], error: null };
-    } catch (e) {
-      console.error("Exception fetching entradas:", e);
-      return { data: null, error: e };
-    }
-  }
-
-  // función para renderizar resultados - SIMPLIFICADA
-  async function buscarYRenderizar() {
-    const codigo = String(codigoInput.value || "").trim();
-    if (!codigo) {
-      showToast("Escribe un código para buscar", false);
-      codigoInput.focus();
-      return;
-    }
-
-    infoDiv.textContent = "Buscando producto y entradas...";
-    listWrap.innerHTML = "";
-    summaryDiv.innerHTML = "";
-
-    // 1) obtener producto (si existe)
-    let productoRow = null;
-    try {
-      if (supabase) {
-        await ensureProductosColumnMap();
-        const { data: prod, error: prodErr } = await supabase.from("productos").select("*").eq("CODIGO", codigo).maybeSingle();
-        if (!prodErr && prod) productoRow = prod;
-      }
-    } catch (e) { /* noop */ }
-
-    if (productoRow) {
-      const i069 = getStockFromProduct(productoRow, 'I069');
-      const i078 = getStockFromProduct(productoRow, 'I078');
-      const i07f = getStockFromProduct(productoRow, 'I07F');
-      const i312 = getStockFromProduct(productoRow, 'I312');
-      const i073 = getStockFromProduct(productoRow, 'I073');
-      const total = i069 + i078 + i07f + i312 + i073;
-      infoDiv.innerHTML = `<strong>${escapeHtml(productoRow.CODIGO)}</strong> — ${escapeHtml(productoRow.DESCRIPCION || "")} — Total inventarios: ${total}`;
-    } else {
-      infoDiv.innerHTML = `Producto <strong>${escapeHtml(codigo)}</strong> no encontrado en tabla <code>productos</code>.`;
-    }
-
-    // 2) buscar entradas en tabla entradas
-    const { data, error } = await fetchEntradasTable(codigo);
-
-    if (error) {
-      listWrap.innerHTML = `<div style="color:#dc2626">Error al buscar entradas: ${escapeHtml(error.message)}</div>`;
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      listWrap.innerHTML = `<div style="color:#6b7280">No hay entradas registradas para el código ${escapeHtml(codigo)}.</div>`;
-      return;
-    }
-
-    // construir resumen SIMPLIFICADO
-    let totalQty = 0;
-    const rows = data.map(r => {
-      const qty = Number(r.cantidad || 0);
-      totalQty += qty;
-
-      return {
-        raw: r,
-        qty: qty,
-        fecha: r.fecha || "",
-        responsable: r.responsable || ""
-      };
-    });
-
-    // SOLO mostrar la información esencial
-    summaryDiv.innerHTML = `<div style="font-size:13px;color:#111;margin-bottom:6px">Cantidad total registrada en estas entradas: <strong>${totalQty}</strong></div>`;
-
-    // lista detallada SIMPLIFICADA
-    const tableEl = document.createElement("table");
-    tableEl.style.width = "100%";
-    tableEl.style.borderCollapse = "collapse";
-    tableEl.innerHTML = `
-      <thead>
-        <tr style="text-align:left;font-size:13px;color:#374151">
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">Fecha</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">Cantidad</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">I069</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">I078</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">I07F</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">I312</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">I073</th>
-          <th style="padding:6px 8px;border-bottom:1px solid #eee">Responsable</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    `;
-    const tbody = tableEl.querySelector("tbody");
-
-    rows.forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(formatDate(r.fecha))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.cantidad || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i069 || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i078 || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i07f || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i312 || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(String(r.raw.i073 || 0))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #fafafa;font-size:13px">${escapeHtml(r.responsable)}</td>
-      `;
-      tbody.appendChild(tr);
-    });
-
-    listWrap.innerHTML = "";
-    listWrap.appendChild(tableEl);
-  }
-
-  // Registrar nueva entrada - MANTENIENDO LA FUNCIONALIDAD COMPLETA
-  async function abrirRegistrarEntrada() {
-    const codigo = String(codigoInput.value || "").trim();
-    if (!codigo) { 
-      showToast("Escribe un código antes de registrar", false); 
-      codigoInput.focus(); 
-      return; 
-    }
-
-    const formHtml = document.createElement("div");
-    formHtml.style.border = "1px dashed #e5e7eb";
-    formHtml.style.padding = "8px";
-    formHtml.style.marginBottom = "10px";
-    formHtml.innerHTML = `
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <div style="display:flex;gap:8px;align-items:center">
-          <strong style="min-width:160px">Agregar por inventario (acepta decimales)</strong>
-          <small style="color:#6b7280">Usa punto (.) para decimales. Ej: 12.5</small>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px">
-          <input id="in_i069" type="number" min="0" step="0.001" placeholder="I069" class="input-text" />
-          <input id="in_i078" type="number" min="0" step="0.001" placeholder="I078" class="input-text" />
-          <input id="in_i07f" type="number" min="0" step="0.001" placeholder="I07F" class="input-text" />
-          <input id="in_i312" type="number" min="0" step="0.001" placeholder="I312" class="input-text" />
-          <input id="in_i073" type="number" min="0" step="0.001" placeholder="I073" class="input-text" />
-        </div>
-
-        <div style="display:flex;gap:8px;align-items:center">
-          <div style="flex:1">
-            <label style="font-size:13px;color:#374151">Responsable</label>
-            <input id="entradaResponsable" type="text" class="input-text" />
-          </div>
-          <div style="width:160px">
-            <label style="font-size:13px;color:#374151">Total a agregar</label>
-            <input id="entradaTotal" type="text" readonly class="input-text readonly" />
-          </div>
-        </div>
-
-        <div style="display:flex;gap:8px">
-          <input id="entradaNota" placeholder="Nota (opcional)" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:6px" />
-          <button id="entradaDo" class="btn-primary">Registrar entrada</button>
-          <button id="entradaCancel" class="btn-cancel">Cancelar</button>
-        </div>
-      </div>
-    `;
-    summaryDiv.parentNode.insertBefore(formHtml, summaryDiv.nextSibling);
-
-    const i069 = formHtml.querySelector("#in_i069");
-    const i078 = formHtml.querySelector("#in_i078");
-    const i07f = formHtml.querySelector("#in_i07f");
-    const i312 = formHtml.querySelector("#in_i312");
-    const i073 = formHtml.querySelector("#in_i073");
-    const totalField = formHtml.querySelector("#entradaTotal");
-    const responsableField = formHtml.querySelector("#entradaResponsable");
-    const notaField = formHtml.querySelector("#entradaNota");
-    const doBtn = formHtml.querySelector("#entradaDo");
-    const cancelBtn = formHtml.querySelector("#entradaCancel");
-
-    // Auto-completar responsable
-    try {
-      const { data: authData } = await supabase.auth.getUser();
-      const user = authData?.user ?? null;
-      if (user && user.email) {
-        responsableField.value = user.email;
-      } else {
-        responsableField.value = CURRENT_USER_FULLNAME || "";
-      }
-    } catch (e) { 
-      responsableField.value = CURRENT_USER_FULLNAME || ""; 
-    }
-
-    function parseInputQtyFloat(el) {
-      if (!el) return 0;
-      const sRaw = String(el.value || "0").trim();
-      if (sRaw === "") return 0;
-      
-      let s = sRaw.replace(/,/g, '.');
-      s = s.replace(/\s+/g, '');
-      
-      const n = Number(s);
-      return Number.isNaN(n) ? 0 : n;
-    }
-
-    function computeTotal() {
-      const a = parseInputQtyFloat(i069);
-      const b = parseInputQtyFloat(i078);
-      const c = parseInputQtyFloat(i07f);
-      const d = parseInputQtyFloat(i312);
-      const e = parseInputQtyFloat(i073);
-      const total = a + b + c + d + e;
-      return Number.isFinite(total) ? total : 0;
-    }
-
-    // Actualizar total en tiempo real
-    [i069, i078, i07f, i312, i073].forEach(inp => {
-      inp.addEventListener("input", () => {
-        const total = computeTotal();
-        totalField.value = total.toFixed(3);
-      });
-    });
-
-    // Inicializar total
-    totalField.value = "0.000";
-
-    // Cancelar
-    cancelBtn.addEventListener("click", () => {
-      formHtml.remove();
-    });
-
-    doBtn.addEventListener("click", async () => {
-      doBtn.disabled = true;
-      doBtn.textContent = "Registrando...";
-
-      try {
-        const codigoVal = String(codigo || "").trim();
-        if (!codigoVal) { 
-          showToast("Código inválido", false); 
-          doBtn.disabled = false; 
-          doBtn.textContent = "Registrar entrada";
-          return; 
-        }
-
-        const codigoNum = parseInt(codigoVal);
-        if (isNaN(codigoNum)) {
-          showToast("Código debe ser un número", false);
-          doBtn.disabled = false;
-          doBtn.textContent = "Registrar entrada";
-          return;
-        }
-
-        // Leer cantidades ingresadas
-        const q069 = parseInputQtyFloat(i069);
-        const q078 = parseInputQtyFloat(i078);
-        const q07f = parseInputQtyFloat(i07f);
-        const q312 = parseInputQtyFloat(i312);
-        const q073 = parseInputQtyFloat(i073);
-
-        const total = q069 + q078 + q07f + q312 + q073;
-        if (total <= 0) { 
-          showToast("Ingresa al menos una cantidad mayor a 0", false); 
-          doBtn.disabled = false; 
-          doBtn.textContent = "Registrar entrada";
-          return; 
-        }
-
-        // Preparar datos para insertar
-        const entradaData = {
-          codigo: codigoNum,
-          cantidad: total,
-          i069: q069,
-          i078: q078,
-          i07f: q07f,
-          i312: q312,
-          i073: q073,
-          responsable: responsableField.value || CURRENT_USER_FULLNAME || "Sistema",
-         fecha: getCurrentLocalDate()  // ← NUEVA FUNCIÓN
-        };
-
-        // Insertar en tabla entradas
-        const { data, error } = await supabase
-          .from("entradas")
-          .insert([entradaData])
-          .select();
-
-        if (error) {
-          console.error("Error detallado de Supabase:", error);
-          throw new Error(`Error al insertar: ${error.message}`);
-        }
-
-        // Actualizar también el producto
-        await actualizarProductoConEntradas(codigoVal, q069, q078, q07f, q312, q073);
-
-        showToast("✅ Entrada registrada correctamente", true);
-
-        // Actualizar UI
-        await buscarYRenderizar();
-        formHtml.remove();
-
-      } catch (err) {
-        console.error("Error registrando entradas:", err);
-        showToast(`❌ Error: ${err.message}`, false);
-      } finally {
-        doBtn.disabled = false;
-        doBtn.textContent = "Registrar entrada";
-      }
-    });
-  }
-// ------------------- FUNCIÓN CORREGIDA PARA FECHAS -------------------
-function getCurrentLocalDate() {
-  const now = new Date();
-  
-  // Obtener componentes de fecha local (no UTC)
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
-}
-
-// ---------------- Helper global mejorado para formatear fechas ----------------
-window.formatDate = function(dateInput) {
-  if (!dateInput) return "";
-
-  // Si ya es Date -> formatear a locale
-  if (dateInput instanceof Date) {
-    if (isNaN(dateInput)) return "";
-    return dateInput.toLocaleDateString('es-MX');
-  }
-
-  const s = String(dateInput).trim();
-
-  // 1) Caso 'YYYY-MM-DD' (solo fecha) -> formatear directamente
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/;
-  const mYmd = s.match(ymd);
-  if (mYmd) {
-    const [, yyyy, mm, dd] = mYmd;
-    return `${dd}/${mm}/${yyyy}`;
-  }
-
-  // 2) Para fechas con tiempo/timezone, usar Date pero forzar visualización local
-  try {
-    // Si incluye 'T' (formato ISO) o tiene tiempo, parsear como UTC pero mostrar local
-    if (s.includes('T') || s.includes(':')) {
-      const parsed = new Date(s);
-      if (!isNaN(parsed)) {
-        // Usamos toLocaleDateString para mostrar en formato local
-        return parsed.toLocaleDateString('es-MX');
-      }
-    }
-    
-    // 3) Otros casos: intentar parsear (si es 'YYYY-MM-DD' sin match anterior, añadimos T00:00)
-    const tryIso = s.length === 10 ? `${s}T00:00:00` : s;
-    const parsed = new Date(tryIso);
-    if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
-  } catch (e) { /* noop */ }
-
-  // 4) Fallback visual: primeros 10 chars (YYYY-MM-DD) o la cadena completa si es corta
-  return s.length >= 10 ? s.slice(0,10) : s;
-};
-  // Función para actualizar el producto con las nuevas entradas
-  async function actualizarProductoConEntradas(codigo, q069, q078, q07f, q312, q073) {
-    try {
-      await ensureProductosColumnMap?.();
-
-      const realCodigoCol = getRealColForName?.('codigo') || getRealColForName?.('CODIGO') || 'CODIGO';
-      
-      const { data: prodRow, error: selErr } = await supabase
-        .from("productos")
-        .select("*")
-        .eq(realCodigoCol, codigo)
-        .maybeSingle();
-
-      if (selErr || !prodRow) {
-        console.warn("No se pudo obtener el producto para actualizar:", selErr);
-        return;
-      }
-
-      const colI069 = detectRealColLabel(prodRow, 'I069') || 'INVENTARIO I069';
-      const colI078 = detectRealColLabel(prodRow, 'I078') || 'INVENTARIO I078';
-      const colI07F = detectRealColLabel(prodRow, 'I07F') || 'INVENTARIO I07F';
-      const colI312 = detectRealColLabel(prodRow, 'I312') || 'INVENTARIO I312';
-      const colI073 = detectRealColLabel(prodRow, 'I073') || 'INVENTARIO I073';
-
-      const updObj = {};
-      updObj[colI069] = (Number(prodRow[colI069] || 0) + q069);
-      updObj[colI078] = (Number(prodRow[colI078] || 0) + q078);
-      updObj[colI07F] = (Number(prodRow[colI07F] || 0) + q07f);
-      updObj[colI312] = (Number(prodRow[colI312] || 0) + q312);
-      updObj[colI073] = (Number(prodRow[colI073] || 0) + q073);
-
-      const { error: updErr } = await supabase
-        .from('productos')
-        .update(updObj)
-        .eq(realCodigoCol, codigo);
-
-      if (updErr) {
-        console.warn("Error actualizando producto:", updErr);
-      }
-
-    } catch (error) {
-      console.error("Error en actualizarProductoConEntradas:", error);
-    }
-  }
-
-  // Helper para detectar columnas reales
-  function detectRealColLabel(prodRow, label) {
-    if (!prodRow) return null;
-    if (typeof getRealColForInventoryLabel === "function") {
-      const r = getRealColForInventoryLabel(label);
-      if (r) return r;
-    }
-    const variants = [
-      `INVENTARIO ${label}`,
-      `inventario_${label.toLowerCase()}`,
-      label,
-      label.toLowerCase(),
-      `INVENTARIO ${label.toUpperCase()}`
-    ];
-    const keys = Object.keys(prodRow || {});
-    for (const v of variants) {
-      const found = keys.find(k => String(k).toLowerCase() === String(v).toLowerCase());
-      if (found) return found;
-    }
-    for (const k of keys) if (new RegExp(label, "i").test(k)) return k;
-    return null;
-  }
-
-  // listeners
-  buscarBtn.addEventListener("click", buscarYRenderizar);
-  codigoInput.addEventListener("keyup", (ev) => { if (ev.key === "Enter") buscarYRenderizar(); });
-  registrarBtn.addEventListener("click", abrirRegistrarEntrada);
-  closeBtn.addEventListener("click", () => overlay.remove());
-  cerrarFooter.addEventListener("click", () => overlay.remove());
-
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
-
-  setTimeout(() => codigoInput.focus(), 50);
-
-  if (prefillCodigo) buscarYRenderizar();
-}
 async function renderPendingList() {
   if (!tablaPendientesBody) return;
 
@@ -3185,7 +2617,7 @@ async function renderPendingList() {
   tablaPendientesBody.innerHTML = "";
 
   if (!list || list.length === 0) {
-    tablaPendientesBody.innerHTML = `<tr><td colspan="9" class="empty-note">No hay salidas pendientes</td></tr>`;
+    tablaPendientesBody.innerHTML = `<tr><td colspan="8" class="empty-note">No hay salidas pendientes</td></tr>`;
     updatePendingCount();
     return;
   }
@@ -3226,7 +2658,6 @@ async function renderPendingList() {
     `;
 
     tr.innerHTML = `
-      <td class="col-code">${escapeHtml(item.CODIGO)}</td>
       <td class="col-desc"><span class="desc-text" title="${escapeHtml(item.DESCRIPCION)}">${escapeHtml(item.DESCRIPCION)}</span></td>
       <td class="col-um">${escapeHtml(item.UM ?? '')}</td>
       <td class="col-inv">${invSelectHTML}</td>
@@ -3250,7 +2681,7 @@ async function renderPendingList() {
         stockSpan.textContent = `Disponible: ${item.AVAILABLE}`;
         qtyInput.max = String(item.AVAILABLE);
       } else {
-        const fetched = await fetchStockForProduct(item.CODIGO, chosen);
+        const fetched = await fetchStockForProduct(item.id, chosen);
         if (fetched !== null) {
           stockSpan.textContent = `Disponible: ${fetched}`;
           item.AVAILABLE = fetched;
@@ -3286,7 +2717,7 @@ async function renderPendingList() {
       const list = getPendingSalidas();
       if (!list[idx]) return;
       list[idx].INVENTARIO_ORIGEN = newInv;
-      const fetched = await fetchStockForProduct(list[idx].CODIGO, newInv);
+      const fetched = await fetchStockForProduct(list[idx].id, newInv);
       if (fetched !== null) {
         list[idx].AVAILABLE = fetched;
       } else {
@@ -3418,9 +2849,6 @@ function renderTable(products) {
     row.className = stockClass;
 
     // Columnas
-    const tdCodigo = document.createElement("td");
-    tdCodigo.textContent = p["CODIGO"] ?? "";
-
     const tdDesc = document.createElement("td");
     tdDesc.textContent = p["DESCRIPCION"] ?? "";
 
@@ -3446,42 +2874,40 @@ function renderTable(products) {
     tdFisico.textContent = formatShowValue(fisicoVal);
 
     // Columna Acciones
-   // Columna Acciones
-const tdAcciones = document.createElement("td");
-tdAcciones.className = "acciones"; // coincide con el CSS que usarás
+    const tdAcciones = document.createElement("td");
+    tdAcciones.className = "acciones"; // coincide con el CSS que usarás
 
-const createBtn = (btnClass, emoji, text, handler) => {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = `btn ${btnClass}`;
-  // estructura: cuadrito del icono + etiqueta
-  btn.innerHTML = `<span class="icon-wrap" aria-hidden>${emoji}</span><span class="label">${text}</span>`;
-  if (handler) btn.addEventListener("click", handler);
-  return btn;
-};
+    const createBtn = (btnClass, emoji, text, handler) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `btn ${btnClass}`;
+      // estructura: cuadrito del icono + etiqueta
+      btn.innerHTML = `<span class="icon-wrap" aria-hidden>${emoji}</span><span class="label">${text}</span>`;
+      if (handler) btn.addEventListener("click", handler);
+      return btn;
+    };
 
-const btnEdit = createBtn("btn-edit", "✏️", "Editar", () => editarProducto(p));
-const btnDelete = createBtn("btn-delete", "🗑️", "Eliminar", () => eliminarProducto(p["CODIGO"]));
-const btnSalida = createBtn("btn-salida", "📦", "Salida", () => openSalidaModal(p));
+    const btnEdit = createBtn("btn-edit", "✏️", "Editar", () => editarProducto(p));
+    const btnDelete = createBtn("btn-delete", "🗑️", "Eliminar", () => eliminarProducto(p["id"]));
+    const btnSalida = createBtn("btn-salida", "📦", "Salida", () => openSalidaModal(p));
 
-// agrega los botones (en una sola fila — el gap lo controla CSS)
-tdAcciones.appendChild(btnEdit);
-tdAcciones.appendChild(btnDelete);
-tdAcciones.appendChild(btnSalida);
+    // agrega los botones (en una sola fila — el gap lo controla CSS)
+    tdAcciones.appendChild(btnEdit);
+    tdAcciones.appendChild(btnDelete);
+    tdAcciones.appendChild(btnSalida);
 
-// Agregar a la fila
-row.appendChild(tdCodigo);
-row.appendChild(tdDesc);
-row.appendChild(tdUm);
-row.appendChild(tdI069);
-row.appendChild(tdI078);
-row.appendChild(tdI07F);
-row.appendChild(tdI312);
-row.appendChild(tdI073);
-row.appendChild(tdFisico);
-row.appendChild(tdAcciones);
+    // Agregar a la fila
+    row.appendChild(tdDesc);
+    row.appendChild(tdUm);
+    row.appendChild(tdI069);
+    row.appendChild(tdI078);
+    row.appendChild(tdI07F);
+    row.appendChild(tdI312);
+    row.appendChild(tdI073);
+    row.appendChild(tdFisico);
+    row.appendChild(tdAcciones);
 
-tableBody.appendChild(row);
+    tableBody.appendChild(row);
   });
 }
 
@@ -3524,7 +2950,7 @@ function editarProducto(producto) {
   }
 
   editMode = true;
-  editingCodigo = producto?.CODIGO ?? producto?.codigo ?? null;
+  editingCodigo = producto?.id ?? null;
 
   if (editingCodigo !== null && editingCodigo !== undefined) {
     editingCodigo = String(editingCodigo).trim();
@@ -3539,8 +2965,7 @@ function editarProducto(producto) {
     if (el) el.value = (value === undefined || value === null) ? "" : value;
   };
 
-  // Rellenar SOLO código, descripción y UM
-  setVal('codigo', producto?.CODIGO ?? producto?.codigo ?? "");
+  // Rellenar SOLO descripción y UM
   setVal('descripcion', producto?.DESCRIPCION ?? producto?.descripcion ?? "");
   setVal('um', producto?.UM ?? producto?.um ?? "");
 
@@ -3557,8 +2982,8 @@ function editarProducto(producto) {
     }
   });
 
-  // En modo EDICIÓN: BLOQUEAR código y UM, solo dejar descripción editable
-  const camposBloquear = ['codigo', 'um'];
+  // En modo EDICIÓN: BLOQUEAR UM, solo dejar descripción editable
+  const camposBloquear = ['um'];
   
   camposBloquear.forEach(campo => {
     const field = productForm.querySelector(`[name="${campo}"]`);
@@ -3588,17 +3013,17 @@ function editarProducto(producto) {
 }
 
 // ------------------- Eliminar Producto -------------------
-async function eliminarProducto(codigo) {
+async function eliminarProducto(id) {
   if (!supabase) {
     showToast("Supabase no está inicializado", false);
     return;
   }
 
-  showConfirm(`⚠ ¿Seguro que deseas eliminar el producto con código ${codigo}?`, async () => {
+  showConfirm(`⚠ ¿Seguro que deseas eliminar el producto?`, async () => {
     const { error } = await supabase
-      .from("productos")
+      .from("productos_sin_codigo")
       .delete()
-      .eq("CODIGO", codigo);
+      .eq("id", id);
 
     if (error) {
       console.error("❌ Error al eliminar:", error);
@@ -3618,8 +3043,8 @@ if (btnOpenModal) {
     editingCodigo = null;
     clearProductFormFields();
     
-    // En modo NUEVO: Mostrar solo código, descripción y UM
-    const camposMostrar = ['codigo', 'descripcion', 'um'];
+    // En modo NUEVO: Mostrar solo descripción y UM
+    const camposMostrar = ['descripcion', 'um'];
     const camposOcultar = ['i069', 'i078', 'i07f', 'i312', 'i073', 'almacen', 'sumar'];
     
     // Mostrar campos básicos
@@ -3656,10 +3081,10 @@ if (btnOpenModal) {
       saveBtn.textContent = "Crear Producto";
     }
     
-    // Enfocar el campo código
-    const codigoField = productForm.querySelector('[name="codigo"]');
-    if (codigoField) {
-      setTimeout(() => codigoField.focus(), 100);
+    // Enfocar el campo descripción
+    const descField = productForm.querySelector('[name="descripcion"]');
+    if (descField) {
+      setTimeout(() => descField.focus(), 100);
     }
   });
 }
@@ -3718,21 +3143,20 @@ productForm?.addEventListener('submit', async (ev) => {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Guardando..."; }
 
     try {
-      await ensureProductosColumnMap?.();
+      await ensureProductosSinCodigoColumnMap?.();
 
-      const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
       const realDescCol   = getRealColForName?.('DESCRIPCION') || getRealColForName?.('descripcion') || 'DESCRIPCION';
 
       if (!editingCodigo) {
-        showToast("Código del producto no definido. No se puede actualizar.", false);
+        showToast("ID del producto no definido. No se puede actualizar.", false);
         return;
       }
 
       // pedimos select() para confirmar que la fila fue devuelta
       const resp = await supabase
-        .from('productos')
+        .from('productos_sin_codigo')
         .update({ [realDescCol]: nuevaDesc })
-        .eq(realCodigoCol, editingCodigo)
+        .eq("id", editingCodigo)
         .select()
         .maybeSingle();
 
@@ -3777,21 +3201,14 @@ productForm?.addEventListener('submit', async (ev) => {
     if (!supabase) { showToast("Supabase no inicializado", false); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Creando..."; }
 
-    await ensureProductosColumnMap?.();
+    await ensureProductosSinCodigoColumnMap?.();
 
     const formData = new FormData(productForm);
     const raw = Object.fromEntries(formData.entries());
 
     // Validar campos obligatorios
-    const codigo = (raw['codigo'] || "").trim();
     const descripcion = (raw['descripcion'] || "").trim();
     const um = (raw['um'] || "").trim();
-
-    if (!codigo) {
-      showToast("El código es obligatorio", false);
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
-      return;
-    }
 
     if (!descripcion) {
       showToast("La descripción es obligatoria", false);
@@ -3806,7 +3223,6 @@ productForm?.addEventListener('submit', async (ev) => {
       insertObj[real] = value;
     };
 
-    mapCampo('CODIGO', codigo);
     mapCampo('DESCRIPCION', descripcion);
     mapCampo('UM', um);
 
@@ -3827,7 +3243,7 @@ productForm?.addEventListener('submit', async (ev) => {
     insertObj[realAlmacen] = 0;
 
     // intento de inserción
-    const resp = await supabase.from('productos').insert([insertObj]).select().limit(1).maybeSingle();
+    const resp = await supabase.from('productos_sin_codigo').insert([insertObj]).select().limit(1).maybeSingle();
     const { data, error } = resp || {};
 
     if (!error || data) {
@@ -3840,12 +3256,7 @@ productForm?.addEventListener('submit', async (ev) => {
       if (modal) modal.style.display = 'none';
     } else {
       console.error("Error creando producto:", error);
-      // Si es error de duplicado
-      if (error?.code === '23505') {
-        showToast("❌ Ya existe un producto con ese código", false);
-      } else {
-        showToast("❌ Error al crear producto", false);
-      }
+      showToast("❌ Error al crear producto", false);
     }
 
   } catch (err) {
@@ -3855,450 +3266,6 @@ productForm?.addEventListener('submit', async (ev) => {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
   }
 });
-
-// ------------------- Refresh global: normalizar inventarios y recalcular almacen -------------------
-async function refreshAllInventarios({ confirmBefore = true, truncateDecimals = true } = {}) {
-  // confirmación simple para evitar ejecuciones accidentales
-  if (confirmBefore) {
-    const ok = window.confirm("Esto actualizará TODOS los productos: normalizará inventarios y recalculará INVENTARIO FÍSICO EN ALMACÉN. ¿Continuar?");
-    if (!ok) return;
-  }
-
-  if (!supabase) {
-    showToast("Supabase no inicializado", false);
-    return;
-  }
-
-  const btn = document.getElementById('btnRefresh');
-  if (btn) { btn.disabled = true; btn.dataset._origText = btn.textContent; btn.textContent = "Actualizando..."; }
-
-  showToast("Iniciando refresco de inventarios...");
-
-  try {
-    await ensureProductosColumnMap?.();
-
-    // Traer todos los productos (ajusta limit si tu tabla es muy grande)
-    const { data: productos, error: fetchErr } = await supabase.from('productos').select('*');
-    if (fetchErr) throw fetchErr;
-    if (!Array.isArray(productos) || productos.length === 0) {
-      showToast("No hay productos para procesar", false);
-      return;
-    }
-
-    const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
-    const realAlmacenCol = getRealColForInventoryLabel?.('ALMACEN') || 'INVENTARIO FISICO EN ALMACEN';
-
-    let updatedCount = 0;
-    let skippedCount = 0;
-    let errorCount = 0;
-
-    // helper local para detectar columna real (por si getRealColFor... no encontró)
-    const detectRealCol = (prodRow, label) => {
-      const r = getRealColForInventoryLabel?.(label);
-      if (r) return r;
-      // heurístico sencillo
-      const variants = [
-        `INVENTARIO ${label}`,
-        `inventario_${label.toLowerCase()}`,
-        label,
-        label.toLowerCase(),
-        `I${label}` // por si usan I069 etc
-      ];
-      const keys = Object.keys(prodRow || {});
-      for (const v of variants) {
-        const found = keys.find(k => String(k).toLowerCase() === String(v).toLowerCase());
-        if (found) return found;
-      }
-      // fallback: buscar primera key que contenga label
-      for (const k of keys) if (new RegExp(label, "i").test(k)) return k;
-      return null;
-    };
-
-    // función para convertir valores a entero seguro
-    const normalizeToInt = (val) => {
-      if (val === null || val === undefined || val === "") return 0;
-      // si ya es número entero
-      if (typeof val === 'number' && Number.isInteger(val)) return val;
-      // intentar parsear como número
-      const n = Number(String(val).replace(/,/g, ".").trim());
-      if (Number.isNaN(n) || !Number.isFinite(n)) return 0;
-      // si pide truncar decimales -> floor, sino round
-      return truncateDecimals ? Math.floor(n) : Math.round(n);
-    };
-
-    // procesar productos uno por uno (puedes paralelizar si necesitas más throughput)
-    for (const prod of productos) {
-      try {
-        // detectar columnas reales para este producto
-        const colI069 = detectRealCol(prod, 'I069') || detectRealCol(prod, '069') || 'INVENTARIO I069';
-        const colI078 = detectRealCol(prod, 'I078') || detectRealCol(prod, '078') || 'INVENTARIO I078';
-        const colI07F = detectRealCol(prod, 'I07F') || detectRealCol(prod, '07F') || 'INVENTARIO I07F';
-        const colI312 = detectRealCol(prod, 'I312') || detectRealCol(prod, '312') || 'INVENTARIO I312';
-        const colI073 = detectRealCol(prod, 'I073') || detectRealCol(prod, '073') || 'INVENTARIO I073';
-
-        // leer valores actuales (sin alterar el objeto original)
-        const rawI069 = prod[colI069];
-        const rawI078 = prod[colI078];
-        const rawI07F = prod[colI07F];
-        const rawI312 = prod[colI312];
-        const rawI073 = prod[colI073];
-
-        // normalizar a enteros
-        const newI069 = normalizeToInt(rawI069);
-        const newI078 = normalizeToInt(rawI078);
-        const newI07F = normalizeToInt(rawI07F);
-        const newI312 = normalizeToInt(rawI312);
-        const newI073 = normalizeToInt(rawI073);
-
-        const newAlmacen = (newI069 + newI078 + newI07F + newI312 + newI073);
-
-        // construir objeto de update solo si hay cambios
-        const upd = {};
-        // sólo asignar si la columna existe en la fila
-        if (colI069 && String(prod[colI069]) !== String(newI069)) upd[colI069] = newI069;
-        if (colI078 && String(prod[colI078]) !== String(newI078)) upd[colI078] = newI078;
-        if (colI07F && String(prod[colI07F]) !== String(newI07F)) upd[colI07F] = newI07F;
-        if (colI312 && String(prod[colI312]) !== String(newI312)) upd[colI312] = newI312;
-        if (colI073 && String(prod[colI073]) !== String(newI073)) upd[colI073] = newI073;
-
-        // asignar almacen si difiere
-        const existingAlmVal = prod[realAlmacenCol];
-        if (realAlmacenCol && String(existingAlmVal) !== String(newAlmacen)) upd[realAlmacenCol] = newAlmacen;
-
-        if (Object.keys(upd).length === 0) {
-          skippedCount++;
-          continue;
-        }
-
-        // ejecutar update por fila (usamos la columna CODIGO como identificador)
-        const codigoVal = prod[realCodigoCol] ?? prod['CODIGO'] ?? prod['codigo'];
-        if (!codigoVal) {
-          console.warn("Fila sin CODIGO detectada, se salta:", prod);
-          skippedCount++;
-          continue;
-        }
-
-        const { error: updErr } = await supabase.from('productos').update(upd).eq(realCodigoCol, codigoVal);
-        if (updErr) {
-          console.error("Error actualizando producto", codigoVal, updErr);
-          errorCount++;
-        } else {
-          updatedCount++;
-        }
-      } catch (rowErr) {
-        console.error("Error procesando fila durante refresh:", rowErr, prod);
-        errorCount++;
-      }
-    } // end for
-
-    // refrescar UI
-    try { await loadProducts(); } catch(e) { /* noop */ }
-
-    showToast(`Refresh completado: actualizados ${updatedCount}, sin cambios ${skippedCount}, errores ${errorCount}`, true);
-  } catch (err) {
-    console.error("Error en refreshAllInventarios:", err);
-    showToast("Error al refrescar inventarios (ver consola)", false);
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = btn.dataset._origText || "Refresh"; delete btn.dataset._origText; }
-  }
-}
-
-// --- conectar al botón de refresco si existe ---
-const btnRefreshEl = document.getElementById('btnRefresh');
-if (btnRefreshEl) btnRefreshEl.addEventListener('click', () => refreshAllInventarios({ confirmBefore: true, truncateDecimals: true }));
-
-
-// Función de búsqueda
-if (searchInput) {
-  const handleSearch = debounce(async () => {
-    const raw = String(searchInput.value || "");
-    const q = raw.trim();
-
-    console.log(`🔍 Buscando: "${q}"`);
-
-    // Si está vacío, mostrar todos los productos
-    if (q === "") {
-      try {
-        if (!window.allProducts || window.allProducts.length === 0) {
-          window.allProducts = await loadProductsAllAtOnce();
-        }
-        renderTable(window.allProducts);
-        console.log(`📋 Mostrando todos los ${window.allProducts.length} productos`);
-      } catch (e) {
-        console.error("Error mostrando todos los productos:", e);
-        renderTable([]);
-      }
-      return;
-    }
-
-    // Usar la variable global allProducts
-    if (!window.allProducts || window.allProducts.length === 0) {
-      console.warn("⚠️ No hay productos para buscar");
-      renderTable([]);
-      return;
-    }
-
-    // ... el resto del código de búsqueda permanece igual
-    const tokens = q.split(/\s+/).map((t) => normalizeText(t)).filter(Boolean);
-    const codigoKeys = ["CODIGO", "codigo", "Codigo", "CÓDIGO", "código", "Código", "CODE", "code"];
-    const descKeys = ["DESCRIPCION", "descripcion", "Descripcion", "DESCRIPCIÓN", "descripción", "Descripción", "DESC", "desc", "descripcion_producto", "producto"];
-
-    const filtered = window.allProducts.filter((p) => {
-      const rawCodigo = getFieldValue(p, codigoKeys);
-      const rawDesc = getFieldValue(p, descKeys);
-      const normalizedCodigo = normalizeText(rawCodigo);
-      const normalizedDesc = normalizeText(rawDesc);
-      const combined = normalizedCodigo + " " + normalizedDesc;
-      
-      return tokens.every(tk => 
-        normalizedCodigo.includes(tk) || 
-        normalizedDesc.includes(tk) || 
-        combined.includes(tk)
-      );
-    });
-
-    console.log(`✅ Búsqueda: "${q}" -> ${filtered.length} resultados`);
-    renderTable(filtered);
-  }, 150);
-
-  searchInput.addEventListener("input", handleSearch);
-}
-// Función auxiliar para forzar recarga de productos
-window.recargarProductos = async function() {
-  console.log("🔄 Forzando recarga de productos...");
-  allProducts = null;
-  searchInput.value = "";
-  await loadProducts();
-};
-
-
-// ------------------- FUNCIÓN LOADPRODUCTS CON PAGINACIÓN -------------------
-async function loadProducts() {
-  if (!supabase) {
-    console.error("Supabase no inicializado");
-    showToast("Supabase no está inicializado", false);
-    return;
-  }
-
-  try {
-    console.log("🔄 Cargando TODOS los productos con paginación...");
-    
-    // Forzar recreación del mapa de columnas
-    PRODUCTOS_COLUMN_MAP = null;
-    await ensureProductosColumnMap();
-    
-    const allProducts = [];
-    let page = 0;
-    const pageSize = 1000; // Máximo por página en Supabase
-    let hasMore = true;
-
-    while (hasMore) {
-      console.log(`📄 Cargando página ${page + 1}...`);
-      
-      const { data, error, count } = await supabase
-        .from("productos")
-        .select("*", { count: 'exact' })
-        .order("CODIGO", { ascending: true })
-        .range(page * pageSize, (page + 1) * pageSize - 1);
-
-      if (error) {
-        console.error(`❌ Error al cargar página ${page + 1}:`, error);
-        showToast("Error al cargar productos", false);
-        break;
-      }
-
-      if (data && data.length > 0) {
-        allProducts.push(...data);
-        console.log(`✅ Página ${page + 1} cargada: ${data.length} productos`);
-        
-        // Verificar si hay más páginas
-        if (data.length < pageSize) {
-          hasMore = false;
-          console.log(`🏁 Última página alcanzada`);
-        } else {
-          page++;
-        }
-      } else {
-        hasMore = false;
-        console.log("🏁 No hay más productos");
-      }
-    }
-
-    console.log(`✅ TOTAL cargado: ${allProducts.length} productos`);
-    
-    // Actualizar variable global
-    window.allProducts = allProducts;
-    
-    // Verificar si coincide con el total esperado
-    if (allProducts.length !== 1120) {
-      console.warn(`⚠️ DISCREPANCIA: Se esperaban 1120 productos, se cargaron ${allProducts.length}`);
-      showToast(`Se cargaron ${allProducts.length} de 1120 productos. Puede haber un límite de paginación.`, false);
-    } else {
-      console.log("🎉 ¡Todos los productos cargados correctamente!");
-      showToast(`✅ ${allProducts.length} productos cargados`, true);
-    }
-    
-    // Renderizar la tabla
-    renderTable(allProducts);
-    updatePendingCount();
-    
-    // Mostrar primeros y últimos códigos para verificación
-    if (allProducts.length > 0) {
-      const primeros = allProducts.slice(0, 3).map(p => p.CODIGO);
-      const ultimos = allProducts.slice(-3).map(p => p.CODIGO);
-      console.log("🔢 Primeros 3 códigos:", primeros);
-      console.log("🔢 Últimos 3 códigos:", ultimos);
-    }
-    
-  } catch (ex) {
-    console.error("❌ Error en loadProducts:", ex);
-    showToast("Error cargando productos", false);
-  }
-}
-
-// ------------------- VERSIÓN ALTERNATIVA SI LA PAGINACIÓN NO FUNCIONA -------------------
-async function loadProductsAllAtOnce() {
-  if (!supabase) {
-    console.error("Supabase no inicializado");
-    showToast("Supabase no está inicializado", false);
-    return;
-  }
-
-  try {
-    console.log("🔄 Cargando TODOS los productos en una sola consulta...");
-    
-    // Forzar recreación del mapa de columnas
-    PRODUCTOS_COLUMN_MAP = null;
-    await ensureProductosColumnMap();
-    
-    // Intentar con un límite muy alto
-    const { data, error, count } = await supabase
-      .from("productos")
-      .select("*", { count: 'exact' })
-      .order("CODIGO", { ascending: true })
-      .limit(2000); // Límite alto para asegurar que traiga todos
-
-    if (error) {
-      console.error("❌ Error al cargar productos:", error);
-      showToast("Error al cargar productos", false);
-      return;
-    }
-
-    // Actualizar variable global
-    window.allProducts = data || [];
-    
-    console.log(`✅ ${window.allProducts.length} productos cargados de la BD`);
-    
-    // Verificar si coincide con el total esperado
-    if (window.allProducts.length !== 1120) {
-      console.warn(`⚠️ DISCREPANCIA: Se esperaban 1120 productos, se cargaron ${window.allProducts.length}`);
-      showToast(`Se cargaron ${window.allProducts.length} de 1120 productos.`, false);
-    } else {
-      console.log("🎉 ¡Todos los productos cargados correctamente!");
-      showToast(`✅ ${window.allProducts.length} productos cargados`, true);
-    }
-    
-    // Renderizar la tabla
-    renderTable(window.allProducts);
-    updatePendingCount();
-    
-  } catch (ex) {
-    console.error("❌ Error en loadProducts:", ex);
-    showToast("Error cargando productos", false);
-  }
-}
-
-// ------------------- ACTUALIZAR EL DIAGNÓSTICO -------------------
-async function diagnosticarProblemaCompleto() {
-  console.log("🔧 DIAGNÓSTICO COMPLETO INICIADO");
-  
-  try {
-    // 1. Contar productos totales
-    const { count, error: countError } = await supabase
-      .from("productos")
-      .select("*", { count: 'exact', head: true });
-    
-    if (countError) {
-      console.error("❌ Error al contar productos:", countError);
-    } else {
-      console.log(`📊 TOTAL de productos en BD: ${count}`);
-    }
-
-    // 2. Verificar límites de Supabase
-    console.log("🔍 Verificando límites de Supabase...");
-    const { data: limitedData, error: limitError } = await supabase
-      .from("productos")
-      .select("*")
-      .limit(5);
-
-    if (limitError) {
-      console.error("❌ Error en consulta limitada:", limitError);
-    } else {
-      console.log(`📝 Consulta limitada a 5 registros: ${limitedData?.length} obtenidos`);
-    }
-
-    // 3. Obtener muestra de productos (los últimos para ver si llega al final)
-    const { data: lastProducts, error: lastError } = await supabase
-      .from("productos")
-      .select("CODIGO")
-      .order("CODIGO", { ascending: false })
-      .limit(5);
-
-    if (lastError) {
-      console.error("❌ Error al obtener últimos productos:", lastError);
-    } else {
-      console.log("🔚 Últimos 5 códigos en BD:", lastProducts?.map(p => p.CODIGO));
-    }
-
-    // 4. Verificar columnas de inventario
-    console.log("🔍 Verificando columnas de inventario...");
-    const inventarios = ['I069', 'I078', 'I07F', 'I312', 'I073'];
-    
-    inventarios.forEach(inv => {
-      const columna = getRealColForInventoryLabel(inv);
-      if (columna) {
-        console.log(`   ${inv} → ${columna}`);
-      } else {
-        console.log(`   ❌ ${inv} → NO ENCONTRADO`);
-      }
-    });
-
-  } catch (error) {
-    console.error("❌ Error en diagnóstico completo:", error);
-  }
-}
-
-// Buscador:
-async function fetchAllProductsFromServer() {
-  if (!supabase) {
-    console.error("Supabase no inicializado");
-    return [];
-  }
-  
-  try {
-    console.log("🔄 Cargando productos desde Supabase...");
-    
-    // Usar la nueva función con paginación
-    const { data, error } = await supabase
-      .from("productos")
-      .select("*")
-      .order("CODIGO", { ascending: true })
-      .limit(2000); // Aumentar el límite
-
-    if (error) {
-      console.error("❌ Error al cargar productos:", error);
-      showToast("Error al cargar productos", false);
-      return [];
-    }
-    
-    console.log(`✅ ${data?.length || 0} productos cargados exitosamente`);
-    return data || [];
-  } catch (e) {
-    console.error("❌ Excepción al cargar productos:", e);
-    return [];
-  }
-}
-
 
 // ------------------- Cargar productos -------------------
 async function loadProducts() {
@@ -4311,9 +3278,8 @@ async function loadProducts() {
   try {
     // traemos todas las columnas (más robusto si renombraste columnas)
     const { data, error } = await supabase
-      .from("productos")
-      .select("*")
-      .order("CODIGO", { ascending: true });
+      .from("productos_sin_codigo")
+      .select("*");
 
     if (error) {
       console.error("❌ Error al cargar productos:", error);
@@ -4323,7 +3289,7 @@ async function loadProducts() {
     
 
     // inicializar map de columnas para futuras operaciones
-    await ensureProductosColumnMap();
+    await ensureProductosSinCodigoColumnMap();
 
     renderTable(data || []);
     updatePendingCount(); // actualizar contador cada vez que recargue la tabla
@@ -4337,10 +3303,10 @@ async function loadProducts() {
 if (supabase?.channel) {
   try {
     supabase
-      .channel("realtime:productos")
+      .channel("realtime:productos_sin_codigo")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "productos" },
+        { event: "*", schema: "public", table: "productos_sin_codigo" },
         (payload) => {
           console.log("📢 Cambio detectado:", payload);
           loadProducts();
@@ -4357,8 +3323,8 @@ const btnVerSalidas = document.getElementById("btnVerSalidas");
 if (btnVerSalidas) {
   btnVerSalidas.addEventListener("click", () => {
     // ir a la página donde se muestran las salidas pendientes
-    // en esa página deberás leer localStorage.getItem("salidas_pendientes")
-    window.location.href = "salidas.html";
+    // en esa página deberás leer localStorage.getItem("salidas_pendientes_sin_codigo")
+    window.location.href = "salidas-sin-codigo.html";
   });
 }
 
@@ -4367,7 +3333,7 @@ async function cargarHistorialSalidas() {
   if (!tablaHistorialBody) return;
   try {
     const { data, error } = await supabase
-      .from("salidas")
+      .from("salidas_sin_codigo")
       .select("*")
       .order("FECHA_SALIDA", { ascending: false });
 
@@ -4380,7 +3346,6 @@ async function cargarHistorialSalidas() {
 
     tablaHistorialBody.innerHTML = "";
     data.forEach((item) => {
-      const codigo = item["CODIGO"] ?? item["CÓDIGO"] ?? "-";
       const descripcion = item["DESCRIPCION"] ?? item["DESCRIPCIÓN"] ?? "-";
       const um = item["UM"] ?? "-";
       const inventario = item["INVENTARIO_ORIGEN"] ?? item["TIPO DE INVENTARIO"] ?? item["ORIGEN"] ?? "-";
@@ -4393,7 +3358,6 @@ async function cargarHistorialSalidas() {
       const color = invColorFor(inventario);
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${escapeHtml(String(codigo))}</td>
         <td>${escapeHtml(String(descripcion))}</td>
         <td>${escapeHtml(String(um))}</td>
         <td><span class="inv-dot" title="${escapeHtml(inventario)}" style="background:${color}"></span> ${escapeHtml(String(inventario))}</td>
@@ -4435,7 +3399,8 @@ function showSummaryModal(successes, errors) {
   document.getElementById("summaryViewBtn").addEventListener("click", () => { overlay.remove(); window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}); });
 }
 
-// ------------------- Confirm pending items (mejorado multi-origen y ALMACEN) -------------------
+// ------------------- Confirm pending items -------------------
+// ------------------- Confirm pending items (con mejor diagnóstico) -------------------
 async function confirmAllPendings() {
   const pendientes = getPendingSalidas();
   if (!pendientes || pendientes.length === 0) {
@@ -4451,6 +3416,25 @@ async function confirmAllPendings() {
 
   for (const item of pendientes.slice()) {
     try {
+      console.log(`🔄 Procesando pendiente:`, item);
+      
+      // Extraer código del producto original con mejor diagnóstico
+      const { data: productoData, error: productoError } = await supabase
+        .from("productos_sin_codigo")
+        .select("*")
+        .eq("id", item.id)
+        .single();
+      
+      if (productoError) {
+        console.error("❌ Error al obtener producto:", productoError);
+        throw productoError;
+      }
+      
+      console.log("📦 Producto obtenido para extraer código:", productoData);
+      
+      const codigoSC = productoData ? extraerCodigoSC(productoData) : 'S/C';
+      console.log(`✅ Código extraído: ${codigoSC}`);
+
       const responsableFinal = ((item.RESPONSABLE_NOMBRE ?? "").trim() || "").length > 0
         ? `${(item.RESPONSABLE_NOMBRE ?? "").trim()} ${(item.RESPONSABLE_APELLIDO ?? "").trim()}`.trim()
         : (item.RESPONSABLE && String(item.RESPONSABLE).trim()) || (CURRENT_USER_FULLNAME || "Usuario");
@@ -4458,7 +3442,7 @@ async function confirmAllPendings() {
       const observacionesFinal = item.OBSERVACIONES ?? "";
       const destinatarioFinal = item.DESTINATARIO ?? "";
 
-      // si es multi-origen (ORIGENES array) lo procesamos por cada origen
+      // Resto del código permanece igual...
       const origenesToProcess = Array.isArray(item.ORIGENES) ? item.ORIGENES.map(o => ({
         INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN,
         CANTIDAD: parseInt(o.CANTIDAD, 10) || 0,
@@ -4469,7 +3453,7 @@ async function confirmAllPendings() {
         AVAILABLE: item.AVAILABLE ?? null
       }];
 
-      // validar sumatoria si venía multi-origen y el total no coincide
+      // Validación de sumatoria
       if (Array.isArray(item.ORIGENES) && item.CANTIDAD) {
         const sum = origenesToProcess.reduce((s,o) => s + (o.CANTIDAD || 0), 0);
         if (sum !== parseInt(item.CANTIDAD, 10)) {
@@ -4477,17 +3461,17 @@ async function confirmAllPendings() {
         }
       }
 
-      // procesar cada origen por separado
+      // Procesar cada origen
       for (const origin of origenesToProcess) {
-        // validación contra snapshot AVAILABLE (si existe)
         const availableSnapshot = parseInt(origin.AVAILABLE || 0, 10);
         if (availableSnapshot > 0 && origin.CANTIDAD > availableSnapshot) {
           throw new Error(`Cantidad (${origin.CANTIDAD}) mayor que stock disponible (${availableSnapshot}) en ${origin.INVENTARIO_ORIGEN}`);
         }
 
-        // intentar RPC primero (si tu rutina acepta origen individual)
+        // Intentar RPC con código S/C
         const rpcPayload = {
-          in_codigo: item.CODIGO,
+          in_id: item.id,
+          in_codigo: codigoSC, // <- AGREGAR CÓDIGO
           in_descripcion: item.DESCRIPCION,
           in_cantidad: origin.CANTIDAD,
           in_responsable: responsableFinal,
@@ -4496,11 +3480,16 @@ async function confirmAllPendings() {
           in_destinatario: destinatarioFinal
         };
 
-        const { data: rpcData, error: rpcError } = await supabase.rpc("crear_salida", rpcPayload).catch(err => ({ data: null, error: err }));
+        console.log("📤 Enviando RPC con payload:", rpcPayload);
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc("crear_salida_sin_codigo", rpcPayload).catch(err => ({ data: null, error: err }));
+        
         if (rpcError) {
-          // fallback: insertar en tabla 'salidas'
+          console.warn("⚠️ RPC falló, usando método alternativo:", rpcError);
+          
+          // Fallback: insertar en tabla 'salidas_sin_codigo' con código
           const salidaObj = {
-            CODIGO: item.CODIGO,
+            CODIGO: codigoSC, // <- AGREGAR CÓDIGO
             DESCRIPCION: item.DESCRIPCION,
             CANTIDAD_SALIDA: origin.CANTIDAD,
             FECHA_SALIDA: new Date().toISOString(),
@@ -4509,45 +3498,45 @@ async function confirmAllPendings() {
             INVENTARIO_ORIGEN: origin.INVENTARIO_ORIGEN,
             OBSERVACIONES: observacionesFinal
           };
-          const { error: errorInsert } = await supabase.from("salidas").insert([salidaObj]);
+          
+          const { error: errorInsert } = await supabase.from("salidas_sin_codigo").insert([salidaObj]);
           if (errorInsert) throw errorInsert;
 
-          // actualizar columna correspondiente en productos restando la cantidad
-          await ensureProductosColumnMap();
+          // Actualizar stock
+          await ensureProductosSinCodigoColumnMap();
           const realKey = getRealColForInventoryLabel(origin.INVENTARIO_ORIGEN);
           if (!realKey) throw new Error("No se pudo detectar columna de stock para actualizar: " + origin.INVENTARIO_ORIGEN);
 
-          // leer valor actual y restar
           const { data: prodRow, error: prodErr } = await supabase
-            .from("productos")
+            .from("productos_sin_codigo")
             .select(realKey)
-            .eq("CODIGO", item.CODIGO)
+            .eq("id", item.id)
             .maybeSingle();
           if (prodErr) throw prodErr;
+          
           const current = parseInt(prodRow ? (prodRow[realKey] ?? 0) : 0, 10) || 0;
           const nuevo = Math.max(0, current - parseInt(origin.CANTIDAD, 10));
           const upd = {}; upd[realKey] = nuevo;
-          const { error: eUpd } = await supabase.from("productos").update(upd).eq("CODIGO", item.CODIGO);
+          const { error: eUpd } = await supabase.from("productos_sin_codigo").update(upd).eq("id", item.id);
           if (eUpd) throw eUpd;
+        } else {
+          console.log("✅ RPC exitoso:", rpcData);
         }
-
-        // si el RPC tuvo éxito: asumimos que el procedimiento ya actualizó inventarios
       }
 
-      // si llegamos aquí sin excepción, considerar el item procesado con éxito
       successes++;
-
-      // borrar del pending (si existe) usando ADDED_AT como identificador preferido
+      
+      // Borrar del pending
       const list = getPendingSalidas();
       const idx = list.findIndex(
         (s) =>
-          s.CODIGO === item.CODIGO &&
+          s.id === item.id &&
           ((s.ADDED_AT && item.ADDED_AT && s.ADDED_AT === item.ADDED_AT) ||
             (s.INVENTARIO_ORIGEN === item.INVENTARIO_ORIGEN && s.CANTIDAD === item.CANTIDAD))
       );
       if (idx >= 0) { list.splice(idx, 1); savePendingSalidas(list); }
     } catch (err) {
-      console.error("Error confirmando pendiente:", item, err);
+      console.error("❌ Error confirmando pendiente:", item, err);
       errors++;
     }
   }
@@ -4563,7 +3552,6 @@ async function confirmAllPendings() {
     showToast("No se procesaron salidas", false);
   }
 }
-
 // ------------------- Clear pending list -------------------
 function clearAllPendings() {
   if (!confirm("¿Eliminar todas las salidas pendientes?")) return;
@@ -4628,9 +3616,8 @@ async function setResponsableFromAuth() {
 async function cargarInventario({ showErrors = false } = {}) {
   try {
     const { data, error } = await supabase
-      .from("productos")
-      .select("*")
-      .order("CODIGO", { ascending: true }); // ← CAMBIADO A "CODIGO" en mayúsculas
+      .from("productos_sin_codigo")
+      .select("*");
 
     if (error) throw error;
 
@@ -4641,7 +3628,7 @@ async function cargarInventario({ showErrors = false } = {}) {
 
     if (!data || data.length === 0) {
       if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">Sin productos registrados</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Sin productos registrados</td></tr>`;
       }
       return;
     }
@@ -4667,7 +3654,6 @@ async function cargarInventario({ showErrors = false } = {}) {
       else colorClass = "red";
 
       tr.innerHTML = `
-        <td>${p.CODIGO || p.codigo || ''}</td>
         <td>${p.DESCRIPCION || p.descripcion || ''}</td>
         <td>${p.UM || p.um || ''}</td>
         <td>${i069}</td>
@@ -4677,8 +3663,8 @@ async function cargarInventario({ showErrors = false } = {}) {
         <td>${i073}</td>
         <td class="${colorClass}">${totalStock}</td>
         <td>
-          <button class="btn-edit" data-id="${p.CODIGO || p.codigo}">✏️</button>
-          <button class="btn-delete" data-id="${p.CODIGO || p.codigo}">🗑️</button>
+          <button class="btn-edit" data-id="${p.id}">✏️</button>
+          <button class="btn-delete" data-id="${p.id}">🗑️</button>
         </td>
       `;
 
@@ -4699,7 +3685,6 @@ if (refreshBtn) {
   });
 }
 
-
 // ------------------- FUNCIÓN PARA NOTIFICACIONES -------------------
 function showToast(msg, ok = true) {
   const toast = document.getElementById("toast");
@@ -4707,7 +3692,9 @@ function showToast(msg, ok = true) {
   toast.className = `toast show ${ok ? "ok" : "error"}`;
   setTimeout(() => (toast.className = "toast"), 2500);
 }
+
 document.addEventListener("DOMContentLoaded", cargarInventario);
+
 // ------------------- Init -------------------
 document.addEventListener("DOMContentLoaded", async () => {
   await setResponsableFromAuth();
@@ -4719,21 +3706,4 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
   if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
   if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
-});
-// En el DOMContentLoaded, agregar:
-document.addEventListener('DOMContentLoaded', function() {
-  console.log("📄 DOM cargado, iniciando aplicación...");
-  
-  // Agregar botones de utilidad
-  addLoadAllButton();
-  addForceRefreshButton();
-  
-  // Configurar búsqueda primero
-  setupSearch();
-  
-  // Luego cargar productos
-  loadInitialProducts();
-  
-  // Configurar infinite scroll
-  setupInfiniteScroll();
 });

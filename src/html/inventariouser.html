@@ -33,35 +33,48 @@
       <button id="verMovimientoBtn" class="ver-movimiento-btn">Ver lista de movimiento</button>
     </div>
 
-    <table id="inventoryTable">
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Descripción</th>
-          <th>UM</th>
-          <th>INVENTARIO I069</th>
-          <th>INVENTARIO I078</th>
-          <th>INVENTARIO I07F</th>
-          <th>INVENTARIO I312</th>
-          <th>INVENTARIO I073</th>
-          <th>INVENTARIO FÍSICO EN ALMACÉN</th>
-          <th>Acción</th>
-        </tr>
-      </thead>
-      <tbody>
-        <!-- Productos se cargan dinámicamente -->
-      </tbody>
-    </table>
-  </div>
-  <script src="js/seguridad.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        checkAuth(); // Ambos roles pueden acceder
-        displayUserInfo();
-    });
-</script>
+    <div class="table-scroll-container">
+  <table id="inventoryTable">
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>UM</th>
+        <th>INVENTARIO I069</th>
+        <th>INVENTARIO I078</th>
+        <th>INVENTARIO I07F</th>
+        <th>INVENTARIO I312</th>
+        <th>INVENTARIO I073</th>
+        <th>INVENTARIO FÍSICO EN ALMACÉN</th>
+        <th class="acciones-head">Acciones</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Los productos se cargarán dinámicamente aquí -->
+    </tbody>
+  </table>
+</div>
 
-  <!-- :contentReference[oaicite:0]{index=0} -->
+
+    <!-- Controles de paginación al final -->
+    <div id="paginationControlsBottom" class="pagination-controls"></div>
+  </div>
+
+  <!-- SOLUCIÓN: Verifica la ruta correcta de seguridad.js -->
+  <script src="../js/seguridad.js"></script>
+  
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Solo ejecutar si las funciones existen
+        if (typeof checkAuth === 'function') {
+            checkAuth();
+        }
+        if (typeof displayUserInfo === 'function') {
+            displayUserInfo();
+        }
+    });
+  </script>
+
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <script src="../js/inventariouser.js"></script>
 </body>

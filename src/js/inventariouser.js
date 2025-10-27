@@ -1,52 +1,26 @@
 // ------------------- CONFIG SUPABASE -------------------
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
-const SUPABASE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
 
 const supabase = window.supabase?.createClient
   ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
   : null;
 
-// ------------------- ELEMENTOS DOM (se obtienen al cargar) -------------
-let tableBody = null;
-let searchInput = null;
-let verBtn = null;
+// ------------------- VARIABLES GLOBALES -------------------
+let currentPage = 1;
+const ITEMS_PER_PAGE = 100;
+let totalProducts = 0;
+let allProducts = [];
+let filteredProducts = [];
 
-// ------------------- ESTADO GLOBALS -------------------
-let PRODUCTOS_COLUMN_MAP = null; // map: normalizedKey -> realColumnName
-let allProducts = null; // cache global de productos
+// ------------------- ELEMENTOS DOM -------------------
+const tableBody = document.querySelector("#inventoryTable tbody");
+const searchInput = document.getElementById("searchInput");
+const paginationContainer = document.getElementById("paginationControls");
+const paginationContainerBottom = document.getElementById("paginationControlsBottom");
+const verMovimientoBtn = document.getElementById("verMovimientoBtn");
 
-// ------------------- UTILS -------------------
-function log(...args) { console.log("[INV]", ...args); }
-function warn(...args) { console.warn("[INV]", ...args); }
-function error(...args) { console.error("[INV]", ...args); }
-
-function debounce(fn, delay = 120) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), delay);
-  };
-}
-
-// normaliza texto: minúsculas + quitar acentos
-function normalizeText(s) {
-  return String(s ?? "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-// normaliza nombres de columnas (quita tildes y no-alfa)
-function normalizeKeyName(s) {
-  if (!s) return "";
-  return String(s)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quitar tildes
-    .replace(/[^a-z0-9]/g, ""); // quitar espacios/puntuación
-}
-
+// ------------------- FUNCIONES UTILITARIAS -------------------
 function escapeHtml(text) {
   if (text === null || text === undefined) return "";
   return String(text)
@@ -56,19 +30,185 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-const toNumber = (v) => {
+function toNumber(v) {
   if (v === null || v === undefined || v === "") return 0;
   const cleaned = String(v).replace(/,/g, "").trim();
   const n = Number(cleaned);
   return Number.isNaN(n) ? 0 : n;
-};
+}
 
 function formatShowValue(val) {
   if (val === null || val === undefined) return "";
   return String(val);
 }
 
-// ------------------- VARIANTES DE INVENTARIO -------------------
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// ------------------- FUNCIONES DE DEBUG -------------------
+function debugLocalStorage() {
+  const movimiento = localStorage.getItem("movimientoMaterial");
+  console.log("🔍 DEBUG LocalStorage movimientoMaterial:", movimiento);
+  console.log("🔍 DEBUG Todos los items en localStorage:");
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    console.log(`  ${key}:`, localStorage.getItem(key));
+  }
+}
+
+function verificarProductoEnLista(codigo) {
+  const lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
+  const existe = lista.some(item => item.codigo === codigo);
+  console.log(`🔍 Producto ${codigo} en lista:`, existe);
+  return existe;
+}
+
+function verMovimiento() {
+  const lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
+  console.log("📋 Lista de movimiento actual:", lista);
+  alert(`Productos en movimiento: ${lista.length}\n${JSON.stringify(lista, null, 2)}`);
+}
+
+// ------------------- CARGAR TODOS LOS PRODUCTOS -------------------
+async function loadAllProducts() {
+  if (!supabase) {
+    console.error("Supabase no inicializado");
+    return;
+  }
+
+  try {
+    console.log("🔄 Cargando todos los productos...");
+    
+    let allProductsData = [];
+    let page = 0;
+    const pageSize = 1000;
+    let hasMore = true;
+
+    while (hasMore) {
+      console.log(`📄 Cargando lote ${page + 1}...`);
+      
+      const { data, error } = await supabase
+        .from("productos")
+        .select("*")
+        .order("CODIGO", { ascending: true })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allProductsData = [...allProductsData, ...data];
+        console.log(`✅ Lote ${page + 1} cargado: ${data.length} productos`);
+        
+        if (data.length < pageSize) {
+          hasMore = false;
+          console.log("🏁 Último lote alcanzado");
+        } else {
+          page++;
+        }
+      } else {
+        hasMore = false;
+        console.log("🏁 No hay más productos");
+      }
+    }
+
+    allProducts = allProductsData;
+    filteredProducts = [...allProducts];
+    totalProducts = allProducts.length;
+
+    console.log(`✅ TOTAL: ${totalProducts} productos cargados exitosamente`);
+    
+    setupPagination();
+    currentPage = 1;
+    renderCurrentPage();
+    
+  } catch (error) {
+    console.error("❌ Error cargando productos:", error);
+  }
+}
+
+// ------------------- RENDERIZAR TABLA -------------------
+function renderTable(products) {
+  if (!tableBody) return;
+  
+  tableBody.innerHTML = "";
+
+  if (!products || products.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No hay productos que coincidan</td></tr>`;
+    return;
+  }
+
+  products.forEach((producto) => {
+    // Obtener valores de inventario usando el método robusto del primer código
+    const i069 = getStockFromProduct(producto, "I069");
+    const i078 = getStockFromProduct(producto, "I078");
+    const i07f = getStockFromProduct(producto, "I07F");
+    const i312 = getStockFromProduct(producto, "I312");
+    const i073 = getStockFromProduct(producto, "I073");
+    
+    // Calcular stock total
+    const stockTotal = i069 + i078 + i07f + i312 + i073;
+
+    // Determinar clase de stock
+    let stockClass = "";
+    if (stockTotal <= 1) {
+      stockClass = "stock-low";
+    } else if (stockTotal <= 10) {
+      stockClass = "stock-medium";
+    } else {
+      stockClass = "stock-high";
+    }
+
+    const row = document.createElement("tr");
+    row.className = stockClass;
+
+    const canAdd = stockTotal > 0;
+
+    row.innerHTML = `
+      <td>${escapeHtml(producto.CODIGO || "")}</td>
+      <td>${escapeHtml(producto.DESCRIPCION || "")}</td>
+      <td>${escapeHtml(producto.UM || "")}</td>
+      <td>${formatShowValue(i069)}</td>
+      <td>${formatShowValue(i078)}</td>
+      <td>${formatShowValue(i07f)}</td>
+      <td>${formatShowValue(i312)}</td>
+      <td>${formatShowValue(i073)}</td>
+      <td>${formatShowValue(stockTotal)}</td>
+      <td>
+        <button class="agregar-btn" ${canAdd ? "" : "disabled"} 
+                data-codigo="${escapeHtml(producto.CODIGO || "")}"
+                data-descripcion="${escapeHtml(producto.DESCRIPCION || "")}"
+                data-um="${escapeHtml(producto.UM || "")}"
+                data-stock="${stockTotal}">
+          ${canAdd ? "Agregar" : "Sin stock"}
+        </button>
+      </td>
+    `;
+
+    tableBody.appendChild(row);
+  });
+
+  agregarEventListenersABotones();
+}
+
+// ------------------- FUNCIONES DE INVENTARIO ROBUSTAS (del primer código) -------------------
+function normalizeKeyName(s) {
+  if (!s) return "";
+  return String(s)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
+}
+
 function inventoryKeyVariants(inv) {
   if (!inv) return [];
   const short = String(inv).trim().toUpperCase().replace(/^INVENTARIO\s*/i, "");
@@ -80,30 +220,6 @@ function inventoryKeyVariants(inv) {
   return [...new Set(variants)];
 }
 
-// ------------------- MAPA DE COLUMNAS (detecta nombres reales) -----------
-async function ensureProductosColumnMap() {
-  if (PRODUCTOS_COLUMN_MAP) return PRODUCTOS_COLUMN_MAP;
-  PRODUCTOS_COLUMN_MAP = {};
-  if (!supabase) return PRODUCTOS_COLUMN_MAP;
-  try {
-    const { data, error } = await supabase.from("productos").select("*").limit(1).maybeSingle();
-    if (error) {
-      warn("ensureProductosColumnMap error:", error);
-      return PRODUCTOS_COLUMN_MAP;
-    }
-    const row = data || {};
-    Object.keys(row).forEach((k) => {
-      PRODUCTOS_COLUMN_MAP[normalizeKeyName(k)] = k;
-    });
-    log("PRODUCTOS_COLUMN_MAP inicializado:", PRODUCTOS_COLUMN_MAP);
-    return PRODUCTOS_COLUMN_MAP;
-  } catch (e) {
-    error("ensureProductosColumnMap exception:", e);
-    return PRODUCTOS_COLUMN_MAP;
-  }
-}
-
-// dada una etiqueta de inventario y un objeto producto -> devuelve número
 function getStockFromProduct(productObj, inventoryLabel) {
   if (!productObj) return 0;
   const variants = inventoryKeyVariants(inventoryLabel);
@@ -118,7 +234,6 @@ function getStockFromProduct(productObj, inventoryLabel) {
     }
   }
 
-  // fallback: si existe alguna columna que contenga 'inventario'
   for (const k of keys) {
     if (normalizeKeyName(k).includes("inventario")) {
       return toNumber(productObj[k]);
@@ -128,315 +243,260 @@ function getStockFromProduct(productObj, inventoryLabel) {
   return 0;
 }
 
-// ------------------- RENDERIZADO DE TABLA -------------------
-// ------------------- RENDERIZADO DE TABLA (con bloqueo de "Agregar" si no hay stock) -------------------
-function renderTable(products) {
-  if (!tableBody) {
-    console.warn("renderTable: tableBody no definido");
-    return;
-  }
-  tableBody.innerHTML = "";
-
-  (products || []).forEach((p) => {
-    // obtener stock por inventario con helper robusto
-    const i069 = getStockFromProduct(p, "I069");
-    const i078 = getStockFromProduct(p, "I078");
-    const i07f = getStockFromProduct(p, "I07F");
-    const i312 = getStockFromProduct(p, "I312");
-    const i073 = getStockFromProduct(p, "I073");
-    const fisico = getStockFromProduct(p, "ALMACEN") || getStockFromProduct(p, "INVENTARIO FISICO EN ALMACEN");
-
-    const stockReal = Number(i069) + Number(i078) + Number(i07f) + Number(i312) + Number(i073);
-
-    // Colores por stock
-    let stockClass = "stock-high";
-    if (stockReal <= 1) {
-      stockClass = "stock-low";
-    } else if (stockReal <= 10) {
-      stockClass = "stock-medium";
-    }
-
-    const codigoVal = p["CODIGO"] ?? p.codigo ?? getValueFromProduct(p, ["CODIGO"]);
-    const descripcionVal = p["DESCRIPCION"] ?? p.descripcion ?? getValueFromProduct(p, ["DESCRIPCION"]);
-
-    const row = document.createElement("tr");
-    row.className = stockClass;
-
-    // Si no hay stock real, deshabilitamos el botón y añadimos clase para estilo
-    const canAdd = stockReal > 0;
-
-    row.innerHTML = `
-      <td>${escapeHtml(codigoVal)}</td>
-      <td>${escapeHtml(descripcionVal)}</td>
-      <td>${escapeHtml(p["UM"] ?? p.um ?? "")}</td>
-      <td>${i069}</td>
-      <td>${i078}</td>
-      <td>${i07f}</td>
-      <td>${i312}</td>
-      <td>${i073}</td>
-      <td>${formatShowValue(fisico)}</td>
-      <td>
-        <button class="agregar-btn" ${canAdd ? "" : "disabled aria-disabled='true'"}>${canAdd ? "Agregar" : "Sin stock"}</button>
-      </td>
-    `;
-
-    const btn = row.querySelector(".agregar-btn");
-    if (btn) {
-      // añadir clase visual si está deshabilitado
-      if (!canAdd) btn.classList.add("disabled");
-
-      btn.addEventListener("click", () => {
-        // protección extra: si está deshabilitado no hace nada
-        if (!canAdd) {
-          showCustomAlert("No hay cantidad disponible para agregar este producto.", "warning");
-          return;
-        }
-
-        const stockRealForPush = stockReal; // ya es la suma
-        agregarAMovimiento({
-          codigo: String(codigoVal ?? "") ,
-          descripcion: String(descripcionVal ?? "") ,
-          um: p["UM"] ?? p.um ?? "",
-          stockDisponible: Number(stockRealForPush)
-        });
-      });
-    }
-
-    tableBody.appendChild(row);
+// ------------------- AGREGAR EVENT LISTENERS A BOTONES -------------------
+function agregarEventListenersABotones() {
+  const botonesAgregar = document.querySelectorAll('.agregar-btn:not([disabled])');
+  
+  console.log(`🔍 Encontrados ${botonesAgregar.length} botones agregar`);
+  
+  botonesAgregar.forEach((btn, index) => {
+    const nuevoBoton = btn.cloneNode(true);
+    btn.parentNode.replaceChild(nuevoBoton, btn);
+    
+    nuevoBoton.addEventListener('click', function() {
+      console.log(`🖱️ Click en botón agregar #${index}:`, this.dataset);
+      
+      const productoData = {
+        codigo: this.dataset.codigo,
+        descripcion: this.dataset.descripcion,
+        um: this.dataset.um,
+        stockDisponible: parseInt(this.dataset.stock)
+      };
+      
+      agregarAMovimiento(productoData);
+    });
+    
+    console.log(`✅ Event listener agregado a botón ${index}:`, nuevoBoton.dataset.codigo);
   });
 }
 
-// ------------------- AGREGAR A MOVIMIENTO (valida stock > 0) -------------------
+// ------------------- AGREGAR A MOVIMIENTO -------------------
 function agregarAMovimiento(producto) {
   try {
+    console.log("🔄 Intentando agregar producto:", producto);
+    
+    debugLocalStorage();
+    
     const stock = Number(producto.stockDisponible ?? 0);
     if (stock <= 0) {
-      // No permitir agregar productos con stock 0 o negativo
-      showCustomAlert("No puedes agregar este producto porque no tiene cantidad disponible.", "warning");
+      mostrarAlerta("No puedes agregar este producto porque no tiene cantidad disponible.", "warning");
       return;
     }
 
-    let lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
-    if (!lista.some(item => item.codigo === producto.codigo)) {
-      lista.push(producto);
-      localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-      showCustomAlert("✅😉 Producto agregado a la lista de movimiento", "success");
-    } else {
-      showCustomAlert("😉 Este producto ya está en la lista de movimiento", "warning");
-    }
-  } catch (e) {
-    console.error("agregarAMovimiento error:", e);
-    showCustomAlert("❌ Error agregando producto", "error");
-  }
-}
-
-
-// Helper usado por render (buscar valor entre posibles claves)
-function getValueFromProduct(item, possibleKeys) {
-  for (const k of possibleKeys) {
-    if (Object.prototype.hasOwnProperty.call(item, k) && item[k] != null && item[k] !== "") {
-      return item[k];
-    }
-  }
-  // fallback por nombres parecidos
-  for (const k of Object.keys(item || {})) {
-    const nk = normalizeKeyName(k);
-    if (nk.includes("codigo")) return item[k];
-  }
-  for (const k of Object.keys(item || {})) {
-    const nk = normalizeKeyName(k);
-    if (nk.includes("descripcion") || nk.includes("desc")) return item[k];
-  }
-  return "";
-}
-
-// ------------------- MOVIMIENTO (localStorage) -------------------
-function showCustomAlert(message, type = 'success') {
-  // crea alert simple no intrusiva
-  const overlay = document.createElement('div');
-  overlay.className = 'custom-alert-overlay';
-  const alert = document.createElement('div');
-  alert.className = `custom-alert ${type}`;
-  alert.innerHTML = `
-    <div class="custom-alert-message">${message}</div>
-    <button class="custom-alert-close">Aceptar</button>
-  `;
-  document.body.appendChild(overlay);
-  document.body.appendChild(alert);
-  setTimeout(() => overlay.classList.add('show'), 10);
-  setTimeout(() => alert.classList.add('show'), 10);
-  alert.querySelector('.custom-alert-close')?.addEventListener('click', () => hideCustomAlert(alert, overlay));
-  overlay.addEventListener('click', () => hideCustomAlert(alert, overlay));
-  setTimeout(() => { if (document.body.contains(alert)) hideCustomAlert(alert, overlay); }, 3000);
-}
-function hideCustomAlert(alert, overlay) {
-  alert.classList.remove('show'); alert.classList.add('hide');
-  overlay.classList.remove('show');
-  setTimeout(() => {
-    if (document.body.contains(alert)) document.body.removeChild(alert);
-    if (document.body.contains(overlay)) document.body.removeChild(overlay);
-  }, 400);
-}
-function agregarAMovimiento(producto) {
-  try {
-    let lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
-    if (!lista.some(item => item.codigo === producto.codigo)) {
-      lista.push(producto);
-      localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-      showCustomAlert("✅😉 Producto agregado a la lista de movimiento", "success");
-    } else {
-      showCustomAlert("😉 Este producto ya está en la lista de movimiento", "warning");
-    }
-  } catch (e) {
-    error("agregarAMovimiento error:", e);
-    showCustomAlert("❌ Error agregando producto", "error");
-  }
-}
-
-// ------------------- FETCH / CACHE DE PRODUCTOS -------------------
-async function fetchAllProductsFromServer() {
-  if (!supabase) throw new Error("Supabase no inicializado");
-  try {
-    const { data, error } = await supabase.from("productos").select("*").order("CODIGO", { ascending: true });
-    if (error) {
-      error("Error fetchAllProductsFromServer:", error);
-      return [];
-    }
-    return data || [];
-  } catch (e) {
-    error("fetchAllProductsFromServer exception:", e);
-    return [];
-  }
-}
-
-async function loadProducts() {
-  if (!supabase) {
-    error("Supabase no inicializado");
-    return;
-  }
-  try {
-    const data = await fetchAllProductsFromServer();
-    // rellenar map de columnas si hace falta
-    if (!PRODUCTOS_COLUMN_MAP || Object.keys(PRODUCTOS_COLUMN_MAP).length === 0) {
-      PRODUCTOS_COLUMN_MAP = {};
-      const sample = (data && data[0]) || {};
-      Object.keys(sample).forEach((k) => {
-        PRODUCTOS_COLUMN_MAP[normalizeKeyName(k)] = k;
-      });
-      log("PRODUCTOS_COLUMN_MAP (auto):", PRODUCTOS_COLUMN_MAP);
-    }
-    allProducts = data || [];
-    renderTable(allProducts);
-  } catch (ex) {
-    error("loadProducts exception:", ex);
-  }
-}
-
-// ------------------- BÚSQUEDA CLIENTE ROBUSTA -------------------
-function resolvePossibleKeys(keywordNorm) {
-  if (!PRODUCTOS_COLUMN_MAP) return [];
-  const found = [];
-  for (const norm in PRODUCTOS_COLUMN_MAP) {
-    if (norm.includes(keywordNorm)) found.push(PRODUCTOS_COLUMN_MAP[norm]);
-  }
-  return found;
-}
-
-function setupSearchListener() {
-  if (!searchInput) {
-    warn("No se encontró searchInput en DOM");
-    return;
-  }
-
-  const handleSearch = debounce(async () => {
-    const raw = String(searchInput.value || "");
-    const q = raw.trim();
-
-    if (q === "") {
-      if (allProducts === null) {
-        await loadProducts();
-      } else {
-        renderTable(allProducts);
+    let lista = [];
+    try {
+      const listaStorage = localStorage.getItem("movimientoMaterial");
+      if (listaStorage) {
+        lista = JSON.parse(listaStorage);
+        if (!Array.isArray(lista)) {
+          console.warn("⚠️ movimientoMaterial no es un array, reiniciando...");
+          lista = [];
+        }
       }
-      return;
+    } catch (e) {
+      console.error("❌ Error parseando movimientoMaterial:", e);
+      lista = [];
     }
 
-    if (allProducts === null) {
-      allProducts = await fetchAllProductsFromServer();
-      await ensureProductosColumnMap();
-    }
-
-    const tokens = q.split(/\s+/).map(t => normalizeText(t)).filter(Boolean);
-
-    const codigoKeys = [...resolvePossibleKeys("codigo"), "CODIGO", "codigo", "Codigo", "code", "Code"];
-    const descKeys = [...resolvePossibleKeys("descripcion"), ...resolvePossibleKeys("desc"), "DESCRIPCION", "descripcion", "Descripcion", "DESC", "desc", "descripcion_producto", "descripcionlarga"];
-
-    const filtered = (allProducts || []).filter((p) => {
-      const rawCodigo = getValueFromProduct(p, codigoKeys);
-      const rawDesc = getValueFromProduct(p, descKeys);
-      const combined = normalizeText(`${rawCodigo} ${rawDesc}`);
-      return tokens.every((tk) => combined.includes(tk));
-    });
-
-    // fallback digits
-    if (filtered.length === 0 && /^\d+$/.test(q)) {
-      const digitFiltered = (allProducts || []).filter((p) => {
-        const rawCodigo = getValueFromProduct(p, codigoKeys);
-        return String(rawCodigo ?? "").toLowerCase().includes(q.toLowerCase());
-      });
-      log("Busqueda digits fallback, matches:", digitFiltered.length);
-      renderTable(digitFiltered);
-      return;
-    }
-
-    renderTable(filtered);
-  }, 90);
-
-  searchInput.addEventListener("input", handleSearch);
-}
-
-// ------------------- INICIALIZACIÓN (espera DOM) -------------------
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    tableBody = document.querySelector("#inventoryTable tbody");
-    searchInput = document.getElementById("searchInput");
-    verBtn = document.getElementById("verMovimientoBtn");
-
-    // Setup search (si existe)
-    setupSearchListener();
-
-    // Inicializar realtime si soportado
-    if (supabase?.channel) {
+    console.log("📋 Lista actual antes de agregar:", lista);
+    
+    const productoExistente = lista.find(item => item.codigo === producto.codigo);
+    
+    if (!productoExistente) {
+      const nuevoProducto = {
+        codigo: producto.codigo,
+        descripcion: producto.descripcion,
+        um: producto.um,
+        stockDisponible: stock,
+        cantidad: 1
+      };
+      
+      lista.push(nuevoProducto);
+      
       try {
-        supabase
-          .channel("productos-changes")
-          .on(
-            "postgres_changes",
-            {
-              event: "*",
-              schema: "public",
-              table: "productos",
-            },
-            (payload) => {
-              log("🔄 Cambio detectado:", payload);
-              loadProducts();
-            }
-          )
-          .subscribe();
-      } catch (err) {
-        warn("No se pudo crear canal realtime:", err);
+        localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
+        console.log("💾 Guardado en localStorage:", lista);
+        
+        const verificacion = localStorage.getItem("movimientoMaterial");
+        console.log("✅ Verificación después de guardar:", verificacion);
+        
+        mostrarAlerta(`✅ Producto "${producto.codigo}" agregado a la lista de movimiento`, "success");
+        
+        setTimeout(() => {
+          verificarProductoEnLista(producto.codigo);
+          debugLocalStorage();
+        }, 100);
+        
+      } catch (storageError) {
+        console.error("❌ Error guardando en localStorage:", storageError);
+        mostrarAlerta("❌ Error al guardar en el almacenamiento local", "error");
       }
+    } else {
+      console.log("⚠️ Producto ya existe en lista:", productoExistente);
+      mostrarAlerta("⚠️ Este producto ya está en la lista de movimiento", "warning");
     }
-
-    if (verBtn) {
-      verBtn.addEventListener("click", () => {
-        window.location.href = "movimientomaterial.html";
-      });
-    }
-
-    // Cargar productos inicialmente
-    await loadProducts();
   } catch (e) {
-    error("Inicialización exception:", e);
+    console.error("❌ Error crítico en agregarAMovimiento:", e);
+    mostrarAlerta("❌ Error grave agregando producto", "error");
   }
+}
+
+// ------------------- ALERTAS -------------------
+function mostrarAlerta(mensaje, tipo = 'success') {
+  const alerta = document.createElement("div");
+  alerta.className = `alert ${tipo}`;
+  alerta.textContent = mensaje;
+  document.body.appendChild(alerta);
+
+  setTimeout(() => alerta.classList.add("show"), 80);
+  setTimeout(() => {
+    alerta.classList.remove("show");
+    setTimeout(() => alerta.remove(), 350);
+  }, 2600);
+}
+
+// ------------------- PAGINACIÓN -------------------
+function setupPagination() {
+  updatePaginationControls();
+}
+
+function updatePaginationControls() {
+  const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
+  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
+
+  const paginationHTML = `
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: center;">
+      <button id="firstPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
+        ⏮️ Primera
+      </button>
+      <button id="prevPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
+        ◀️ Anterior
+      </button>
+      
+      <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        <span style="font-weight: 600; color: #495057;">Página</span>
+        <input 
+          type="number" 
+          id="pageInput" 
+          value="${currentPage}" 
+          min="1" 
+          max="${totalPages}" 
+          style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ced4da; border-radius: 4px; font-weight: bold;"
+        >
+        <span style="font-weight: 600; color: #495057;">de ${totalPages}</span>
+      </div>
+      
+      <button id="nextPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
+        Siguiente ▶️
+      </button>
+      <button id="lastPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
+        Última ⏭️
+      </button>
+      
+      <div style="margin-left: 10px; font-weight: 600; color: #495057; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
+        📊 Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${totalProducts}</strong> productos
+      </div>
+      
+      <!-- Botones de debug -->
+      <div style="display: flex; gap: 5px;">
+        <button onclick="debugLocalStorage()" style="padding: 5px 10px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">🔍 Debug</button>
+        <button onclick="verMovimiento()" style="padding: 5px 10px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">📋 Ver Movimiento</button>
+      </div>
+    </div>
+  `;
+
+  if (paginationContainer) paginationContainer.innerHTML = paginationHTML;
+  if (paginationContainerBottom) paginationContainerBottom.innerHTML = paginationHTML;
+
+  document.getElementById('firstPage')?.addEventListener('click', () => goToPage(1));
+  document.getElementById('prevPage')?.addEventListener('click', () => goToPage(currentPage - 1));
+  document.getElementById('nextPage')?.addEventListener('click', () => goToPage(currentPage + 1));
+  document.getElementById('lastPage')?.addEventListener('click', () => goToPage(totalPages));
+  
+  const pageInput = document.getElementById('pageInput');
+  if (pageInput) {
+    pageInput.addEventListener('change', (e) => {
+      const page = parseInt(e.target.value);
+      if (page >= 1 && page <= totalPages) {
+        goToPage(page);
+      } else {
+        e.target.value = currentPage;
+      }
+    });
+    
+    pageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        const page = parseInt(e.target.value);
+        if (page >= 1 && page <= totalPages) {
+          goToPage(page);
+        }
+      }
+    });
+  }
+}
+
+function goToPage(page) {
+  if (page < 1 || page > Math.ceil(totalProducts / ITEMS_PER_PAGE)) return;
+  
+  currentPage = page;
+  renderCurrentPage();
+  updatePaginationControls();
+}
+
+function getCurrentPageItems() {
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  return filteredProducts.slice(startIndex, endIndex);
+}
+
+function renderCurrentPage() {
+  const currentItems = getCurrentPageItems();
+  renderTable(currentItems);
+}
+
+// ------------------- BÚSQUEDA -------------------
+function setupSearch() {
+  if (searchInput) {
+    searchInput.addEventListener('input', debounce((e) => {
+      const term = e.target.value.trim().toLowerCase();
+      
+      if (term === '') {
+        filteredProducts = [...allProducts];
+        totalProducts = filteredProducts.length;
+        currentPage = 1;
+        renderCurrentPage();
+        updatePaginationControls();
+        return;
+      }
+      
+      filteredProducts = allProducts.filter(producto => {
+        const codigo = String(producto.CODIGO || "").toLowerCase();
+        const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
+        
+        return codigo.includes(term) || descripcion.includes(term);
+      });
+      
+      totalProducts = filteredProducts.length;
+      currentPage = 1;
+      renderCurrentPage();
+      updatePaginationControls();
+      
+    }, 300));
+  }
+}
+
+// ------------------- INICIALIZACIÓN -------------------
+document.addEventListener('DOMContentLoaded', function() {
+  console.log("👤 Inicializando vista de usuario...");
+  
+  setupSearch();
+  
+  if (verMovimientoBtn) {
+    verMovimientoBtn.addEventListener('click', () => {
+      window.location.href = 'movimientomaterial.html';
+    });
+  }
+  
+  loadAllProducts();
 });

@@ -10,6 +10,7 @@
 <body>
   <div class="container">
     <a href="inventariouser.html" class="back-btn">⬅ Volver al Inventario</a>
+    
     <h1>Lista de Movimiento de Material</h1>
 
     <div class="solicitante-box">
@@ -24,20 +25,20 @@
           <th>Descripción</th>
           <th>UM</th>
           <th>Cantidad</th>
-          <th>Eliminar</th>
+          <th>Acción</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
-
     <div class="acciones">
-      <button id="btnImprimir">🖨️ Imprimir Hoja de Salida</button>
-    </div>
+  <button id="btnVaciarTodo" class="vaciar-btn">🗑️ Vaciar Lista</button>
+  <button id="btnImprimir" class="imprimir-btn">🖨️ Imprimir Solicitud</button>
+  </div>
   </div>
 
   <!-- Hoja de salida para impresión -->
   <div id="hoja-salida" style="display:none;">
-    <h2>📋 Hoja de productos solicitanes 📋</h2>
+    <h2>📋 Hoja de Productos Solicitados</h2>
     <p><strong>Solicitante:</strong> <span id="nombreSalida"></span></p>
     <p><strong>Fecha:</strong> <span id="fechaSalida"></span></p>
 
@@ -53,13 +54,29 @@
       <tbody></tbody>
     </table>
   </div>
-  <script src="js/seguridad.js"></script>
-<script>
+<!-- Confirm Modal (global) -->
+<div class="alert-overlay" id="confirmOverlay" aria-hidden="true"></div>
+
+<div class="confirm-modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmText" tabindex="-1">
+  <div class="confirm-content">
+    <h3 id="confirmTitle"><span class="confirm-icon">⚠️</span> <span id="confirmTitleText">Confirmar Acción</span></h3>
+    <p id="confirmText">¿Estás seguro?</p>
+    <div class="confirm-buttons">
+      <button class="confirm-btn confirm-vaciar-btn" id="confirmYes">Sí, eliminar</button>
+      <button class="confirm-btn cancel-btn" id="confirmNo">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+  <script src="../js/seguridad.js"></script>
+  <script>
     document.addEventListener('DOMContentLoaded', function() {
-        checkAuth(); // Permite ambos roles
-        displayUserInfo();
+        if (typeof checkAuth === 'function' && typeof displayUserInfo === 'function') {
+            checkAuth();
+            displayUserInfo();
+        }
     });
-</script>
+  </script>
 
   <script type="module" src="../js/movimientomaterial.js"></script>
 </body>
