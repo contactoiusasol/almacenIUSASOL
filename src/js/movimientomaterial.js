@@ -1,4 +1,4 @@
-// ../js/movimientomaterial.js
+// movimientomaterial.js
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
@@ -7,8 +7,89 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 document.addEventListener("DOMContentLoaded", init);
 
+function escapeHtml(text) {
+  if (text === null || text === undefined) return "";
+  return String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function ensureToastContainer() {
+  let c = document.querySelector(".toast-container");
+  if (!c) {
+    c = document.createElement("div");
+    c.className = "toast-container";
+    document.body.appendChild(c);
+  }
+  return c;
+}
+
+function mostrarAlerta(mensaje, tipo = "success", tiempo = 2600) {
+  const c = ensureToastContainer();
+  const t = document.createElement("div");
+  t.className = `toast ${tipo}`;
+  t.innerHTML = `<span class="icon">${tipo === 'success' ? '✅' : tipo === 'warning' ? '⚠️' : '❌'}</span><div style="flex:1">${escapeHtml(mensaje)}</div>`;
+  c.appendChild(t);
+  // force reflow
+  requestAnimationFrame(() => t.classList.add("show"));
+  setTimeout(() => {
+    t.classList.remove("show");
+    setTimeout(() => t.remove(), 300);
+  }, tiempo);
+}
+
+/* Helper impresión: intenta abrir ventana e imprimir; si falla, usa iframe fallback */
+function createPrintWindow(html) {
+  try {
+    const w = window.open("", "_blank", "noopener");
+    if (!w) return false;
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    // Esperar a que el contenido cargue
+    const p = setInterval(() => {
+      if (w.document.readyState === "complete") {
+        clearInterval(p);
+        w.focus();
+        w.print();
+        // cerrar ventana tras imprimir (opcional): se hace con timeout para evitar bloquear algunos navegadores
+        setTimeout(() => {
+          try { w.close(); } catch (err) { /* ignore */ }
+        }, 600);
+      }
+    }, 80);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function createIframePrint(html) {
+  const iframe = document.createElement("iframe");
+  iframe.style.position = "fixed";
+  iframe.style.right = "0";
+  iframe.style.bottom = "0";
+  iframe.style.width = "0";
+  iframe.style.height = "0";
+  iframe.style.border = "0";
+  iframe.setAttribute("aria-hidden", "true");
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(html);
+  idoc.close();
+  iframe.contentWindow.focus();
+  // Delay para asegurarse carga
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.print();
+    } catch (e) {
+      console.error("Print fallback failed:", e);
+    }
+    setTimeout(() => iframe.remove(), 800);
+  }, 300);
+}
+
 async function init() {
-  // Elementos DOM
+  // DOM elements
   const nombreSolicitanteInput = document.getElementById("nombreSolicitante");
   const tablaBody = document.querySelector("#tabla-movimiento tbody");
   const btnImprimir = document.getElementById("btnImprimir");
@@ -18,7 +99,6 @@ async function init() {
   const nombreSalida = document.getElementById("nombreSalida");
   const fechaSalida = document.getElementById("fechaSalida");
 
-  // Modal confirm
   const overlay = document.getElementById("confirmOverlay");
   const modal = document.getElementById("confirmModal");
   const titleEl = document.getElementById("confirmTitleText");
@@ -26,88 +106,67 @@ async function init() {
   const btnYes = document.getElementById("confirmYes");
   const btnNo = document.getElementById("confirmNo");
 
-  // Cargar usuario desde Supabase
+  // intentar obtener usuario (si tienes sesión Supabase)
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    const user = data?.user;
     if (user && user.email) {
-      const email = user.email;
-      const { data, error } = await supabase
-        .from("usuarios")
-        .select("nombre, apellido")
-        .eq("email", email)
-        .single();
-
-      if (error) {
-        console.error("Error obteniendo usuario:", error);
-        nombreSolicitanteInput.value = "Usuario no identificado";
+      const { data: udata, error } = await supabase.from("usuarios").select("nombre, apellido").eq("email", user.email).single();
+      if (!error && udata) {
+        nombreSolicitanteInput.value = `${udata.nombre || ""} ${udata.apellido || ""}`.trim();
       } else {
-        const nombreCompleto = `${data?.nombre || ""} ${data?.apellido || ""}`.trim();
-        nombreSolicitanteInput.value = nombreCompleto || "Usuario no identificado";
+        nombreSolicitanteInput.value = nombreSolicitanteInput.value || "Usuario no identificado";
       }
     } else {
-      nombreSolicitanteInput.value = "Usuario no identificado";
+      nombreSolicitanteInput.value = nombreSolicitanteInput.value || "Usuario no identificado";
     }
   } catch (err) {
-    console.error("Error supabase:", err);
-    nombreSolicitanteInput.value = "Usuario no identificado";
+    console.warn("No se obtuvo usuario supabase:", err);
+    nombreSolicitanteInput.value = nombreSolicitanteInput.value || "Usuario no identificado";
   }
 
-  // Lista desde localStorage
-  let lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
-
-  // Toast de alerta (compacto)
-  function mostrarAlerta(mensaje, tipo = 'success') {
-    const alerta = document.createElement("div");
-    alerta.className = `alert ${tipo}`;
-    alerta.textContent = mensaje;
-    document.body.appendChild(alerta);
-
-    // show
-    setTimeout(() => alerta.classList.add("show"), 80);
-    // hide
-    setTimeout(() => {
-      alerta.classList.remove("show");
-      setTimeout(() => alerta.remove(), 350);
-    }, 2600);
-  }
+  // cargar lista desde localStorage
+  let lista = JSON.parse(localStorage.getItem("movimientoMaterial") || "[]");
+  if (!Array.isArray(lista)) lista = [];
 
   // Render tabla
   function renderTabla() {
+    if (!tablaBody) return;
     tablaBody.innerHTML = "";
     if (!lista || lista.length === 0) {
-      tablaBody.innerHTML = `
-        <tr><td colspan="5" style="text-align:center; padding: 20px; color: #777;">
-        No hay productos en la lista de movimiento</td></tr>`;
+      tablaBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px; color:#777;">No hay productos en la lista de movimiento</td></tr>`;
       return;
     }
-
     lista.forEach((item, index) => {
-      const fila = document.createElement("tr");
-      fila.innerHTML = `
-        <td>${item.codigo}</td>
-        <td style="text-align:left;">${item.descripcion}</td>
-        <td>${item.um}</td>
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(item.codigo)}</td>
+        <td style="text-align:left;">${escapeHtml(item.descripcion)}</td>
+        <td>${escapeHtml(item.um)}</td>
         <td style="text-align:center;">
-          <input type="number" min="1" max="${item.stockDisponible}"
-          value="${item.cantidad || ''}" class="cantidad-input" data-index="${index}" />
-          <small style="color:#888; font-size:0.75rem; display:block;">Max: ${item.stockDisponible}</small>
+          <input type="number" min="1" max="${Number(item.stockDisponible||0)}" value="${escapeHtml(String(item.cantidad||1))}" class="cantidad-input" data-index="${index}" />
+          <small style="display:block;color:#888;font-size:.75rem;">Max: ${escapeHtml(String(item.stockDisponible||0))}</small>
         </td>
-        <td style="text-align:center;"><button class="eliminar-btn" data-index="${index}">Eliminar</button></td>`;
-      tablaBody.appendChild(fila);
+        <td style="text-align:center;"><button class="eliminar-btn" data-index="${index}">Eliminar</button></td>
+      `;
+      tablaBody.appendChild(tr);
     });
   }
 
-  // showConfirm: Promise<boolean>
-  function showConfirm(message, title = "Confirmar Acción") {
+  // Modal confirm (promise)
+  function showConfirm(message, title = "Confirmar acción") {
     return new Promise((resolve) => {
+      if (!overlay || !modal || !titleEl || !textEl || !btnYes || !btnNo) {
+        // si no hay modal físico, usar confirm() nativo
+        resolve(window.confirm(message));
+        return;
+      }
       titleEl.textContent = title;
       textEl.textContent = message;
-
-      // show modal
       overlay.classList.add("show");
       modal.classList.add("show");
       modal.setAttribute("aria-hidden", "false");
-      btnNo.focus(); // focus en cancelar por defecto
+      btnNo.focus();
 
       const cleanup = (result) => {
         overlay.classList.remove("show");
@@ -121,7 +180,6 @@ async function init() {
 
       const onYes = () => cleanup(true);
       const onNo = () => cleanup(false);
-
       const onKey = (e) => {
         if (e.key === "Escape") cleanup(false);
         if (e.key === "Enter") cleanup(true);
@@ -133,68 +191,74 @@ async function init() {
     });
   }
 
-  // Vaciar lista (usa showConfirm)
+  // Vaciar lista completa
   async function vaciarListaCompleta() {
     if (!lista || lista.length === 0) {
       mostrarAlerta("📭 No hay productos en la lista para vaciar", "warning");
       return;
     }
-
     const confirmar = await showConfirm(`¿Estás seguro de que deseas vaciar toda la lista?\nSe eliminarán ${lista.length} producto(s).`, "Vaciar lista");
-
     if (confirmar) {
       lista = [];
       localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-      mostrarAlerta("✅ Lista vaciada correctamente", "success");
       renderTabla();
+      if (typeof updateVerMovimientoBadge === "function") updateVerMovimientoBadge();
+      mostrarAlerta("✅ Lista vaciada correctamente", "success");
     } else {
-      mostrarAlerta("Operación cancelada", "info");
+      mostrarAlerta("Operación cancelada", "warning");
     }
   }
 
-  // Event listeners en tabla (delegación)
-  tablaBody.addEventListener("input", (e) => {
-    if (e.target.classList.contains("cantidad-input")) {
-      const index = Number(e.target.dataset.index);
-      const max = Number(lista[index]?.stockDisponible || 0);
-      let val = parseInt(e.target.value, 10);
-      if (isNaN(val) || val < 1) val = 1;
-      if (val > max) {
-        mostrarAlerta(`❌ No puedes pedir más de ${max} unidades disponibles`, "warning");
-        val = max;
-        e.target.value = max;
+  // Eventos delegados en la tabla
+  if (tablaBody) {
+    tablaBody.addEventListener("input", (e) => {
+      if (e.target && e.target.classList.contains("cantidad-input")) {
+        const idx = Number(e.target.dataset.index);
+        const max = Number(lista[idx]?.stockDisponible || 0);
+        let v = parseInt(e.target.value, 10);
+        if (isNaN(v) || v < 1) v = 1;
+        if (v > max) {
+          mostrarAlerta(`❌ Máximo ${max} unidades disponibles`, "warning");
+          v = max;
+          e.target.value = max;
+        }
+        if (lista[idx]) {
+          lista[idx].cantidad = v;
+          localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
+        }
       }
-      lista[index].cantidad = val;
-      localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-    }
-  });
+    });
 
-  tablaBody.addEventListener("click", async (e) => {
-    if (e.target.classList.contains("eliminar-btn")) {
-      const index = Number(e.target.dataset.index);
-      const item = lista[index];
-      const confirmar = await showConfirm(`¿Seguro que deseas eliminar el producto con código ${item?.codigo || ''} y descripción "${item?.descripcion || ''}"?`, "Confirmar eliminación");
-
-      if (confirmar) {
-        lista.splice(index, 1);
-        localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-        renderTabla();
-        mostrarAlerta("🗑️ Producto eliminado", "success");
-      } else {
-        mostrarAlerta("Acción cancelada", "info");
+    tablaBody.addEventListener("click", async (e) => {
+      if (e.target && e.target.classList.contains("eliminar-btn")) {
+        const idx = Number(e.target.dataset.index);
+        const item = lista[idx];
+        const confirmar = await showConfirm(`¿Eliminar producto ${item?.codigo || ''}?\n"${item?.descripcion || ''}"`, "Confirmar eliminación");
+        if (confirmar) {
+          lista.splice(idx, 1);
+          localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
+          renderTabla();
+          if (typeof updateVerMovimientoBadge === "function") updateVerMovimientoBadge();
+          mostrarAlerta("🗑️ Producto eliminado", "success");
+        } else {
+          mostrarAlerta("Acción cancelada", "warning");
+        }
       }
-    }
-  });
+    });
+  }
 
-  // Botón Imprimir
-  if (btnImprimir) {
+  // Botón vaciar todo
+  if (btnVaciarTodo) btnVaciarTodo.addEventListener("click", vaciarListaCompleta);
+
+  // ---- Imprimir: rellenar tablaSalida y generar HTML forzado ----
+   if (btnImprimir) {
     btnImprimir.addEventListener("click", () => {
       const nombre = (nombreSolicitanteInput?.value || "").trim();
       if (!nombre) return mostrarAlerta("⚠️ Escribe el nombre del solicitante", "warning");
 
       const listaFiltrada = lista.filter(item => item.cantidad && item.cantidad > 0);
       if (listaFiltrada.length === 0) {
-        return mostrarAlerta("⚠️ No hay productos con cantidad para imprimir", "warning");
+        return mostrarAlerta(" No hay productos con cantidad para imprimir", "warning");
       }
 
       nombreSalida.textContent = nombre;

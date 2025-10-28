@@ -3445,7 +3445,7 @@ function renderTable(products) {
     const tdFisico = document.createElement("td");
     tdFisico.textContent = formatShowValue(fisicoVal);
 
-    // Columna Acciones
+    
    // Columna Acciones
 const tdAcciones = document.createElement("td");
 tdAcciones.className = "acciones"; // coincide con el CSS que usarás
@@ -3696,7 +3696,7 @@ window.addEventListener("click", (e) => {
   }
 });
 
-// ------------------- Guardar Producto (robusto) -------------------
+// ------------------- Guardar Producto  -------------------
 productForm?.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   if (!productForm) return;
@@ -3725,10 +3725,35 @@ productForm?.addEventListener('submit', async (ev) => {
 
       if (!editingCodigo) {
         showToast("Código del producto no definido. No se puede actualizar.", false);
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
         return;
       }
 
-      // pedimos select() para confirmar que la fila fue devuelta
+      // --- NUEVA COMPROBACIÓN: evitar descripciones duplicadas (excluyendo el propio producto)
+      try {
+        // Recolectar campos extra que distinguen productos (si existen en el formulario)
+        const extraFields = {};
+        const umField = productForm.querySelector('[name="um"]')?.value ?? "";
+        if (umField) extraFields['UM'] = umField;
+
+        ['tipo','familia','marca','categoria'].forEach(fname => {
+          const fv = productForm.querySelector(`[name="${fname}"]`)?.value;
+          if (fv && String(fv).trim() !== "") extraFields[fname] = fv;
+        });
+
+        const dupDesc = await existsDescripcion(nuevaDesc, editingCodigo, extraFields);
+        if (dupDesc) {
+          showToast("❌ Ya existe otro producto con esa descripción y características", false);
+          descEl?.focus();
+          if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+          return;
+        }
+      } catch (errCheck) {
+        console.warn("No se pudo verificar duplicado de descripción antes de actualizar.", errCheck);
+        // no bloqueamos la operación si falla la comprobación remota
+      }
+
+      // pedimos select() para confirmar que la fila fue devuelta (update)
       const resp = await supabase
         .from('productos')
         .update({ [realDescCol]: nuevaDesc })
@@ -3799,6 +3824,44 @@ productForm?.addEventListener('submit', async (ev) => {
       return;
     }
 
+    // --- NUEVA COMPROBACIÓN: evitar códigos duplicados
+    try {
+      const codigoExists = await existsCodigo(codigo);
+      if (codigoExists) {
+        showToast("❌ Ya existe un producto con ese código", false);
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+        const codigoField = productForm.querySelector('[name="codigo"]');
+        codigoField?.focus();
+        return;
+      }
+    } catch (errCheck) {
+      console.warn("No se pudo verificar duplicado de código antes de insertar.", errCheck);
+      // no bloqueamos la operación si falla la comprobación remota
+    }
+
+    // --- NUEVA COMPROBACIÓN: evitar descripciones duplicadas solo si coinciden también los campos que importan
+    try {
+      const extraFields = {};
+      if (um) extraFields['UM'] = um;
+
+      ['tipo','familia','marca','categoria'].forEach(fname => {
+        const fv = productForm.querySelector(`[name="${fname}"]`)?.value;
+        if (fv && String(fv).trim() !== "") extraFields[fname] = fv;
+      });
+
+      const descExists = await existsDescripcion(descripcion, null, extraFields);
+      if (descExists) {
+        showToast("❌ Ya existe un producto con esa descripción y las mismas características", false);
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+        const descField = productForm.querySelector('[name="descripcion"]');
+        descField?.focus();
+        return;
+      }
+    } catch (errCheck) {
+      console.warn("No se pudo verificar duplicado de descripción antes de insertar.", errCheck);
+      // no bloqueamos la operación si falla la comprobación remota
+    }
+
     // Construir insert con valores por defecto para inventarios
     const insertObj = {};
     const mapCampo = (prefName, value) => {
@@ -3856,6 +3919,409 @@ productForm?.addEventListener('submit', async (ev) => {
   }
 });
 
+// ------------------- VERIFICACIÓN DE DUPLICADOS -------------------
+async function verificarDuplicados() {
+    console.log("🔍 Iniciando verificación de duplicados...");
+    
+    try {
+        // Cargar todos los productos para el análisis
+        const { data: productos, error } = await supabase
+            .from("productos")
+            .select("CODIGO, DESCRIPCION")
+            .order("CODIGO", { ascending: true });
+
+        if (error) throw error;
+
+        if (!productos || productos.length === 0) {
+            console.log("📭 No hay productos para verificar");
+            return;
+        }
+
+        console.log(`📊 Analizando ${productos.length} productos...`);
+
+        // Verificar códigos duplicados
+        const duplicadosCodigo = encontrarCodigosDuplicados(productos);
+        
+        // Verificar descripciones similares
+        const descripcionesSimilares = await encontrarDescripcionesSimilares(productos);
+        
+        // Mostrar resultados
+        mostrarResultadosDuplicados(duplicadosCodigo, descripcionesSimilares);
+
+    } catch (error) {
+        console.error("❌ Error en verificación de duplicados:", error);
+        showToast("Error verificando duplicados", false);
+    }
+}
+
+// ------------------- ENCONTRAR CÓDIGOS DUPLICADOS -------------------
+function encontrarCodigosDuplicados(productos) {
+    const codigosMap = new Map();
+    const duplicados = [];
+
+    productos.forEach(producto => {
+        const codigo = producto.CODIGO?.toString().trim();
+        if (!codigo) return;
+
+        if (codigosMap.has(codigo)) {
+            // Es duplicado
+            const existente = codigosMap.get(codigo);
+            duplicados.push({
+                codigo: codigo,
+                productos: [existente, producto]
+            });
+        } else {
+            codigosMap.set(codigo, producto);
+        }
+    });
+
+    return duplicados;
+}
+
+// ------------------- ENCONTRAR DESCRIPCIONES SIMILARES -------------------
+async function encontrarDescripcionesSimilares(productos, umbralSimilitud = 0.85) {
+    const similares = [];
+    const descripcionesProcesadas = new Set();
+
+    for (let i = 0; i < productos.length; i++) {
+        const producto1 = productos[i];
+        const desc1 = producto1.DESCRIPCION?.toString().trim().toLowerCase();
+        
+        if (!desc1 || descripcionesProcesadas.has(desc1)) continue;
+
+        const grupoSimilar = [producto1];
+
+        for (let j = i + 1; j < productos.length; j++) {
+            const producto2 = productos[j];
+            const desc2 = producto2.DESCRIPCION?.toString().trim().toLowerCase();
+            
+            if (!desc2 || descripcionesProcesadas.has(desc2)) continue;
+
+            const similitud = calcularSimilitudDescripciones(desc1, desc2);
+            
+            if (similitud >= umbralSimilitud) {
+                grupoSimilar.push(producto2);
+                descripcionesProcesadas.add(desc2);
+            }
+        }
+
+        if (grupoSimilar.length > 1) {
+            similares.push({
+                descripcionBase: desc1,
+                similitud: umbralSimilitud,
+                productos: grupoSimilar
+            });
+        }
+
+        descripcionesProcesadas.add(desc1);
+    }
+
+    return similares;
+}
+
+// ------------------- CALCULAR SIMILITUD ENTRE DESCRIPCIONES -------------------
+function calcularSimilitudDescripciones(desc1, desc2) {
+    if (!desc1 || !desc2) return 0;
+    
+    // Normalizar textos
+    const normalizar = (texto) => {
+        return texto
+            .toLowerCase()
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // quitar acentos
+            .replace(/[^a-z0-9\s]/g, '') // quitar caracteres especiales
+            .replace(/\s+/g, ' ') // normalizar espacios
+            .trim();
+    };
+
+    const texto1 = normalizar(desc1);
+    const texto2 = normalizar(desc2);
+
+    // Si son idénticos después de normalizar
+    if (texto1 === texto2) return 1.0;
+
+    // Si uno contiene al otro
+    if (texto1.includes(texto2) || texto2.includes(texto1)) {
+        const masLargo = Math.max(texto1.length, texto2.length);
+        const masCorto = Math.min(texto1.length, texto2.length);
+        return masCorto / masLargo;
+    }
+
+    // Calcular similitud por palabras en común
+    const palabras1 = new Set(texto1.split(' '));
+    const palabras2 = new Set(texto2.split(' '));
+    
+    const palabrasComunes = [...palabras1].filter(palabra => 
+        palabras2.has(palabra) && palabra.length > 2 // ignorar palabras muy cortas
+    ).length;
+
+    const totalPalabrasUnicas = new Set([...palabras1, ...palabras2]).size;
+    
+    if (totalPalabrasUnicas === 0) return 0;
+    
+    return palabrasComunes / totalPalabrasUnicas;
+}
+
+// ------------------- MOSTRAR RESULTADOS EN INTERFAZ (solo botón Cerrar) ------------------- 
+function mostrarResultadosDuplicados(duplicadosCodigo, descripcionesSimilares) {
+    // Crear modal para mostrar resultados
+    const modal = document.createElement('div');
+    modal.id = 'modal-duplicados';
+    modal.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        z-index: 10000;
+        max-width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+        font-family: Arial, sans-serif;
+    `;
+
+    let contenidoHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0; color: #333;">🔍 Resultados de Verificación de Duplicados</h2>
+        </div>
+    `;
+
+    // Mostrar códigos duplicados
+    if (duplicadosCodigo.length > 0) {
+        contenidoHTML += `
+            <div style="margin-bottom: 25px;">
+                <h3 style="color: #dc2626; margin-bottom: 10px;">
+                    ❌ Códigos Duplicados (${duplicadosCodigo.length})
+                </h3>
+                ${duplicadosCodigo.map(duplicado => `
+                    <div style="background: #fef2f2; padding: 10px; margin: 5px 0; border-radius: 5px; border-left: 4px solid #dc2626;">
+                        <strong>Código: ${duplicado.codigo}</strong>
+                        <div style="margin-top: 5px;">
+                            ${duplicado.productos.map((prod, idx) => `
+                                <div style="font-size: 12px; color: #666;">
+                                    ${idx + 1}. ${prod.DESCRIPCION || 'Sin descripción'}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        contenidoHTML += `
+            <div style="background: #f0fdf4; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #16a34a;">
+                <h3 style="color: #16a34a; margin: 0;">✅ No se encontraron códigos duplicados</h3>
+            </div>
+        `;
+    }
+
+    // Mostrar descripciones similares
+    if (descripcionesSimilares.length > 0) {
+        contenidoHTML += `
+            <div style="margin-bottom: 25px;">
+                <h3 style="color: #d97706; margin-bottom: 10px;">
+                    ⚠️ Descripciones Similares (${descripcionesSimilares.length})
+                </h3>
+                ${descripcionesSimilares.map(grupo => `
+                    <div style="background: #fffbeb; padding: 10px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #d97706;">
+                        <strong>Descripción base: "${grupo.descripcionBase}"</strong>
+                        <div style="margin-top: 8px;">
+                            ${grupo.productos.map((prod, idx) => `
+                                <div style="font-size: 12px; color: #666; margin: 3px 0;">
+                                    <strong>${prod.CODIGO}:</strong> ${prod.DESCRIPCION}
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } else {
+        contenidoHTML += `
+            <div style="background: #f0fdf4; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #16a34a;">
+                <h3 style="color: #16a34a; margin: 0;">✅ No se encontraron descripciones similares</h3>
+            </div>
+        `;
+    }
+
+    // Solo el botón "Cerrar"
+    contenidoHTML += `
+        <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
+            <button onclick="cerrarModalDuplicados()" 
+                    style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 5px; cursor: pointer;">
+                Cerrar
+            </button>
+        </div>
+    `;
+
+    modal.innerHTML = contenidoHTML;
+    document.body.appendChild(modal);
+
+    // Agregar overlay (sin cierre al hacer click)
+    const overlay = document.createElement('div');
+    overlay.id = 'overlay-duplicados';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 9999;
+    `;
+    document.body.appendChild(overlay);
+}
+
+// ------------------- CERRAR MODAL -------------------
+function cerrarModalDuplicados() {
+    const modal = document.getElementById('modal-duplicados');
+    const overlay = document.getElementById('overlay-duplicados');
+    if (modal) modal.remove();
+    if (overlay) overlay.remove();
+}
+
+// ------------------- INTEGRAR CON TU INTERFAZ -------------------
+function agregarBotonVerificacionDuplicados() {
+    // Buscar contenedor de botones existente
+    const contenedorBotones = document.querySelector('.container') || 
+                             document.querySelector('header') || 
+                             document.body;
+
+    if (!contenedorBotones) return;
+
+    const botonVerificar = document.createElement('button');
+    botonVerificar.innerHTML = '🔍 Verificar Duplicados';
+    botonVerificar.style.cssText = `
+        padding: 10px 16px;
+        background: linear-gradient(135deg, #f62b49ff 0%, #f39092ff 100%);
+        color: white;
+        border: none;
+        border-radius: 26px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        margin: 5px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    `;
+
+    botonVerificar.onmouseover = () => {
+        botonVerificar.style.transform = 'translateY(-2px)';
+        botonVerificar.style.boxShadow = '0 4px 8px rgba(0,0,0,0.2)';
+    };
+
+    botonVerificar.onmouseout = () => {
+        botonVerificar.style.transform = 'translateY(0)';
+        botonVerificar.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+    };
+
+    botonVerificar.onclick = verificarDuplicados;
+
+    // Insertar cerca de otros botones de acción
+    const btnOpenModal = document.getElementById('btnOpenModal');
+    if (btnOpenModal && btnOpenModal.parentNode) {
+        btnOpenModal.parentNode.insertBefore(botonVerificar, btnOpenModal.nextSibling);
+    } else {
+        contenedorBotones.insertBefore(botonVerificar, contenedorBotones.firstChild);
+    }
+}
+/////////////////////////////// ajustar bien el apartado de duplicados de codigos y descrip
+
+// ------------------- FUNCIONES AUXILIARES (AGREGADAS) -------------------
+async function existsCodigo(codigo) {
+  if (!supabase) return false;
+  try {
+    await ensureProductosColumnMap?.();
+    const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
+    const { data, error } = await supabase
+      .from('productos')
+      .select(realCodigoCol)
+      .ilike(realCodigoCol, String(codigo).trim())
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      console.error("Error comprobando código existente:", error);
+      return false;
+    }
+    return !!data;
+  } catch (err) {
+    console.error("Exception en existsCodigo:", err);
+    return false;
+  }
+}
+
+// ------------------- FUNCIONES AUXILIARES (MEJORADAS) -------------------
+function normalizeStringForCompare(s) {
+  if (!s && s !== 0) return "";
+  return String(s)
+    .normalize("NFD")               // normalizar acentos
+    .replace(/[\u0300-\u036f]/g, "")// quitar diacríticos
+    .replace(/[^\w\s-]/g, "")       // quitar signos de puntuación
+    .replace(/\s+/g, " ")           // espacios múltiples -> 1
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Comprueba si existe una DESCRIPCION duplicada.
+ * - descripcion: texto a buscar (case/acentos-insensitive)
+ * - excludeCodigo: si se pasa, excluye la fila con ese CODIGO (útil en edición)
+ * - extraFields: objeto {campoFormName: valor} para hacer match adicional (UM, tipo, familia, marca...)
+ *
+ * Retorna true si existe al menos una fila que coincida exactamente en DESCRIPCION
+ * y en todos los extraFields provistos.
+ */
+async function existsDescripcion(descripcion, excludeCodigo = null, extraFields = {}) {
+  if (!supabase) return false;
+  try {
+    await ensureProductosColumnMap?.();
+
+    const realDescCol = getRealColForName?.('DESCRIPCION') || getRealColForName?.('descripcion') || 'DESCRIPCION';
+    const realCodigoCol = getRealColForName?.('CODIGO') || getRealColForName?.('codigo') || 'CODIGO';
+
+    // Normalizamos la descripción para comparar reasonablemente.
+    const normalized = normalizeStringForCompare(descripcion);
+
+    // Construimos la query inicial - usamos ilike para case-insensitive,
+    // pero también aplicamos normalization comparando una versión "normalizada"
+    // si tu backend tiene funciones, podrías usar una columna normalizada; aquí usamos ilike.
+    let query = supabase
+      .from('productos')
+      .select(realDescCol)
+      .ilike(realDescCol, String(descripcion).trim());
+
+    // Añadimos filtros extras sólo si se proporcionan valores no vacíos
+    for (const [formName, val] of Object.entries(extraFields || {})) {
+      if (val === undefined || val === null) continue;
+      const rawVal = String(val).trim();
+      if (rawVal === "") continue;
+
+      // intentar mapear al nombre real de columna si existe helper
+      const realCol = getRealColForName?.(formName) || getRealColForName?.(formName.toUpperCase?.() || formName) || formName.toUpperCase();
+      query = query.eq(realCol, rawVal);
+    }
+
+    // Excluir el propio producto en modo edición
+    if (excludeCodigo != null && String(excludeCodigo).trim() !== "") {
+      query = query.neq(realCodigoCol, String(excludeCodigo).trim());
+    }
+
+    const { data, error } = await query.limit(1).maybeSingle();
+    if (error) {
+      console.error("Error comprobando descripción existente:", error);
+      // Si hay error en la comprobación, devolvemos false para no bloquear operaciones
+      return false;
+    }
+
+    // Si hay alguna fila, la consideramos duplicada (coincide descripción + campos extra)
+    return !!data;
+  } catch (err) {
+    console.error("Exception en existsDescripcion:", err);
+    return false;
+  }
+}
 // ------------------- Refresh global: normalizar inventarios y recalcular almacen -------------------
 async function refreshAllInventarios({ confirmBefore = true, truncateDecimals = true } = {}) {
   // confirmación simple para evitar ejecuciones accidentales
@@ -4724,10 +5190,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 document.addEventListener('DOMContentLoaded', function() {
   console.log("📄 DOM cargado, iniciando aplicación...");
   
-  // Agregar botones de utilidad
-  addLoadAllButton();
-  addForceRefreshButton();
-  
+
   // Configurar búsqueda primero
   setupSearch();
   
@@ -4736,4 +5199,10 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Configurar infinite scroll
   setupInfiniteScroll();
+});
+// ------------------- INICIALIZACIÓN -------------------
+document.addEventListener('DOMContentLoaded', function() {
+  
+    // Agregar botón de verificación de duplicados
+    setTimeout(agregarBotonVerificacionDuplicados, 1000);
 });

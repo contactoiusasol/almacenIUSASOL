@@ -65,10 +65,14 @@ function debugLocalStorage() {
   }
 }
 
-function verificarProductoEnLista(codigo) {
+/**
+ * verificarProductoEnLista
+ * Ahora recibe un identificador (id) que puede ser el CODIGO o la DESCRIPCION si el CODIGO es S/C.
+ */
+function verificarProductoEnLista(id) {
   const lista = JSON.parse(localStorage.getItem("movimientoMaterial")) || [];
-  const existe = lista.some(item => item.codigo === codigo);
-  console.log(`🔍 Producto ${codigo} en lista:`, existe);
+  const existe = lista.some(item => item.id === id);
+  console.log(`🔍 Identificador ${id} en lista:`, existe);
   return existe;
 }
 
@@ -78,7 +82,7 @@ function verMovimiento() {
   alert(`Productos en movimiento: ${lista.length}\n${JSON.stringify(lista, null, 2)}`);
 }
 
-// ------------------- CARGAR TODOS LOS PRODUCTOS -------------------
+// ------------------- CARGAR TODOS LOS PRODUCTOS (productos_sin_codigo) -------------------
 async function loadAllProducts() {
   if (!supabase) {
     console.error("Supabase no inicializado");
@@ -86,7 +90,7 @@ async function loadAllProducts() {
   }
 
   try {
-    console.log("🔄 Cargando todos los productos...");
+    console.log("🔄 Cargando todos los productos (productos_sin_codigo)...");
     
     let allProductsData = [];
     let page = 0;
@@ -97,7 +101,7 @@ async function loadAllProducts() {
       console.log(`📄 Cargando lote ${page + 1}...`);
       
       const { data, error } = await supabase
-        .from("productos")
+        .from("productos_sin_codigo")
         .select("*")
         .order("CODIGO", { ascending: true })
         .range(page * pageSize, (page + 1) * pageSize - 1);
@@ -124,7 +128,7 @@ async function loadAllProducts() {
     filteredProducts = [...allProducts];
     totalProducts = allProducts.length;
 
-    console.log(`✅ TOTAL: ${totalProducts} productos cargados exitosamente`);
+    console.log(`✅ TOTAL: ${totalProducts} productos cargados exitosamente (productos_sin_codigo)`);
     
     setupPagination();
     currentPage = 1;
@@ -132,6 +136,7 @@ async function loadAllProducts() {
     
   } catch (error) {
     console.error("❌ Error cargando productos:", error);
+    mostrarAlerta("❌ Error cargando productos desde el servidor", "error");
   }
 }
 
@@ -147,7 +152,7 @@ function renderTable(products) {
   }
 
   products.forEach((producto) => {
-    // Obtener valores de inventario usando el método robusto del primer código
+    // Obtener valores de inventario usando el método robusto
     const i069 = getStockFromProduct(producto, "I069");
     const i078 = getStockFromProduct(producto, "I078");
     const i07f = getStockFromProduct(producto, "I07F");
@@ -172,6 +177,13 @@ function renderTable(products) {
 
     const canAdd = stockTotal > 0;
 
+    // Generar identificador: si CODIGO existe y no es "S/C" lo usamos, si no usamos DESCRIPCION
+    const rawCodigo = producto.CODIGO || "";
+    const descripcion = producto.DESCRIPCION || "";
+    const idForList = (String(rawCodigo).trim().toUpperCase() !== "S/C" && String(rawCodigo).trim() !== "")
+      ? String(rawCodigo).trim()
+      : descripcion.trim();
+
     row.innerHTML = `
       <td>${escapeHtml(producto.CODIGO || "")}</td>
       <td>${escapeHtml(producto.DESCRIPCION || "")}</td>
@@ -184,6 +196,7 @@ function renderTable(products) {
       <td>${formatShowValue(stockTotal)}</td>
       <td>
         <button class="agregar-btn" ${canAdd ? "" : "disabled"} 
+                data-id="${escapeHtml(idForList)}"
                 data-codigo="${escapeHtml(producto.CODIGO || "")}"
                 data-descripcion="${escapeHtml(producto.DESCRIPCION || "")}"
                 data-um="${escapeHtml(producto.UM || "")}"
@@ -198,17 +211,19 @@ function renderTable(products) {
 
   agregarEventListenersABotones();
 }
+
 // ------------------- AGREGAR EVENT LISTENERS A BOTONES -------------------
 function agregarEventListenersABotones() {
   const botonesAgregar = document.querySelectorAll('.agregar-btn:not([disabled])');
   
-  botonesAgregar.forEach((btn, index) => {
+  botonesAgregar.forEach((btn) => {
     // Clonamos para eliminar listeners previos
     const nuevoBoton = btn.cloneNode(true);
     btn.parentNode.replaceChild(nuevoBoton, btn);
     
     nuevoBoton.addEventListener('click', function() {
       const productoData = {
+        id: this.dataset.id, // identificador único: CODIGO (si no es S/C) o DESCRIPCION
         codigo: this.dataset.codigo,
         descripcion: this.dataset.descripcion,
         um: this.dataset.um,
@@ -219,7 +234,7 @@ function agregarEventListenersABotones() {
   });
 }
 
-// ------------------- FUNCIONES DE INVENTARIO ROBUSTAS (del primer código) -------------------
+// ------------------- FUNCIONES DE INVENTARIO ROBUSTAS -------------------
 function normalizeKeyName(s) {
   if (!s) return "";
   return String(s)
@@ -263,62 +278,7 @@ function getStockFromProduct(productObj, inventoryLabel) {
   return 0;
 }
 
-// ------------------- AGREGAR EVENT LISTENERS A BOTONES -------------------
-function agregarAMovimiento(producto) {
-  try {
-    // Validación de stock
-    const stock = Number(producto.stockDisponible ?? 0);
-    if (stock <= 0) {
-      mostrarAlerta("❌ No puedes agregar este producto porque no tiene cantidad disponible.", "warning");
-      return;
-    }
-
-    // Cargar lista desde localStorage (con manejo de errores)
-    let lista = [];
-    try {
-      const listaStorage = localStorage.getItem("movimientoMaterial");
-      if (listaStorage) {
-        lista = JSON.parse(listaStorage);
-        if (!Array.isArray(lista)) lista = [];
-      }
-    } catch (e) {
-      lista = [];
-    }
-
-    const productoExistente = lista.find(item => item.codigo === producto.codigo);
-
-    if (!productoExistente) {
-      const nuevoProducto = {
-        codigo: producto.codigo,
-        descripcion: producto.descripcion,
-        um: producto.um,
-        stockDisponible: stock,
-        cantidad: 1
-      };
-
-      lista.push(nuevoProducto);
-
-      try {
-        localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-        // Actualiza el badge contador (si lo tienes)
-        if (typeof updateVerMovimientoBadge === 'function') updateVerMovimientoBadge();
-
-        mostrarAlerta(`✅ Producto ${producto.codigo} agregado a la lista de movimiento`, "success");
-
-      } catch (storageError) {
-        mostrarAlerta("❌ Error al guardar en el almacenamiento local", "error");
-      }
-    } else {
-      // Mostrar ALERTA (en vez de imprimir objeto en consola)
-      mostrarAlerta(`⚠️ El producto ${producto.codigo} ya está en la lista de movimiento`, "warning");
-    }
-  } catch (e) {
-    mostrarAlerta("❌ Error agregando producto", "error");
-  }
-}
-
-
-// ------------------- AGREGAR A MOVIMIENTO -------------------
+// ------------------- AGREGAR A MOVIMIENTO (manejo robusto y alertas) -------------------
 function agregarAMovimiento(producto) {
   try {
     console.log("🔄 Intentando agregar producto:", producto);
@@ -327,9 +287,13 @@ function agregarAMovimiento(producto) {
     
     const stock = Number(producto.stockDisponible ?? 0);
     if (stock <= 0) {
-      mostrarAlerta("No puedes agregar este producto porque no tiene cantidad disponible.", "warning");
+      mostrarAlerta("❌ No puedes agregar este producto porque no tiene cantidad disponible.", "warning");
       return;
     }
+
+    // Determinar id único (ya viene en producto.id), y texto para mensajes (descripcion o id)
+    const id = producto.id || (producto.codigo && producto.codigo.trim() !== "" ? producto.codigo : producto.descripcion);
+    const textoMostrar = producto.descripcion && producto.descripcion.trim() !== "" ? producto.descripcion : id;
 
     let lista = [];
     try {
@@ -348,13 +312,14 @@ function agregarAMovimiento(producto) {
 
     console.log("📋 Lista actual antes de agregar:", lista);
     
-    const productoExistente = lista.find(item => item.codigo === producto.codigo);
+    const productoExistente = lista.find(item => item.id === id);
     
     if (!productoExistente) {
       const nuevoProducto = {
-        codigo: producto.codigo,
-        descripcion: producto.descripcion,
-        um: producto.um,
+        id: id,
+        codigo: producto.codigo || "",
+        descripcion: producto.descripcion || textoMostrar,
+        um: producto.um || "",
         stockDisponible: stock,
         cantidad: 1
       };
@@ -366,15 +331,12 @@ function agregarAMovimiento(producto) {
         updateVerMovimientoBadge();
 
         console.log("💾 Guardado en localStorage:", lista);
-        updateVerMovimientoBadge();
 
-        const verificacion = localStorage.getItem("movimientoMaterial");
-        console.log("✅ Verificación después de guardar:", verificacion);
-        
-        mostrarAlerta(`✅ Producto "${producto.codigo}" agregado a la lista de movimiento`, "success");
+        // Mensaje usando la descripción como texto principal
+        mostrarAlerta(`✅ Producto "${nuevoProducto.descripcion}" agregado a la lista de movimiento`, "success");
         
         setTimeout(() => {
-          verificarProductoEnLista(producto.codigo);
+          verificarProductoEnLista(id);
           debugLocalStorage();
         }, 100);
         
@@ -384,7 +346,9 @@ function agregarAMovimiento(producto) {
       }
     } else {
       console.log("⚠️ Producto ya existe en lista:", productoExistente);
-      mostrarAlerta("⚠️ Este producto ya está en la lista de movimiento", "warning");
+      // Mostrar mensaje usando descripción si está disponible
+      const textoDup = productoExistente.descripcion || id;
+      mostrarAlerta(`⚠️ El producto "${textoDup}" ya está en la lista de movimiento`, "warning");
     }
   } catch (e) {
     console.error("❌ Error crítico en agregarAMovimiento:", e);
@@ -392,18 +356,29 @@ function agregarAMovimiento(producto) {
   }
 }
 
-// ------------------- ALERTAS -------------------
-function mostrarAlerta(mensaje, tipo = 'success') {
-  const alerta = document.createElement("div");
-  alerta.className = `alert ${tipo}`;
-  alerta.textContent = mensaje;
-  document.body.appendChild(alerta);
+// ------------------- ALERTAS / TOASTS -------------------
+function mostrarAlerta(mensaje, tipo = "success") {
+  let container = document.querySelector(".toast-container");
+  if (!container) {
+    container = document.createElement("div");
+    container.className = "toast-container";
+    document.body.appendChild(container);
+  }
 
-  setTimeout(() => alerta.classList.add("show"), 80);
+  const toast = document.createElement("div");
+  toast.className = `toast ${tipo}`;
+  toast.textContent = mensaje;
+
+  container.appendChild(toast);
+
+  // Animar aparición
+  setTimeout(() => toast.classList.add("show"), 50);
+
+  // Desaparecer después de 3 segundos
   setTimeout(() => {
-    alerta.classList.remove("show");
-    setTimeout(() => alerta.remove(), 350);
-  }, 2600);
+    toast.classList.remove("show");
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
 }
 
 // ------------------- PAGINACIÓN -------------------
@@ -412,8 +387,8 @@ function setupPagination() {
 }
 
 function updatePaginationControls() {
-  const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
-  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+  const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE) || 1;
+  const startItem = totalProducts === 0 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE + 1;
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
 
   const paginationHTML = `
@@ -531,6 +506,7 @@ function setupSearch() {
     }, 300));
   }
 }
+
 // ---------- Badge contador en el botón "Ver Movimiento" ----------
 function ensureVerMovimientoBadge() {
   if (!verMovimientoBtn) return null;
@@ -556,7 +532,6 @@ function getMovimientoCount() {
   try {
     const lista = JSON.parse(localStorage.getItem('movimientoMaterial')) || [];
     if (!Array.isArray(lista)) return 0;
-    // contar elementos (cambiar a sumatoria de cantidad si prefieres)
     return lista.length;
   } catch (e) {
     console.warn('Error leyendo movimientoMaterial:', e);
@@ -584,71 +559,12 @@ window.addEventListener('storage', (e) => {
   if (e.key === 'movimientoMaterial') updateVerMovimientoBadge();
 });
 
-
-function getMovimientoCount() {
-  try {
-    const lista = JSON.parse(localStorage.getItem('movimientoMaterial')) || [];
-    if (!Array.isArray(lista)) return 0;
-    return lista.length;
-  } catch (e) {
-    console.warn('Error leyendo movimientoMaterial:', e);
-    return 0;
-  }
-}
-
-function updateVerMovimientoBadge() {
-  const badge = ensureVerMovimientoBadge();
-  if (!badge) return;
-  const count = getMovimientoCount();
-  if (count > 0) {
-    badge.textContent = count > 99 ? '99+' : String(count); // cap visual
-    badge.classList.remove('hidden');
-  } else {
-    badge.classList.add('hidden');
-  }
-}
-
 // actualizar al inicio
 updateVerMovimientoBadge();
 
-// actualizar cuando la lista cambie dentro de la misma pestaña
-// (llama a esta función desde las funciones que modifican la lista)
-window.updateVerMovimientoBadge = updateVerMovimientoBadge;
-
-// escuchar cambios en localStorage (otras pestañas)
-window.addEventListener('storage', (e) => {
-  if (e.key === 'movimientoMaterial') {
-    updateVerMovimientoBadge();
-  }
-});
-
-function mostrarAlerta(mensaje, tipo = "success") {
-  let container = document.querySelector(".toast-container");
-  if (!container) {
-    container = document.createElement("div");
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast ${tipo}`;
-  toast.textContent = mensaje;
-
-  container.appendChild(toast);
-
-  // Animar aparición
-  setTimeout(() => toast.classList.add("show"), 50);
-
-  // Desaparecer después de 3 segundos
-  setTimeout(() => {
-    toast.classList.remove("show");
-    setTimeout(() => toast.remove(), 400);
-  }, 3000);
-}
-
 // ------------------- INICIALIZACIÓN -------------------
 document.addEventListener('DOMContentLoaded', function() {
-  console.log("👤 Inicializando vista de usuario...");
+  console.log("👤 Inicializando vista 'inventario sin códigos'...");
   
   setupSearch();
   

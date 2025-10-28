@@ -306,8 +306,64 @@ function getRealColForInventoryLabel(invLabel) {
   console.warn(`❌ No se encontró columna para: ${invLabel}`);
   return null;
 }
+// ------------------- FUNCIÓN PARA EXTRAER CÓDIGO S/C -------------------
+function extraerCodigoSC(producto) {
+  if (!producto) return 'S/C';
+  
+  console.log("🔍 Buscando código S/C en producto:", producto);
+  
+  // Buscar directamente en la columna "CODIGO" que existe en tu BD
+  if (producto.CODIGO !== undefined && producto.CODIGO !== null && producto.CODIGO !== '') {
+    const codigo = String(producto.CODIGO).trim();
+    console.log(`✅ Código encontrado en columna 'CODIGO': "${codigo}"`);
+    return codigo;
+  }
+  
+  // Fallback: buscar en otras posibles columnas
+  const posiblesColumnas = ['CODIGO_SC', 'SC', 'S/C', 'CÓDIGO', 'Clave', 'SKU'];
+  for (const columna of posiblesColumnas) {
+    if (producto[columna] !== undefined && producto[columna] !== null && producto[columna] !== '') {
+      const codigo = String(producto[columna]).trim();
+      console.log(`✅ Código encontrado en columna '${columna}': "${codigo}"`);
+      return codigo;
+    }
+  }
+  
+  console.log("⚠️ No se encontró código, usando valor por defecto 'S/C'");
+  return 'S/C'; // Valor por defecto
+}
+// ------------------- FUNCIÓN PARA EXTRAER CÓDIGO S/C -------------------
+function extraerCodigoSC(producto) {
+  if (!producto) return 'S/C';
+  
+  console.log("🔍 Buscando código S/C en producto:", producto);
+  
+  // Buscar directamente en la columna "CODIGO" que existe en tu BD
+  if (producto.CODIGO !== undefined && producto.CODIGO !== null && producto.CODIGO !== '') {
+    const codigo = String(producto.CODIGO).trim();
+    console.log(`✅ Código encontrado en columna 'CODIGO': "${codigo}"`);
+    return codigo;
+  }
+  
+  // Fallback: buscar en otras posibles columnas
+  const posiblesColumnas = ['CODIGO_SC', 'SC', 'S/C', 'CÓDIGO', 'Clave', 'SKU'];
+  for (const columna of posiblesColumnas) {
+    if (producto[columna] !== undefined && producto[columna] !== null && producto[columna] !== '') {
+      const codigo = String(producto[columna]).trim();
+      console.log(`✅ Código encontrado en columna '${columna}': "${codigo}"`);
+      return codigo;
+    }
+  }
+  
+  console.log("⚠️ No se encontró código, usando valor por defecto 'S/C'");
+  return 'S/C'; // Valor por defecto
+}
 
-// ------------------- RENDER TABLE CORREGIDA CON COLUMNA CÓDIGO -------------------
+// ------------------- DIAGNÓSTICO COMPLETO -------------------
+async function diagnosticarProblemaCompleto() {
+  // ... el resto de tu código existente ...
+}
+// ------------------- RENDER TABLE  -------------------
 function renderTable(products) {
   if (!tableBody) {
     console.error("❌ tableBody no encontrado en el DOM");
@@ -329,7 +385,7 @@ function renderTable(products) {
   }
 
   products.forEach((p, index) => {
-    // Obtener el código S/C - ESTA ES LA PARTE IMPORTANTE
+    // Obtener el código S/C 
     const codigoSC = extraerCodigoSC(p);
     
     // Obtener stocks usando las columnas específicas de tu BD
@@ -417,8 +473,9 @@ async function diagnosticarColumnas() {
       console.log("---------------------------------------------------");
       
       // Probar la extracción de código
+      console.log(`🔍 Probando extracción de código...`);
       const codigoExtraido = extraerCodigoSC(productoMuestra);
-      console.log(`🔍 Código extraído: "${codigoExtraido}"`);
+      console.log(`✅ Código extraído: "${codigoExtraido}"`);
     }
     
   } catch (err) {
@@ -884,16 +941,15 @@ function renderTable(products) {
   tableBody.innerHTML = "";
 
   if (products.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No hay productos que coincidan con la búsqueda</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center;">No hay productos que coincidan con la búsqueda</td></tr>`;
     return;
   }
 
   products.forEach((p, index) => {
-    // Obtener el código S/C
+    // Obtener el código S/C 
     const codigoSC = extraerCodigoSC(p);
+    
     // Obtener stocks usando las columnas específicas de tu BD
-
-
     const i069 = getStockFromProduct(p, "I069");
     const i078 = getStockFromProduct(p, "I078");
     const i07f = getStockFromProduct(p, "I07F");
@@ -905,7 +961,7 @@ function renderTable(products) {
     
     // Debug para los primeros 2 productos
     if (index < 2) {
-      console.log(`📊 Producto: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
+      console.log(`📊 Producto ${index + 1}: Código=${codigoSC}, I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
     }
 
     // Determinar clase de stock
@@ -922,35 +978,47 @@ function renderTable(products) {
     const um = p.UM || "";
 
     row.innerHTML = `
-      <td>${escapeHtml(codigoSC)}</td>  
+      <td>${escapeHtml(codigoSC)}</td>
       <td>${escapeHtml(descripcion)}</td>
       <td>${um}</td>
-      <td>${formatShowValue(i069)}</td>
-      <td>${formatShowValue(i078)}</td>
-      <td>${formatShowValue(i07f)}</td>
-      <td>${formatShowValue(i312)}</td>
-      <td>${formatShowValue(i073)}</td>
-      <td>${formatShowValue(stockReal)}</td>
-      <td class="acciones">
-        <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>✏️</span>
-          <span class="label">Editar</span>
-        </button>
-        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
-          <span class="icon-wrap" aria-hidden>🗑️</span>
-          <span class="label">Eliminar</span>
-        </button>
-        <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>📦</span>
-          <span class="label">Salida</span>
-        </button>
-      </td>
     `;
+
+    // Agregar las celdas de inventario
+    const inventarios = [i069, i078, i07f, i312, i073];
+    inventarios.forEach(stock => {
+      const td = document.createElement("td");
+      td.textContent = formatShowValue(stock);
+      row.appendChild(td);
+    });
+
+    // Agregar celda de total
+    const tdTotal = document.createElement("td");
+    tdTotal.textContent = formatShowValue(stockReal);
+    row.appendChild(tdTotal);
+
+    // Agregar celda de acciones
+    const tdAcciones = document.createElement("td");
+    tdAcciones.className = "acciones";
+    tdAcciones.innerHTML = `
+      <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+        <span class="icon-wrap" aria-hidden>✏️</span>
+        <span class="label">Editar</span>
+      </button>
+      <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
+        <span class="icon-wrap" aria-hidden>🗑️</span>
+        <span class="label">Eliminar</span>
+      </button>
+      <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+        <span class="icon-wrap" aria-hidden>📦</span>
+        <span class="label">Salida</span>
+      </button>
+    `;
+    row.appendChild(tdAcciones);
 
     tableBody.appendChild(row);
   });
 
-  console.log("✅ Tabla renderizada correctamente");
+  console.log("✅ Tabla renderizada correctamente con columna de código");
 }
 
 // ------------------- INICIALIZACIÓN -------------------
@@ -1804,10 +1872,16 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+// ------------------- FUNCIÓN CORREGIDA PARA OBTENER NOMBRES DE COLUMNAS -------------------
 function getRealColForName(preferredName) {
-  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
+  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return preferredName;
+  
   const norm = normalizeKeyName(preferredName);
-  return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm] || null;
+  const realName = PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
+  
+  console.log(`🔍 Buscando columna: "${preferredName}" -> normalizada: "${norm}" -> encontrada: "${realName}"`);
+  
+  return realName || preferredName;
 }
 
 function getRealColForInventoryLabel(invLabel) {
@@ -2848,31 +2922,33 @@ function renderTable(products) {
     const row = document.createElement("tr");
     row.className = stockClass;
 
-    // Columnas
-    const tdDesc = document.createElement("td");
-    tdDesc.textContent = p["DESCRIPCION"] ?? "";
+    // Columnas - CORREGIDO CON CÓDIGO
+const tdCodigo = document.createElement("td");
+tdCodigo.textContent = extraerCodigoSC(p) ?? "";
 
-    const tdUm = document.createElement("td");
-    tdUm.textContent = p["UM"] ?? "";
+const tdDesc = document.createElement("td");
+tdDesc.textContent = p["DESCRIPCION"] ?? "";
 
-    const tdI069 = document.createElement("td");
-    tdI069.textContent = formatShowValue(i069);
+const tdUm = document.createElement("td");
+tdUm.textContent = p["UM"] ?? "";
 
-    const tdI078 = document.createElement("td");
-    tdI078.textContent = formatShowValue(i078);
+const tdI069 = document.createElement("td");
+tdI069.textContent = formatShowValue(i069);
 
-    const tdI07F = document.createElement("td");
-    tdI07F.textContent = formatShowValue(i07f);
+const tdI078 = document.createElement("td");
+tdI078.textContent = formatShowValue(i078);
 
-    const tdI312 = document.createElement("td");
-    tdI312.textContent = formatShowValue(i312);
+const tdI07F = document.createElement("td");
+tdI07F.textContent = formatShowValue(i07f);
 
-    const tdI073 = document.createElement("td");
-    tdI073.textContent = formatShowValue(i073);
+const tdI312 = document.createElement("td");
+tdI312.textContent = formatShowValue(i312);
 
-    const tdFisico = document.createElement("td");
-    tdFisico.textContent = formatShowValue(fisicoVal);
+const tdI073 = document.createElement("td");
+tdI073.textContent = formatShowValue(i073);
 
+const tdFisico = document.createElement("td");
+tdFisico.textContent = formatShowValue(fisicoVal);
     // Columna Acciones
     const tdAcciones = document.createElement("td");
     tdAcciones.className = "acciones"; // coincide con el CSS que usarás
@@ -2897,16 +2973,16 @@ function renderTable(products) {
     tdAcciones.appendChild(btnSalida);
 
     // Agregar a la fila
-    row.appendChild(tdDesc);
-    row.appendChild(tdUm);
-    row.appendChild(tdI069);
-    row.appendChild(tdI078);
-    row.appendChild(tdI07F);
-    row.appendChild(tdI312);
-    row.appendChild(tdI073);
-    row.appendChild(tdFisico);
-    row.appendChild(tdAcciones);
-
+row.appendChild(tdCodigo);    // Primero: Código
+row.appendChild(tdDesc);      // Segundo: Descripción
+row.appendChild(tdUm);        // Tercero: UM
+row.appendChild(tdI069);      // Cuarto: I069
+row.appendChild(tdI078);      // Quinto: I078
+row.appendChild(tdI07F);      // Sexto: I07F
+row.appendChild(tdI312);      // Séptimo: I312
+row.appendChild(tdI073);      // Octavo: I073
+row.appendChild(tdFisico);    // Noveno: Inventario Físico
+row.appendChild(tdAcciones);  // Décimo: Acciones
     tableBody.appendChild(row);
   });
 }
@@ -3121,7 +3197,7 @@ window.addEventListener("click", (e) => {
   }
 });
 
-// ------------------- Guardar Producto (robusto) -------------------
+// ------------------- GUARDAR PRODUCTO CORREGIDO - SIN COLUMNA "No." -------------------
 productForm?.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   if (!productForm) return;
@@ -3129,143 +3205,102 @@ productForm?.addEventListener('submit', async (ev) => {
   const saveBtn = productForm.querySelector('.btn-save');
   const originalBtnText = saveBtn?.textContent ?? "";
 
-  // bandera para saber si la operación sí llegó a aplicar cambios
-  let operationSucceeded = false;
-
-  // --- EDICIÓN: solo actualizar DESCRIPCION ---
-  if (editMode) {
-    const descEl = productForm.querySelector('[name="descripcion"]');
-    const nuevaDesc = (descEl?.value || "").trim();
-    if (!nuevaDesc) { showToast("Descripción vacía", false); descEl?.focus(); return; }
-
-    if (!supabase) { showToast("Supabase no inicializado", false); return; }
-
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Guardando..."; }
-
-    try {
-      await ensureProductosSinCodigoColumnMap?.();
-
-      const realDescCol   = getRealColForName?.('DESCRIPCION') || getRealColForName?.('descripcion') || 'DESCRIPCION';
-
-      if (!editingCodigo) {
-        showToast("ID del producto no definido. No se puede actualizar.", false);
-        return;
-      }
-
-      // pedimos select() para confirmar que la fila fue devuelta
-      const resp = await supabase
-        .from('productos_sin_codigo')
-        .update({ [realDescCol]: nuevaDesc })
-        .eq("id", editingCodigo)
-        .select()
-        .maybeSingle();
-
-      const { data, error } = resp || {};
-
-      // marcar éxito si no hay error o si data existe (Supabase a veces devuelve error con data)
-      if (!error || data) {
-        operationSucceeded = true;
-      }
-
-      if (operationSucceeded) {
-        showToast("Descripción actualizada", true);
-        try { await loadProducts(); } catch(_) {}
-        if (modal) modal.style.display = 'none';
-        editMode = false;
-        editingCodigo = null;
-      } else {
-        console.error("Error al actualizar descripción:", error);
-        showToast("Error actualizando descripción (ver consola)", false);
-      }
-    } catch (err) {
-      // Si la operación había sido marcada como exitosa, no mostramos el toast de error
-      if (operationSucceeded) {
-        console.warn("Operación resultó exitosa pero ocurrió excepción posterior:", err);
-        showToast("Descripción actualizada", true);
-        try { await loadProducts(); } catch(_) {}
-        if (modal) modal.style.display = 'none';
-        editMode = false;
-        editingCodigo = null;
-      } else {
-        console.error("Error inesperado al guardar descripción:", err);
-        showToast("Error inesperado al guardar descripción (ver consola)", false);
-      }
-    } finally {
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
-    }
-    return;
-  }
-
-  // --- MODO CREAR: insertar nueva fila ---
   try {
-    if (!supabase) { showToast("Supabase no inicializado", false); return; }
-    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = "Creando..."; }
-
-    await ensureProductosSinCodigoColumnMap?.();
-
-    const formData = new FormData(productForm);
-    const raw = Object.fromEntries(formData.entries());
-
-    // Validar campos obligatorios
-    const descripcion = (raw['descripcion'] || "").trim();
-    const um = (raw['um'] || "").trim();
-
-    if (!descripcion) {
-      showToast("La descripción es obligatoria", false);
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+    if (!supabase) {
+      showToast("Supabase no inicializado", false);
       return;
     }
 
-    // Construir insert con valores por defecto para inventarios
-    const insertObj = {};
-    const mapCampo = (prefName, value) => {
-      const real = getRealColForName?.(prefName) || getRealColForName?.(prefName.toUpperCase()) || prefName.toUpperCase();
-      insertObj[real] = value;
-    };
-
-    mapCampo('DESCRIPCION', descripcion);
-    mapCampo('UM', um);
-
-    // VALORES POR DEFECTO PARA INVENTARIOS - automáticamente en 0
-    const detectAndAssign = (label, val) => {
-      const realCol = getRealColForInventoryLabel?.(label) || label;
-      insertObj[realCol] = val || 0; // Siempre 0 para nuevo producto
-    };
-
-    detectAndAssign('I069', 0);
-    detectAndAssign('I078', 0);
-    detectAndAssign('I07F', 0);
-    detectAndAssign('I312', 0);
-    detectAndAssign('I073', 0);
-
-    // Almacén también en 0
-    const realAlmacen = getRealColForInventoryLabel?.('ALMACEN') || 'INVENTARIO FISICO EN ALMACEN';
-    insertObj[realAlmacen] = 0;
-
-    // intento de inserción
-    const resp = await supabase.from('productos_sin_codigo').insert([insertObj]).select().limit(1).maybeSingle();
-    const { data, error } = resp || {};
-
-    if (!error || data) {
-      operationSucceeded = true;
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = editMode ? "Guardando..." : "Creando...";
     }
 
-    if (operationSucceeded) {
-      showToast("✅ Producto creado exitosamente", true);
-      await loadProducts();
-      if (modal) modal.style.display = 'none';
-    } else {
-      console.error("Error creando producto:", error);
-      showToast("❌ Error al crear producto", false);
+    // Obtener datos del formulario
+    const formData = new FormData(productForm);
+    const rawData = Object.fromEntries(formData.entries());
+    
+    console.log("📝 Datos del formulario:", rawData);
+
+    // Validaciones básicas
+    const descripcion = (rawData['descripcion'] || "").trim();
+    const um = (rawData['um'] || "").trim();
+
+    if (!descripcion) {
+      showToast("La descripción es obligatoria", false);
+      if (saveBtn) {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalBtnText;
+      }
+      return;
     }
 
-  } catch (err) {
-    console.error("Error creando producto (capturado):", err);
-    showToast("❌ Error al crear producto", false);
+    // Construir objeto para insertar - SIN LA COLUMNA "No."
+    const insertData = {
+      "DESCRIPCION": descripcion,
+      "UM": um,
+      "CODIGO": "S/C",
+      "INVENTARIO I069": 0,
+      "INVENTARIO I078": 0,
+      "INVENTARIO I07F": 0,
+      "INVENTARIO I312": 0,
+      "INVENTARIO I073": 0,
+      "INVENTARIO FISICO EN ALMACEN": 0
+    };
+
+    console.log("📤 Datos a insertar (sin columna 'No.'):", insertData);
+
+    // Intentar inserción SIN especificar columnas (deja que Supabase use valores por defecto)
+    const { data, error } = await supabase
+      .from("productos_sin_codigo")
+      .insert([insertData])
+      .select();
+
+    if (error) {
+      console.error("❌ Error Supabase:", error);
+      
+      if (error.code === '23502') {
+        // Si aún da error, intentar con un valor por defecto para "No."
+        console.log("🔄 Intentando con valor por defecto para 'No.'...");
+        insertData["No."] = 0; // Valor temporal
+        return await reintentarInsercion(insertData);
+      } else {
+        showToast(`Error al crear producto: ${error.message}`, false);
+      }
+      
+      throw error;
+    }
+
+    // Éxito
+    console.log("✅ Producto creado:", data);
+    showToast("✅ Producto creado exitosamente", true);
+    
+    // Recargar productos y cerrar modal
+    await loadProducts();
+    if (modal) modal.style.display = 'none';
+    clearProductFormFields();
+
+  } catch (error) {
+    console.error("❌ Error general creando producto:", error);
+    showToast("❌ Error al crear producto. Ver consola para detalles.", false);
   } finally {
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = originalBtnText; }
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = originalBtnText;
+    }
   }
 });
+
+// Función para reintentar inserción con valor por defecto
+async function reintentarInsercion(datos) {
+  const { data, error } = await supabase
+    .from("productos_sin_codigo")
+    .insert([datos])
+    .select();
+
+  if (error) throw error;
+  return data;
+}
 
 // ------------------- Cargar productos -------------------
 async function loadProducts() {
@@ -3322,42 +3357,84 @@ if (supabase?.channel) {
 const btnVerSalidas = document.getElementById("btnVerSalidas");
 if (btnVerSalidas) {
   btnVerSalidas.addEventListener("click", () => {
-    // ir a la página donde se muestran las salidas pendientes
-    // en esa página deberás leer localStorage.getItem("salidas_pendientes_sin_codigo")
-    window.location.href = "salidas-sin-codigo.html";
+    // Redireccionar a salidas.html
+    window.location.href = "salidas.html";
   });
 }
 
 // ------------------- Historial desde DB -------------------
 async function cargarHistorialSalidas() {
-  if (!tablaHistorialBody) return;
+  if (!tablaHistorialBody) {
+    console.log("ℹ️ tablaHistorialBody no encontrado - probablemente no estás en la página de salidas");
+    return;
+  }
+
   try {
+    console.log("🔍 Cargando historial de salidas desde tabla 'salidas'...");
+    
+    // Usar la tabla 'salidas' en lugar de 'salidas_sin_codigo'
     const { data, error } = await supabase
-      .from("salidas_sin_codigo")
+      .from("salidas")
       .select("*")
-      .order("FECHA_SALIDA", { ascending: false });
+      .order("FECHA_SALIDA", { ascending: false })
+      .limit(50);
 
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      tablaHistorialBody.innerHTML = `<tr><td colspan="8" class="empty-note">No hay registros de salidas</td></tr>`;
+    if (error) {
+      console.error("❌ Error al cargar historial:", error);
+      tablaHistorialBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
+            Error cargando historial de salidas
+          </td>
+        </tr>
+      `;
       return;
     }
 
+    if (!data || data.length === 0) {
+      tablaHistorialBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
+            No hay registros de salidas
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Filtrar solo salidas de productos sin código o mostrar todas
+    const salidasFiltradas = data.filter(item => 
+      item.CODIGO === 'S/C' || !item.CODIGO || item.CODIGO === ''
+    );
+
+    if (salidasFiltradas.length === 0) {
+      tablaHistorialBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
+            No hay registros de salidas para productos sin código
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    // Renderizar los datos
     tablaHistorialBody.innerHTML = "";
-    data.forEach((item) => {
-      const descripcion = item["DESCRIPCION"] ?? item["DESCRIPCIÓN"] ?? "-";
-      const um = item["UM"] ?? "-";
-      const inventario = item["INVENTARIO_ORIGEN"] ?? item["TIPO DE INVENTARIO"] ?? item["ORIGEN"] ?? "-";
-      const cantidad = item["CANTIDAD_SALIDA"] ?? item["cantidad"] ?? "-";
-      const fecha = formatShowValue(item["FECHA_SALIDA"] ?? item["fecha_salida"] ?? item["fecha"]);
-      const responsable = item["RESPONSABLE"] ?? "-";
-      const destinatario = item["DESTINATARIO"] ?? "";
-      const observ = item["OBSERVACIONES"] ?? item["OBSERVACIONES_SALIDA"] ?? "";
+    salidasFiltradas.forEach((item) => {
+      const codigo = item.CODIGO || 'S/C';
+      const descripcion = item.DESCRIPCION || "-";
+      const um = item.UM || "-";
+      const inventario = item.INVENTARIO_ORIGEN || "-";
+      const cantidad = item.CANTIDAD_SALIDA || "-";
+      const fecha = formatShowValue(item.FECHA_SALIDA || item.fecha_salida || item.fecha);
+      const responsable = item.RESPONSABLE || "-";
+      const destinatario = item.DESTINATARIO || "";
+      const observ = item.OBSERVACIONES || "";
 
       const color = invColorFor(inventario);
       const tr = document.createElement("tr");
       tr.innerHTML = `
+        <td>${escapeHtml(String(codigo))}</td>
         <td>${escapeHtml(String(descripcion))}</td>
         <td>${escapeHtml(String(um))}</td>
         <td><span class="inv-dot" title="${escapeHtml(inventario)}" style="background:${color}"></span> ${escapeHtml(String(inventario))}</td>
@@ -3369,12 +3446,22 @@ async function cargarHistorialSalidas() {
       `;
       tablaHistorialBody.appendChild(tr);
     });
+    
+    console.log(`✅ Historial cargado: ${salidasFiltradas.length} registros de productos sin código`);
+    
   } catch (err) {
-    console.error("Error cargando historial de salidas:", err);
-    tablaHistorialBody.innerHTML = `<tr><td colspan="8">Error cargando salidas</td></tr>`;
+    console.error("❌ Error inesperado cargando historial:", err);
+    if (tablaHistorialBody) {
+      tablaHistorialBody.innerHTML = `
+        <tr>
+          <td colspan="9" style="text-align:center; color:#dc2626; padding:20px;">
+            Error cargando historial de salidas
+          </td>
+        </tr>
+      `;
+    }
   }
 }
-
 // ------------------- Modal summary (UX) -------------------
 function showSummaryModal(successes, errors) {
   const existing = document.getElementById("summaryModal");
@@ -3400,7 +3487,6 @@ function showSummaryModal(successes, errors) {
 }
 
 // ------------------- Confirm pending items -------------------
-// ------------------- Confirm pending items (con mejor diagnóstico) -------------------
 async function confirmAllPendings() {
   const pendientes = getPendingSalidas();
   if (!pendientes || pendientes.length === 0) {
@@ -3485,22 +3571,22 @@ async function confirmAllPendings() {
         const { data: rpcData, error: rpcError } = await supabase.rpc("crear_salida_sin_codigo", rpcPayload).catch(err => ({ data: null, error: err }));
         
         if (rpcError) {
-          console.warn("⚠️ RPC falló, usando método alternativo:", rpcError);
+            console.warn("⚠️ RPC falló, usando método alternativo:", rpcError);
           
           // Fallback: insertar en tabla 'salidas_sin_codigo' con código
-          const salidaObj = {
-            CODIGO: codigoSC, // <- AGREGAR CÓDIGO
-            DESCRIPCION: item.DESCRIPCION,
-            CANTIDAD_SALIDA: origin.CANTIDAD,
-            FECHA_SALIDA: new Date().toISOString(),
-            RESPONSABLE: responsableFinal,
-            DESTINATARIO: destinatarioFinal,
-            INVENTARIO_ORIGEN: origin.INVENTARIO_ORIGEN,
-            OBSERVACIONES: observacionesFinal
-          };
+           const salidaObj = {
+            CODIGO: codigoSC, // 
+             DESCRIPCION: item.DESCRIPCION,
+             CANTIDAD_SALIDA: origin.CANTIDAD,
+             FECHA_SALIDA: new Date().toISOString(),
+             RESPONSABLE: responsableFinal,
+              DESTINATARIO: destinatarioFinal,
+              INVENTARIO_ORIGEN: origin.INVENTARIO_ORIGEN,
+              OBSERVACIONES: observacionesFinal
+            };
           
-          const { error: errorInsert } = await supabase.from("salidas_sin_codigo").insert([salidaObj]);
-          if (errorInsert) throw errorInsert;
+            const { error: errorInsert } = await supabase.from("salidas").insert([salidaObj]);
+            if (errorInsert) throw errorInsert;
 
           // Actualizar stock
           await ensureProductosSinCodigoColumnMap();
@@ -3654,6 +3740,7 @@ async function cargarInventario({ showErrors = false } = {}) {
       else colorClass = "red";
 
       tr.innerHTML = `
+        <td>${p.CODIGO || p.codigo || ''}</td>
         <td>${p.DESCRIPCION || p.descripcion || ''}</td>
         <td>${p.UM || p.um || ''}</td>
         <td>${i069}</td>
@@ -3707,3 +3794,33 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
   if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
 });
+
+// ------------------- DIAGNOSTICOS-------------------
+// ------------------- DIAGNÓSTICO DE CREACIÓN DE PRODUCTO -------------------
+async function diagnosticarCreacionProducto() {
+  console.log("🔧 DIAGNÓSTICO CREACIÓN PRODUCTO");
+  
+  try {
+    // Verificar conexión a Supabase
+    console.log("🔗 Supabase inicializado:", !!supabase);
+    
+    // Verificar tabla existe
+    const { data, error } = await supabase
+      .from("productos_sin_codigo")
+      .select("id")
+      .limit(1);
+    
+    console.log("📊 Tabla accesible:", !error, error);
+    
+    // Verificar columnas requeridas
+    console.log("🔍 Verificando columnas requeridas...");
+    const columnMap = await ensureProductosSinCodigoColumnMap();
+    console.log("🗺️ Mapa de columnas:", columnMap);
+    
+  } catch (error) {
+    console.error("❌ Error en diagnóstico:", error);
+  }
+}
+
+// Ejecutar diagnóstico
+setTimeout(diagnosticarCreacionProducto, 2000);
