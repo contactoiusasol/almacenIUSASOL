@@ -1,4 +1,3 @@
-// movimientomaterial.js
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
@@ -28,7 +27,6 @@ function mostrarAlerta(mensaje, tipo = "success", tiempo = 2600) {
   t.className = `toast ${tipo}`;
   t.innerHTML = `<span class="icon">${tipo === 'success' ? '✅' : tipo === 'warning' ? '⚠️' : '❌'}</span><div style="flex:1">${escapeHtml(mensaje)}</div>`;
   c.appendChild(t);
-  // force reflow
   requestAnimationFrame(() => t.classList.add("show"));
   setTimeout(() => {
     t.classList.remove("show");
@@ -36,7 +34,7 @@ function mostrarAlerta(mensaje, tipo = "success", tiempo = 2600) {
   }, tiempo);
 }
 
-/* Helper impresión: intenta abrir ventana e imprimir; si falla, usa iframe fallback */
+/* Helper impresión */
 function createPrintWindow(html) {
   try {
     const w = window.open("", "_blank", "noopener");
@@ -44,15 +42,13 @@ function createPrintWindow(html) {
     w.document.open();
     w.document.write(html);
     w.document.close();
-    // Esperar a que el contenido cargue
     const p = setInterval(() => {
       if (w.document.readyState === "complete") {
         clearInterval(p);
         w.focus();
         w.print();
-        // cerrar ventana tras imprimir (opcional): se hace con timeout para evitar bloquear algunos navegadores
         setTimeout(() => {
-          try { w.close(); } catch (err) { /* ignore */ }
+          try { w.close(); } catch (err) {}
         }, 600);
       }
     }, 80);
@@ -77,7 +73,6 @@ function createIframePrint(html) {
   idoc.write(html);
   idoc.close();
   iframe.contentWindow.focus();
-  // Delay para asegurarse carga
   setTimeout(() => {
     try {
       iframe.contentWindow.print();
@@ -106,7 +101,6 @@ async function init() {
   const btnYes = document.getElementById("confirmYes");
   const btnNo = document.getElementById("confirmNo");
 
-  // intentar obtener usuario (si tienes sesión Supabase)
   try {
     const { data } = await supabase.auth.getUser();
     const user = data?.user;
@@ -138,14 +132,28 @@ async function init() {
       return;
     }
     lista.forEach((item, index) => {
+      // Si stockDisponible <= 0, deshabilitar input y mostrar 0
+      const maxStock = Number(item.stockDisponible || 0);
+      const inputDisabled = maxStock <= 0 ? "disabled" : "";
+      const valor = Number(item.cantidad) && Number(item.cantidad) > 0 ? Number(item.cantidad) : 1;
+
       const tr = document.createElement("tr");
       tr.innerHTML = `
         <td>${escapeHtml(item.codigo)}</td>
         <td style="text-align:left;">${escapeHtml(item.descripcion)}</td>
         <td>${escapeHtml(item.um)}</td>
         <td style="text-align:center;">
-          <input type="number" min="1" max="${Number(item.stockDisponible||0)}" value="${escapeHtml(String(item.cantidad||1))}" class="cantidad-input" data-index="${index}" />
-          <small style="display:block;color:#888;font-size:.75rem;">Max: ${escapeHtml(String(item.stockDisponible||0))}</small>
+          <input 
+            type="number" 
+            min="1" 
+            step="1" 
+            inputmode="numeric" 
+            pattern="\\d*" 
+            ${inputDisabled} 
+            value="${escapeHtml(String(valor))}" 
+            class="cantidad-input" 
+            data-index="${index}" />
+          <small style="display:block;color:#888;font-size:.75rem;">Max: ${escapeHtml(String(maxStock))}</small>
         </td>
         <td style="text-align:center;"><button class="eliminar-btn" data-index="${index}">Eliminar</button></td>
       `;
@@ -157,7 +165,6 @@ async function init() {
   function showConfirm(message, title = "Confirmar acción") {
     return new Promise((resolve) => {
       if (!overlay || !modal || !titleEl || !textEl || !btnYes || !btnNo) {
-        // si no hay modal físico, usar confirm() nativo
         resolve(window.confirm(message));
         return;
       }
@@ -211,24 +218,78 @@ async function init() {
 
   // Eventos delegados en la tabla
   if (tablaBody) {
+    // INPUT: sanitizar valor (elimina no-dígitos), asegurar min 1 y max stock
     tablaBody.addEventListener("input", (e) => {
       if (e.target && e.target.classList.contains("cantidad-input")) {
         const idx = Number(e.target.dataset.index);
-        const max = Number(lista[idx]?.stockDisponible || 0);
-        let v = parseInt(e.target.value, 10);
+        if (!Number.isInteger(idx) || !lista[idx]) return;
+
+        // Limpiar cualquier carácter no numérico (por si pegó texto)
+        let raw = String(e.target.value || "");
+        raw = raw.replace(/[^\d]/g, ""); // sólo dígitos
+        // Evitar campo vacío -> 1 por defecto
+        let v = raw === "" ? 1 : parseInt(raw, 10);
         if (isNaN(v) || v < 1) v = 1;
+
+        const max = Number(lista[idx]?.stockDisponible || 0);
         if (v > max) {
           mostrarAlerta(`❌ Máximo ${max} unidades disponibles`, "warning");
-          v = max;
-          e.target.value = max;
+          v = max > 0 ? max : 1;
         }
-        if (lista[idx]) {
-          lista[idx].cantidad = v;
-          localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
-        }
+
+        e.target.value = String(v);
+
+        // Actualizar lista y localStorage
+        lista[idx].cantidad = v;
+        localStorage.setItem("movimientoMaterial", JSON.stringify(lista));
+        if (typeof updateVerMovimientoBadge === "function") updateVerMovimientoBadge();
       }
     });
 
+    // KEYDOWN: prevenir caracteres no permitidos (ej. '-', 'e', '.', '+')
+    tablaBody.addEventListener("keydown", (e) => {
+      const tgt = e.target;
+      if (!tgt || !tgt.classList.contains("cantidad-input")) return;
+
+      // Permitir teclas de control/navigation
+      const controlKeys = [
+        "Backspace", "Delete", "ArrowLeft", "ArrowRight",
+        "ArrowUp", "ArrowDown", "Tab", "Home", "End"
+      ];
+      if (controlKeys.includes(e.key)) return;
+
+      // Prohibir estas teclas (p. ej. 'e' en chrome, '-', '.', '+')
+      if (e.key === "-" || e.key === "+" || e.key === "e" || e.key === "E" || e.key === ".") {
+        e.preventDefault();
+        return;
+      }
+
+      // Permitir sólo dígitos 0-9
+      if (!/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+      }
+    });
+
+    // PASTE: limpiar lo pegado
+    tablaBody.addEventListener("paste", (e) => {
+      const tgt = e.target;
+      if (!tgt || !tgt.classList.contains("cantidad-input")) return;
+      const clip = (e.clipboardData || window.clipboardData).getData("text");
+      const cleaned = String(clip || "").replace(/[^\d]/g, "");
+      if (!cleaned) {
+        e.preventDefault();
+        // si no hay dígitos, poner 1 como fallback
+        tgt.value = "1";
+        tgt.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+      }
+      // Si hay dígitos, insertar solo los dígitos (evita pegar signos)
+      e.preventDefault();
+      tgt.value = cleaned;
+      tgt.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
+    // CLICK: eliminar fila
     tablaBody.addEventListener("click", async (e) => {
       if (e.target && e.target.classList.contains("eliminar-btn")) {
         const idx = Number(e.target.dataset.index);
@@ -250,8 +311,8 @@ async function init() {
   // Botón vaciar todo
   if (btnVaciarTodo) btnVaciarTodo.addEventListener("click", vaciarListaCompleta);
 
-  // ---- Imprimir: rellenar tablaSalida y generar HTML forzado ----
-   if (btnImprimir) {
+  // ---- Imprimir
+  if (btnImprimir) {
     btnImprimir.addEventListener("click", () => {
       const nombre = (nombreSolicitanteInput?.value || "").trim();
       if (!nombre) return mostrarAlerta("⚠️ Escribe el nombre del solicitante", "warning");
@@ -279,11 +340,6 @@ async function init() {
       window.print();
       hojaSalida.style.display = "none";
     });
-  }
-
-  // Botón Vaciar Todo
-  if (btnVaciarTodo) {
-    btnVaciarTodo.addEventListener("click", vaciarListaCompleta);
   }
 
   // Inicial render
