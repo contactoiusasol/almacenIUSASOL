@@ -18,6 +18,7 @@
     'entradas.html',
     'salidas.html',
     'reportes.html',
+    'productos-sin-codigo.html',
     'usuarios.html'
   ];
 
@@ -59,6 +60,53 @@
       return null;
     }
   }
+// Llamar al servidor para validar la sesión al cargar la página protegida
+async function validateWithServer() {
+  try {
+    // Endpoint que valida la cookie HttpOnly o token; debe devolver 200 si OK
+    const res = await fetch('/api/session/validate', {
+      method: 'GET',
+      credentials: 'include' // enviar cookie
+    });
+    if (!res.ok) {
+      redirectToLoginImmediate();
+      return false;
+    }
+    // opcional: actualizar datos de usuario en UI
+    return true;
+  } catch (err) {
+    // fallo de red -> mejor redirigir o mostrar aviso
+    redirectToLoginImmediate();
+    return false;
+  }
+}
+
+async function protectNow() {
+  const pathname = location.pathname || location.href;
+
+  if (isLoginPage(pathname)) {
+    if (await validateWithServer()) {
+      // redirigir local segun rol (opcional: obtener rol del server)
+      // ... (tu redirección)
+    } else {
+      try { document.documentElement.style.visibility = ''; } catch (e) {}
+    }
+    return;
+  }
+
+  if (isProtectedPage(pathname)) {
+    // validar con servidor antes de mostrar contenido
+    if (!await validateWithServer()) {
+      return;
+    }
+    try { document.documentElement.style.visibility = ''; } catch (e) {}
+    if (typeof displayUserInfo === 'function') displayUserInfo();
+    if (typeof setupActivityCheck === 'function') setupActivityCheck();
+    return;
+  }
+
+  try { document.documentElement.style.visibility = ''; } catch (e) {}
+}
 
   function checkAuth(requiredRole = 'admin') {
     const user = parseUser();

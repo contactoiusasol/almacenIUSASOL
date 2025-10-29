@@ -67,6 +67,12 @@
       if (typeof displayUserInfo === 'function') displayUserInfo();
     });
   </script>
+  <script src="../js/seguridad.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        protectPage('admin');
+    });
+</script>
 
   <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
