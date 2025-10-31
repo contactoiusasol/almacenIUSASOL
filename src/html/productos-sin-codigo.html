@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Almacen- IUSA</title>
-  <link rel="stylesheet" href="../styles/inventario.css">
+  <title>STOCK-VISION</title>
+  <link rel="stylesheet" href="../styles/productos-sin-codigo.css">
   <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -34,7 +34,7 @@
       <input type="text" id="searchInput" placeholder="Buscar por descripción...">
       <button class="btn-add" id="btnOpenModal">➕ Agregar Producto</button>
       <button id="refreshReport" class="generate-btn" title="Refrescar datos">🔄 Refrescar</button>
-      <button class="btn-salidas" id="btnVerSalidas">📋 Ver Salidas</button> 
+      <button class="btn-salidas" id="btnVerSalidas" onclick="window.location.href='salidas-sin-codigo.html'">📋 Ver Salidas</button> 
     </div>
     
     <div class="table-scroll-container">
@@ -193,11 +193,11 @@
           <label for="salidaInventarioSelect">Inventario origen</label>
           <select id="salidaInventarioSelect" required>
             <option value="">-- Selecciona inventario --</option>
-            <option value="I069">INVENTARIO I069</option>
-            <option value="I078">INVENTARIO I078</option>
-            <option value="I07F">INVENTARIO I07F</option>
-            <option value="I312">INVENTARIO I312</option>
-            <option value="I073">INVENTARIO I073</option>
+            <option value="INVENTARIO I069">INVENTARIO I069</option>
+            <option value="INVENTARIO I078">INVENTARIO I078</option>
+            <option value="INVENTARIO I07F">INVENTARIO I07F</option>
+            <option value="INVENTARIO I312">INVENTARIO I312</option>
+            <option value="INVENTARIO I073">INVENTARIO I073</option>
           </select>
         </div>
 
@@ -233,8 +233,7 @@
   <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
   <!-- CAMBIADO EL SCRIPT A productos-sin-codigo.js -->
-  <script src="../js/productos-sin-codigo.js"></script>
-
+ <script type="module" src="../js/productos-sin-codigo.js"></script>
   <script>
     // 🔹 Calcula automáticamente el Inventario Físico en Almacén
     const inputsInventario = ["i069", "i078", "i07f", "i312", "i073"];
@@ -257,14 +256,128 @@
       const sumar = document.getElementById('sumarCheckbox');
       if (sumar) sumar.checked = false;
     });
+
+    // Función para abrir modal de salida
+    function abrirModalSalida(descripcion, um, stockDisponible) {
+      const modal = document.getElementById('salidaModal');
+      const form = document.getElementById('salidaForm');
+      
+      // Limpiar formulario
+      form.reset();
+      
+      // Configurar datos del producto
+      modal.dataset.descripcion = descripcion;
+      modal.dataset.um = um;
+      modal.dataset.stock = stockDisponible;
+      
+      // Actualizar información de stock disponible
+      document.getElementById('salidaDisponible').textContent = `Disponible: ${stockDisponible}`;
+      
+      // Mostrar modal
+      modal.style.display = 'block';
+      
+      // Enfocar en el campo de cantidad
+      setTimeout(() => {
+        document.getElementById('salidaCantidadInput').focus();
+      }, 100);
+    }
+
+    // Event listeners para el modal de salida
+    document.addEventListener('DOMContentLoaded', function() {
+      const salidaModal = document.getElementById('salidaModal');
+      const salidaCloseBtn = document.getElementById('salidaCloseBtn');
+      const salidaCancelBtn = document.getElementById('salidaCancelBtn');
+      const salidaForm = document.getElementById('salidaForm');
+      
+      // Cerrar modal
+      salidaCloseBtn.addEventListener('click', () => {
+        salidaModal.style.display = 'none';
+      });
+      
+      salidaCancelBtn.addEventListener('click', () => {
+        salidaModal.style.display = 'none';
+      });
+      
+      // Cerrar al hacer clic fuera del modal
+      window.addEventListener('click', (event) => {
+        if (event.target === salidaModal) {
+          salidaModal.style.display = 'none';
+        }
+      });
+      
+      // Validar cantidad antes de enviar
+      document.getElementById('salidaCantidadInput').addEventListener('input', function() {
+        const cantidad = parseInt(this.value);
+        const stockDisponible = parseInt(salidaModal.dataset.stock);
+        const boton = document.getElementById('salidaAddBtn');
+        
+        if (cantidad > stockDisponible) {
+          this.style.borderColor = 'red';
+          boton.disabled = true;
+          boton.title = 'La cantidad no puede ser mayor al stock disponible';
+        } else {
+          this.style.borderColor = '';
+          boton.disabled = false;
+          boton.title = '';
+        }
+      });
+      
+      // Manejar envío del formulario de salida
+      salidaForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const descripcion = salidaModal.dataset.descripcion;
+        const um = salidaModal.dataset.um;
+        const inventarioOrigen = document.getElementById('salidaInventarioSelect').value;
+        const cantidad = parseInt(document.getElementById('salidaCantidadInput').value);
+        const responsable = document.getElementById('salidaResponsableInput').value;
+        const destinatario = document.getElementById('salidaDestinatarioInput').value;
+        const observaciones = document.getElementById('salidaObservacionesInput').value;
+        
+        // Crear objeto de salida pendiente
+        const salidaPendiente = {
+          DESCRIPCION: descripcion,
+          UM: um,
+          INVENTARIO_ORIGEN: inventarioOrigen,
+          CANTIDAD: cantidad,
+          RESPONSABLE: responsable,
+          DESTINATARIO: destinatario,
+          OBSERVACIONES: observaciones,
+          ADDED_AT: String(Date.now())
+        };
+        
+        // Guardar en localStorage (usando la clave correcta para productos sin código)
+        const pendientes = JSON.parse(localStorage.getItem('salidas_sin_codigo_pendientes') || '[]');
+        pendientes.push(salidaPendiente);
+        localStorage.setItem('salidas_sin_codigo_pendientes', JSON.stringify(pendientes));
+        
+        // Mostrar confirmación
+        showToast(`Salida de "${descripcion}" agregada a pendientes`, true);
+        
+        // Cerrar modal
+        salidaModal.style.display = 'none';
+      });
+    });
+
+    // Función para mostrar notificación
+    function showToast(message, isSuccess = true) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = 'toast ' + (isSuccess ? 'success' : 'error');
+      toast.style.display = 'block';
+      
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
   </script>
   
   <script src="../js/seguridad.js"></script>
-<script>
+  <script>
     document.addEventListener('DOMContentLoaded', function() {
-        protectPage('admin');
+      protectPage('admin');
     });
-</script>
+  </script>
   
 </body>
 </html>

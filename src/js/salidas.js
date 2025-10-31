@@ -836,7 +836,6 @@ async function confirmAllPendings() {
 });
 if (!okConfirmAll) return;
 
-
   if (btnConfirmAll) btnConfirmAll.disabled = true;
   let successes = 0;
   let errors = 0;

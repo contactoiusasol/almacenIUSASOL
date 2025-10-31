@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STOCK-VISION - Salidas Sin Código</title>
+  
+  <!-- Fuente -->
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- CSS externo -->
+  <link rel="stylesheet" href="../styles/salidas-sin-codigo.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="top-row">
+      <a class="back-btn" href="admin.html">Volver al Panel</a>
+      <a class="back-btn" href="productos-sin-codigo.html" style="background:linear-gradient(135deg,#10b981,#047857)">Volver al inventario</a>
+    </div>
+
+    <h1>Salidas Sin Código</h1>
+
+    <!-- Controls: responsable + acciones -->
+    <div class="controls-row">
+      <div class="responsable-box">
+        <label for="nombreResponsable">Responsable de la salida:</label>
+        <input id="nombreResponsable" type="text" readonly placeholder="Cargando usuario..." />
+      </div>
+
+      <div class="action-buttons">
+        <button id="btnConfirmAll" class="btn primary">Confirmar pendientes </button>
+        <button id="btnClearPending" class="btn ghost">Vaciar pendientes</button>
+        <button id="btnRefresh" class="btn ghost" title="Refrescar historial">🔄 Refrescar historial</button>
+      </div>
+    </div>
+
+    <!-- PENDING LIST -->
+    <div>
+      <div class="section-title">Salidas pendientes</div>
+
+      <div class="table-wrap">
+        <div class="table-scroll-container" role="region" aria-label="Lista de salidas pendientes">
+          <table id="pendingTable" aria-describedby="pendingTableDescription">
+            <colgroup>
+               <col style="width:6%;">
+              <col style="width:34%;">  <!-- descripción -->
+              <col style="width:6%;">   <!-- UM -->
+              <col style="width:12%;">  <!-- Inventario -->
+              <col style="width:15%;">  <!-- Cantidad -->
+              <col style="width:12%;">  <!-- Responsable -->
+              <col style="width:10%;">  <!-- Destinatario -->
+              <col style="width:12%;">  <!-- Observaciones -->
+              <col style="width:8%;">   <!-- Accion -->
+            </colgroup>
+
+            <thead>
+              <tr>
+                <th>Codigo</th>
+                <th class="col-desc">Descripción</th>
+                <th class="col-um">UM</th>
+                <th class="col-inv">Inventario</th>
+                <th class="col-cant">Cantidad</th>
+                <th class="col-resp">Responsable</th>
+                <th class="col-dest">Destinatario</th>
+                <th class="col-obs">Observaciones</th>
+                <th class="col-acc">Acción</th>
+              </tr>
+            </thead>
+
+            <tbody id="pendingTableBody">
+              <!-- Filas generadas por JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <hr class="section-sep" />
+
+    <!-- HISTORIAL -->
+    <div>
+      <div class="section-title">Historial de salidas</div>
+      <div class="table-wrap">
+        <div class="table-scroll-container" role="region" aria-label="Historial de salidas">
+          <table id="salidasTable" aria-describedby="salidasTableDesc">
+            <colgroup>
+               <col style="width:6%;">
+              <col style="width:20%;">  <!-- descripción -->
+              <col style="width:6%;">   <!-- UM -->
+              <col style="width:12%;">  <!-- Inventario -->
+              <col style="width:5%;">  <!-- Cantidad -->
+              <col style="width:12%;">  <!-- Responsable -->
+              <col style="width:10%;">  <!-- Destinatario -->
+              <col style="width:12%;">  <!-- Observaciones -->
+            </colgroup>
+            <thead>
+              <tr>
+                <th>Codigo</th>
+                <th>Descripción</th>
+                <th>UM</th>
+                <th>Inventario</th>
+                <th>Cantidad de Salida</th>
+                <th>Fecha Salida</th>
+                <th>Responsable</th>
+                <th>Destinatario</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- Filas agregadas por JS (historial) -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Custom confirm modal (se usa por JS si lo necesitas) -->
+    <div id="custom-confirm-overlay" style="display:none;"></div>
+
+  </div>
+
+  <!-- Seguridad y script principal -->
+  <script src="../js/seguridad.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      try { if (typeof protectPage === 'function') protectPage('admin'); } catch(e) {}
+    });
+  </script>
+  <!-- Cargar UMD de Supabase (proporciona window.supabase.createClient) -->
+
+  <script type="module" src="../js/salidas-sin-codigo.js"></script>
+</body>
+</html>

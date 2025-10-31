@@ -1,3826 +1,2621 @@
-function protectPage() {
-  console.log("🛡️ protectPage ejecutada");
-  // Aquí puedes agregar lógica de protección si es necesaria
-  return true;
-}
-// ------------------- CONFIG SUPABASE -------------------
-const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
-const SUPABASE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
-const supabase = window.supabase?.createClient
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-  : null;
+(() => {
+  // -------------------- CONFIG SUPABASE --------------------
+  const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
+  const supabase = (window.supabase && typeof window.supabase.createClient === "function")
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
 
-// ------------------- Selectores DOM (si existen) -------------------
-const tableBody = document.querySelector("#inventoryTable tbody");
-const searchInput = document.getElementById("searchInput");
-const modal = document.getElementById("modalForm"); // modal para agregar/editar producto
-const btnOpenModal = document.getElementById("btnOpenModal");
-const btnCloseModal = document.getElementById("btnCloseModal");
-const productForm = document.getElementById("productForm");
-const btnCancelModal = document.querySelector('#btnCancelModal');
-const refreshBtn = document.getElementById("refreshReport");
+  // -------------------- SELECTORES DOM --------------------
+  const tableBody = document.querySelector("#inventoryTable tbody");
+  const inventoryTable = document.getElementById("inventoryTable");
+  const searchInput = document.getElementById("searchInput");
+  const modal = document.getElementById("modalForm");
+  const btnOpenModal = document.getElementById("btnOpenModal");
+  const btnCloseModal = document.getElementById("btnCloseModal");
+  const productForm = document.getElementById("productForm");
+  const btnCancelModal = document.querySelector("#btnCancelModal");
+  const refreshBtn = document.getElementById("refreshReport");
 
-const tablaPendientesBody = document.querySelector("#pendingTable tbody"); // usado en renderPendingList
-const tablaHistorialBody = document.querySelector("#salidasTable tbody"); // usado por historial
+  const tablaPendientesBody = document.querySelector("#pendingTable tbody") || null;
+  const tablaHistorialBody = document.querySelector("#salidasTable tbody") || null;
 
-const btnConfirmAll = document.getElementById("btnConfirmAll");
-const btnClearPending = document.getElementById("btnClearPending");
-const btnRefresh = document.getElementById("btnRefresh");
+  const btnConfirmAll = document.getElementById("btnConfirmAll");
+  const btnClearPending = document.getElementById("btnClearPending");
 
-const nombreResponsableInput = document.getElementById("nombreResponsable");
+  // -------------------- ESTADO --------------------
+  let editMode = false;
+  let editingId = null;
+  let PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
+  let paginatedProducts = [];
+  let allProductsFromServer = [];
+  let currentPage = 1;
+  const ITEMS_PER_PAGE = 200;
+  let totalProducts = 0;
 
-// Estado de edición
-let editMode = false;
-let editingCodigo = null;
-// estado global del usuario autenticado (nombre/apellido)
-let CURRENT_USER_FULLNAME = "";
-let CURRENT_USER_NOMBRE = "";
-let CURRENT_USER_APELLIDO = "";
-let PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null; // map: normalizedKey -> realColumnName
+  // PENDINGS (salidas)
+  const PENDINGS_KEY_SALIDAS = "salidas_sin_codigo_pendientes";
+// -------------------- PENDING KEY (consistente y fallback) --------------------
+const PENDING_KEY = "salidas_sin_codigo_pendientes"; // la key canonical que usamos
+// posibles keys antiguas (legacy) que otros módulos podrían haber usado
+const LEGACY_PENDING_KEYS = [
+  "PENDINGS_KEY_SALIDAS",
+  "pending_salidas",
+  "salidas_pending",
+  "salidas_sin_codigo_pendientes" // incluida por si acaso se guarda directamente
+];
 
-// ------------------- VARIABLES PARA CARGA PROGRESIVA -------------------
-let currentOffset = 0;
-const BATCH_SIZE = 500;
-let isLoading = false;
-let hasMoreData = true;
-let allLoadedProducts = []; // Acumula todos los productos cargados
-let currentFilteredProducts = []; // Para búsquedas
-
-// Helper para calcular la suma de inventarios
-function calcularAlmacen(producto) {
-  const i069 = getStockFromProduct(producto, 'I069') ?? 0;
-  const i078 = getStockFromProduct(producto, 'I078') ?? 0;
-  const i07f = getStockFromProduct(producto, 'I07F') ?? 0;
-  const i312 = getStockFromProduct(producto, 'I312') ?? 0;
-  const i073 = getStockFromProduct(producto, 'I073') ?? 0;
-
-  return i069 + i078 + i07f + i312 + i073;
-}
-
-// ------------------- Función Toast -------------------
-function showToast(message, success = true) {
-  let toast = document.getElementById("toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "toast";
-    document.body.appendChild(toast);
+  // -------------------- UTIL --------------------
+  function nl(v){ return v === null || v === undefined ? "" : String(v); }
+  function toNumber(v) {
+    if (v === null || v === undefined || v === "") return 0;
+    const cleaned = String(v).replace(/,/g, "").trim();
+    const n = Number(cleaned);
+    return Number.isNaN(n) ? 0 : n;
   }
-
-  toast.textContent = message;
-  toast.className = "show"; // añade clase visible (usa CSS para animación)
-  toast.style.background = success ? "linear-gradient(90deg,#16a34a,#059669)" : "linear-gradient(90deg,#ef4444,#dc2626)";
-  // aseguramos z-index alto para que esté delante del overlay/modal
-  toast.style.zIndex = "13000";
-
-  // animar: la clase .show ya controla la opacidad/transform
-  // remover si había timeout anterior
-  if (toast._timeout) clearTimeout(toast._timeout);
-  // pequeño delay para aplicar transición (si recién creado)
-  setTimeout(() => toast.classList.add("show"), 20);
-
-  toast._timeout = setTimeout(() => {
-    toast.classList.remove("show");
-    // limpiar texto después de animación
-    setTimeout(() => { toast.textContent = ""; }, 280);
-  }, 3000);
+  // redondeo seguro (usa en todo el módulo)
+function roundFloat(n, decimals = 6) {
+  const v = Number(n || 0);
+  if (!Number.isFinite(v)) return 0;
+  const f = Math.pow(10, decimals);
+  return Math.round(v * f) / f;
 }
 
-// ------------------- Confirmación personalizada -------------------
-function showConfirm(message, onConfirm) {
-  const confirmModal = document.getElementById("confirmModal");
-  const confirmMessage = document.getElementById("confirmMessage");
-  const btnYes = document.getElementById("btnConfirmYes");
-  const btnNo = document.getElementById("btnConfirmNo");
-
-  if (!confirmModal || !confirmMessage || !btnYes || !btnNo) {
-    // Fallback si no existe el modal personalizado
-    if (confirm(message)) onConfirm();
-    return;
+  function escapeHtml(text) {
+    if (text === null || text === undefined) return "";
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
   }
-
-  confirmMessage.textContent = message;
-  confirmModal.style.display = "flex";
-
-  btnYes.onclick = () => {
-    confirmModal.style.display = "none";
-    onConfirm();
-  };
-
-  btnNo.onclick = () => {
-    confirmModal.style.display = "none";
-  };
-}
-
-// ------------------- Helpers numéricos y de escape -------------------
-const toNumber = (v) => {
-  if (v === null || v === undefined || v === "") return 0;
-  const cleaned = String(v).replace(/,/g, "").trim();
-  const n = Number(cleaned);
-  return Number.isNaN(n) ? 0 : n;
-};
-
-function escapeHtml(text) {
-  if (text === null || text === undefined) return "";
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// Normaliza texto para comparar nombres de columna
-function normalizeKeyName(s) {
+  function normalizeKeyName(s) {
+    if (!s) return "";
+    return String(s)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]/g, "");
+  }
+  function debounce(fn, wait = 300) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(() => fn(...args), wait);
+    };
+  }
+  
+  // -------------------- Helpers similitud / normalización --------------------
+function normalizeTextForCompare(s){
   if (!s) return "";
   return String(s)
+    .trim()
     .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") // quitar tildes
-    .replace(/[^a-z0-9]/g, ""); // quitar espacios/puntuación
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")   // quitar acentos
+    .replace(/[^a-z0-9\s]/g, "")                       // quitar símbolos
+    .replace(/\s+/g, " ")                              // colapsar espacios
+    .trim();
 }
 
-// Dado un inventario como "I078" o "INVENTARIO I078" devuelve variantes esperables
-function inventoryKeyVariants(inv) {
-  if (!inv) return [];
-  const short = String(inv).trim().toUpperCase().replace(/^INVENTARIO\s*/i, "");
-  const variants = [];
-
-  // forma con espacios y mayúsculas (antigua)
-  variants.push(`INVENTARIO ${short}`); // "INVENTARIO I078"
-  // forma snake_case (nueva)
-  variants.push(`inventario_${short.toLowerCase()}`); // "inventario_i078"
-  // otras formas posibles
-  variants.push(`INVENTARIO ${short.replace(/^0+/, "")}`);
-  variants.push(`inventario${short.toLowerCase()}`);
-  // forma sin prefijo (por si en tu BD guardaste solo I078)
-  variants.push(`${short}`);
-  // normalizada (por si el nombre de la columna tenía acentos/varios)
-  return [...new Set(variants)];
-}
-
-// Busca en el objeto producto la primera clave existente entre variantes y devuelve su valor numérico
-function getStockFromProduct(productObj, inventoryLabel) {
-  if (!productObj) return 0;
-  const variants = inventoryKeyVariants(inventoryLabel);
-  const keys = Object.keys(productObj || {});
-  const normMap = new Map(keys.map(k => [normalizeKeyName(k), k]));
-
-  for (const v of variants) {
-    const nk = normalizeKeyName(v);
-    if (normMap.has(nk)) {
-      const realKey = normMap.get(nk);
-      return toNumber(productObj[realKey]);
+function levenshteinDistance(a, b){
+  const as = String(a || ""), bs = String(b || "");
+  if (as === bs) return 0;
+  const la = as.length, lb = bs.length;
+  if (la === 0) return lb;
+  if (lb === 0) return la;
+  let v0 = new Array(lb + 1), v1 = new Array(lb + 1);
+  for (let j = 0; j <= lb; j++) v0[j] = j;
+  for (let i = 0; i < la; i++) {
+    v1[0] = i + 1;
+    for (let j = 0; j < lb; j++) {
+      const cost = as[i] === bs[j] ? 0 : 1;
+      v1[j+1] = Math.min(v1[j] + 1, v0[j+1] + 1, v0[j] + cost);
     }
+    // swap
+    const tmp = v0; v0 = v1; v1 = tmp;
+  }
+  return v0[lb];
+}
+
+function similarityRatio(a, b){
+  const na = normalizeTextForCompare(a);
+  const nb = normalizeTextForCompare(b);
+  if (!na && !nb) return 1;
+  if (!na || !nb) return 0;
+  const dist = levenshteinDistance(na, nb);
+  const maxLen = Math.max(na.length, nb.length);
+  if (maxLen === 0) return 1;
+  return 1 - (dist / maxLen);
+}
+
+
+function ensureToast() {
+  if (!document.getElementById("toast")) {
+    const t = document.createElement("div");
+    t.id = "toast";
+    t.className = "toast";
+    // estilos inline robustos para evitar que CSS externos lo oculten
+    Object.assign(t.style, {
+      position: "fixed",
+      top: "18px",
+      right: "18px",
+      padding: "10px 14px",
+      borderRadius: "10px",
+      color: "#fff",
+      zIndex: "99999",
+      display: "none",
+      fontFamily: "'Quicksand', sans-serif",
+      fontWeight: "600",
+      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
+      alignItems: "center",
+      justifyContent: "center"
+    });
+    document.body.appendChild(t);
+  }
+}
+
+function showToast(msg, ok = true, time = 3000) {
+  ensureToast();
+  const toast = document.getElementById("toast");
+  if (!toast) return;
+
+  // debug: log para confirmar invocación
+  console.debug("showToast llamado:", msg, "ok:", ok, "duration:", time);
+
+  // aplicar background según éxito/error
+  const bg = ok ? "linear-gradient(90deg,#16a34a,#059669)" : "linear-gradient(90deg,#ef4444,#dc2626)";
+  toast.style.background = bg;
+
+  // Forzar visibilidad con inline style y prioridad
+  toast.style.setProperty("display", "flex", "important");
+  toast.style.setProperty("opacity", "1", "important");
+  toast.style.setProperty("visibility", "visible", "important");
+
+  toast.textContent = msg;
+
+  // cancelar timeout previo si existe
+  if (toast._t) {
+    clearTimeout(toast._t);
   }
 
-  // fallback: si existe alguna columna que contenga 'inventario' o 'almacen'
-  for (const k of keys) {
-    const nk = normalizeKeyName(k);
-    if (nk.includes("inventario") || nk.includes("almacen")) {
-      return toNumber(productObj[k]);
-    }
-  }
-
-  return 0;
+  // auto-hide
+  toast._t = setTimeout(() => {
+    try {
+      toast.style.setProperty("opacity", "0", "important");
+      toast.style.setProperty("visibility", "hidden", "important");
+      // luego ocultar (no important, para que la próxima llamada lo muestre de nuevo)
+      setTimeout(()=> toast.style.display = "none", 200);
+    } catch(e){ console.warn("Error hiding toast", e); }
+  }, time);
 }
-
-// muestra números con decimales si los tienen, mantiene strings tal cual
-function formatShowValue(val) {
-  if (val === null || val === undefined || val === "") return "";
-  // si ya es número
-  if (typeof val === "number") {
-    // si tiene parte fraccional -> mostrar hasta 2 decimales sin eliminar ceros significativos
-    if (!Number.isInteger(val)) {
-      // elimina ceros finales innecesarios pero conserva al menos 1 decimal si corresponde
-      return Number(val).toString();
-    }
-    return String(val);
-  }
-  // si es string que representa número, intentamos mantener su forma
-  const maybeNum = Number(String(val).replace(/,/g, '.').trim());
-  if (!Number.isNaN(maybeNum)) {
-    if (!Number.isInteger(maybeNum)) return String(maybeNum);
-    return String(maybeNum);
-  }
-  // fallback: texto
-  return String(val);
-}
-
-if (typeof btnCancelModal !== 'undefined' && btnCancelModal && !btnCancelModal.dataset.cancelAttached) {
-  btnCancelModal.addEventListener('click', (e) => {
-    e.preventDefault();
-    if (!productForm || !modal) return;
-    // cerrar modal
-    modal.style.display = 'none';
-    // limpiar form
-    if (typeof clearProductFormFields === 'function') clearProductFormFields();
-    // resetear flags de edición
-    editMode = false;
-    editingCodigo = null;
-    // restaurar botón guardar
-    const saveBtnInside = productForm.querySelector('.btn-save');
-    if (saveBtnInside) {
-      saveBtnInside.disabled = false;
-      saveBtnInside.textContent = "Crear Producto";
-    }
-  });
-  btnCancelModal.dataset.cancelAttached = "true";
-}
-
-// ------------------- CONFIGURACIÓN ESPECÍFICA PARA TU ESTRUCTURA -------------------
-async function ensureProductosSinCodigoColumnMap() {
-  if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
-  PRODUCTOS_SIN_CODIGO_COLUMN_MAP = {};
-  if (!supabase) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
-  
+// ----------------- TOAST FORZADO + DEPURACIÓN -----------------
+(function setupForcedToast() {
+  // inject strong CSS so external CSS can't hide it
   try {
-    console.log("🔍 Detectando estructura de columnas de productos_sin_codigo...");
-    const { data, error } = await supabase.from("productos_sin_codigo").select("*").limit(5);
-    
-    if (error) {
-      console.warn("Error al detectar columnas:", error);
+    if (!document.getElementById("__forced_toast_styles")) {
+      const style = document.createElement("style");
+      style.id = "__forced_toast_styles";
+      style.textContent = `
+        /* regla fuerte para que el toast nunca quede oculto por CSS externo */
+        #toast, .toast {
+          display: -webkit-box !important;
+          display: -ms-flexbox !important;
+          display: flex !important;
+          -webkit-box-align: center !important;
+          -ms-flex-align: center !important;
+          align-items: center !important;
+          -webkit-box-pack: center !important;
+          -ms-flex-pack: center !important;
+          justify-content: center !important;
+          position: fixed !important;
+          top: 18px !important;
+          right: 18px !important;
+          z-index: 999999 !important;
+          padding: 10px 14px !important;
+          border-radius: 10px !important;
+          color: #fff !important;
+          font-weight: 600 !important;
+          box-shadow: 0 6px 20px rgba(2,6,23,0.18) !important;
+          transition: opacity 0.2s ease !important;
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
+        }
+        /* small helper class for error/ok colors if needed */
+        #toast.ok { background: linear-gradient(90deg,#16a34a,#059669) !important; }
+        #toast.err { background: linear-gradient(90deg,#ef4444,#dc2626) !important; }
+      `;
+      document.head.appendChild(style);
+    }
+  } catch (e) {
+    console.warn("No se pudo inyectar estilos de toast:", e);
+  }
+
+  // create toast if not exists
+  if (!document.getElementById("toast")) {
+    const t = document.createElement("div");
+    t.id = "toast";
+    t.className = "toast";
+    // inline defaults (seguros)
+    Object.assign(t.style, {
+      display: "flex",
+      position: "fixed",
+      top: "18px",
+      right: "18px",
+      zIndex: "999999",
+      padding: "10px 14px",
+      borderRadius: "10px",
+      color: "#fff",
+      fontWeight: "600",
+      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "opacity 0.2s ease",
+      opacity: "1",
+      visibility: "visible"
+    });
+    document.body.appendChild(t);
+    console.debug("setupForcedToast: #toast creado");
+  } else {
+    console.debug("setupForcedToast: #toast ya existía");
+  }
+})();
+
+function ensureToast() {
+  // ya creado en setupForcedToast, pero por compatibilidad comprobamos
+  if (!document.getElementById("toast")) {
+    const t = document.createElement("div");
+    t.id = "toast";
+    t.className = "toast";
+    Object.assign(t.style, {
+      display: "flex",
+      position: "fixed",
+      top: "18px",
+      right: "18px",
+      zIndex: "999999",
+      padding: "10px 14px",
+      borderRadius: "10px",
+      color: "#fff",
+      fontWeight: "600",
+      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
+      alignItems: "center",
+      justifyContent: "center",
+      transition: "opacity 0.2s ease",
+      opacity: "1",
+      visibility: "visible"
+    });
+    document.body.appendChild(t);
+    console.debug("ensureToast: creado de emergencia");
+  }
+}
+
+function showToast(msg, ok = true, time = 3000) {
+  ensureToast();
+  const toast = document.getElementById("toast");
+  if (!toast) {
+    // última línea de defensa
+    try { alert(msg); } catch(e){ console.error("alert fallback failed", e); }
+    console.warn("showToast: no hay #toast, se usó alert como fallback");
+    return;
+  }
+
+  // debug: mostrar en consola cada llamada
+  console.debug("showToast llamado:", { msg, ok, time });
+
+  // aplicar clase de color
+  toast.classList.remove("ok", "err");
+  toast.classList.add(ok ? "ok" : "err");
+
+  // Mensaje y visibilidad forzados (inline style con setProperty "important")
+  toast.textContent = msg;
+  try {
+    toast.style.setProperty("display", "flex", "important");
+    toast.style.setProperty("opacity", "1", "important");
+    toast.style.setProperty("visibility", "visible", "important");
+  } catch (e) {
+    // algunos navegadores/entornos pueden no soportar third arg; aun así debe funcionar
+    toast.style.display = "flex";
+    toast.style.opacity = "1";
+    toast.style.visibility = "visible";
+  }
+
+  // limpiar timeout previo
+  if (toast._t) clearTimeout(toast._t);
+
+  // auto hide
+  toast._t = setTimeout(() => {
+    try {
+      toast.style.setProperty("opacity", "0", "important");
+      toast.style.setProperty("visibility", "hidden", "important");
+      // pequeña espera antes de ocultar del todo
+      setTimeout(()=> {
+        try { toast.style.display = "none"; } catch(e){}
+      }, 180);
+    } catch (e) {
+      // fallback directo
+      toast.style.opacity = "0";
+      toast.style.visibility = "hidden";
+      setTimeout(()=> { toast.style.display = "none"; }, 180);
+    }
+  }, time);
+
+  // comprobación post-show: si por alguna razón sigue oculto -> fallback alert
+  setTimeout(() => {
+    try {
+      const cs = getComputedStyle(toast);
+      console.debug("showToast computedStyle:", { display: cs.display, visibility: cs.visibility, opacity: cs.opacity });
+      if ((cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) ) {
+        // fallback
+        console.warn("showToast: el toast sigue oculto — uso alert() como fallback");
+        try { alert(msg); } catch(e){ console.error("alert fallback failed", e); }
+      }
+    } catch (e) {
+      console.warn("showToast: error comprobando estilo computado", e);
+    }
+  }, 60);
+}
+
+//  showToast y añadir logs
+function showActionToast(action, success = true, details = "") {
+  const actions = {
+    create: { success: "✅ Producto creado exitosamente", error: "❌ Error al crear el producto" },
+    update: { success: "✏️ Producto actualizado exitosamente", error: "❌ Error al actualizar el producto" },
+    delete: { success: "🗑️ Producto eliminado exitosamente", error: "❌ Error al eliminar el producto" },
+    load: { success: "📦 Productos cargados exitosamente", error: "❌ Error al cargar productos" },
+    search: { success: "🔍 Búsqueda completada", error: "❌ Error en la búsqueda" },
+    entrada: { success: "📥 Entrada registrada exitosamente", error: "❌ Error al registrar entrada" },
+    salida: { success: "📦 Salida agregada a pendientes", error: "❌ Error al registrar salida" },
+    pendiente: { success: "⏳ Acción en pendientes completada", error: "❌ Error en pendientes" },
+    clear: { success: "🧹 Pendientes eliminados", error: "❌ Error al eliminar pendientes" },
+    historial: { success: "📜 Historial cargado", error: "❌ Error al cargar historial" },
+    auth: { success: "🔐 Sesión verificada", error: "❌ Error de autenticación" },
+    general: { success: "✅ Acción completada", error: "❌ Error en la acción" }
+  };
+
+  const messageType = actions[action] || actions.general;
+  const message = success ? messageType.success : messageType.error;
+  const fullMessage = details ? `${message}: ${details}` : message;
+
+  try {
+    console.debug("showActionToast:", { action, success, details, fullMessage });
+    showToast(fullMessage, success, success ? 3000 : 4500);
+  } catch (e) {
+    console.error("showActionToast error:", e);
+    try { alert(fullMessage); } catch(e2){ console.error("alert fallback failed", e2); }
+  }
+}
+
+
+  function showConfirm(message, onConfirm, onCancel) {
+    let modalC = document.getElementById("confirmModal");
+    if (!modalC) {
+      modalC = document.createElement("div");
+      modalC.id = "confirmModal";
+      Object.assign(modalC.style, { 
+        position: "fixed", 
+        inset: 0, 
+        display: "none", 
+        alignItems: "center", 
+        justifyContent: "center", 
+        background: "rgba(0,0,0,0.4)", 
+        zIndex: 20000 
+      });
+      modalC.innerHTML = `
+        <div class="modal-content" style="background:#fff;padding:18px;border-radius:10px;max-width:480px;width:95%">
+          <p id="confirmMessage" style="margin:0 0 16px 0;font-size:16px;color:#333"></p>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+            <button id="btnConfirmNo" style="padding:8px 16px;border:1px solid #d1d5db;background:#f9fafb;border-radius:6px;cursor:pointer">Cancelar</button>
+            <button id="btnConfirmYes" style="background:#ef4444;color:#fff;padding:8px 16px;border-radius:6px;border:none;cursor:pointer">Aceptar</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modalC);
+    }
+    modalC.style.display = "flex";
+    modalC.querySelector("#confirmMessage").textContent = message;
+    const yes = modalC.querySelector("#btnConfirmYes");
+    const no = modalC.querySelector("#btnConfirmNo");
+
+    function clean() {
+      modalC.style.display = "none";
+      yes.removeEventListener("click", y);
+      no.removeEventListener("click", n);
+    }
+    function y() { clean(); onConfirm?.(); }
+    function n() { clean(); onCancel?.(); }
+    yes.addEventListener("click", y);
+    no.addEventListener("click", n);
+  }
+
+  // -------------------- MAPA DE COLUMNAS (productos_sin_codigo) --------------------
+  async function ensureProductosSinCodigoColumnMap() {
+    if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
+    PRODUCTOS_SIN_CODIGO_COLUMN_MAP = {};
+    if (!supabase) {
+      showActionToast("auth", false, "Supabase no inicializado");
       return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
     }
-    
-    if (data && data.length > 0) {
-      const sampleRow = data[0];
-      console.log("📋 Columnas reales en tu BD productos_sin_codigo:", Object.keys(sampleRow));
-      
-      // Mapear todas las columnas encontradas
-      Object.keys(sampleRow).forEach((key) => {
-        PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(key)] = key;
-      });
-      
-      console.log("🗺️ Mapa de columnas normalizado:", PRODUCTOS_SIN_CODIGO_COLUMN_MAP);
-    }
-    
-    return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
-  } catch (e) {
-    console.error("Error en ensureProductosSinCodigoColumnMap:", e);
-    return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
-  }
-}
-
-// ------------------- FUNCIÓN ESPECÍFICA PARA TUS COLUMNAS -------------------
-function getRealColForInventoryLabel(invLabel) {
-  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
-  
-  console.log(`🔍 Buscando columna para: ${invLabel}`);
-  
-  // PARA TU ESTRUCTURA ESPECÍFICA - los nombres exactos de tus columnas
-  const columnMapping = {
-    'I069': 'INVENTARIO I069',
-    'I078': 'INVENTARIO I078', 
-    'I07F': 'INVENTARIO I07F',
-    'I312': 'INVENTARIO I312',
-    'I073': 'INVENTARIO I073',
-    'ALMACEN': 'INVENTARIO FISICO EN ALMACEN'
-  };
-
-  // Primero intentar con el mapeo directo
-  const directMap = columnMapping[invLabel];
-  if (directMap && PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(directMap)]) {
-    const realKey = PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(directMap)];
-    console.log(`✅ Columna encontrada por mapeo directo: ${realKey} para ${invLabel}`);
-    return realKey;
-  }
-
-  // Si no funciona, buscar variantes
-  const variants = [
-    `INVENTARIO ${invLabel}`,           // "INVENTARIO I069"
-    `INVENTARIO ${invLabel.toLowerCase()}`, // "INVENTARIO i069"
-    `INVENTARIO_${invLabel}`,           // "INVENTARIO_I069"
-    `INVENTARIO_${invLabel.toLowerCase()}`, // "INVENTARIO_i069"
-    `${invLabel}`,                      // "I069"
-    `${invLabel.toLowerCase()}`,        // "i069"
-  ];
-
-  for (const variant of variants) {
-    const normVariant = normalizeKeyName(variant);
-    if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant]) {
-      console.log(`✅ Columna encontrada por variante: ${PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant]} para ${invLabel}`);
-      return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normVariant];
-    }
-  }
-  
-  console.warn(`❌ No se encontró columna para: ${invLabel}`);
-  return null;
-}
-// ------------------- FUNCIÓN PARA EXTRAER CÓDIGO S/C -------------------
-function extraerCodigoSC(producto) {
-  if (!producto) return 'S/C';
-  
-  console.log("🔍 Buscando código S/C en producto:", producto);
-  
-  // Buscar directamente en la columna "CODIGO" que existe en tu BD
-  if (producto.CODIGO !== undefined && producto.CODIGO !== null && producto.CODIGO !== '') {
-    const codigo = String(producto.CODIGO).trim();
-    console.log(`✅ Código encontrado en columna 'CODIGO': "${codigo}"`);
-    return codigo;
-  }
-  
-  // Fallback: buscar en otras posibles columnas
-  const posiblesColumnas = ['CODIGO_SC', 'SC', 'S/C', 'CÓDIGO', 'Clave', 'SKU'];
-  for (const columna of posiblesColumnas) {
-    if (producto[columna] !== undefined && producto[columna] !== null && producto[columna] !== '') {
-      const codigo = String(producto[columna]).trim();
-      console.log(`✅ Código encontrado en columna '${columna}': "${codigo}"`);
-      return codigo;
-    }
-  }
-  
-  console.log("⚠️ No se encontró código, usando valor por defecto 'S/C'");
-  return 'S/C'; // Valor por defecto
-}
-// ------------------- FUNCIÓN PARA EXTRAER CÓDIGO S/C -------------------
-function extraerCodigoSC(producto) {
-  if (!producto) return 'S/C';
-  
-  console.log("🔍 Buscando código S/C en producto:", producto);
-  
-  // Buscar directamente en la columna "CODIGO" que existe en tu BD
-  if (producto.CODIGO !== undefined && producto.CODIGO !== null && producto.CODIGO !== '') {
-    const codigo = String(producto.CODIGO).trim();
-    console.log(`✅ Código encontrado en columna 'CODIGO': "${codigo}"`);
-    return codigo;
-  }
-  
-  // Fallback: buscar en otras posibles columnas
-  const posiblesColumnas = ['CODIGO_SC', 'SC', 'S/C', 'CÓDIGO', 'Clave', 'SKU'];
-  for (const columna of posiblesColumnas) {
-    if (producto[columna] !== undefined && producto[columna] !== null && producto[columna] !== '') {
-      const codigo = String(producto[columna]).trim();
-      console.log(`✅ Código encontrado en columna '${columna}': "${codigo}"`);
-      return codigo;
-    }
-  }
-  
-  console.log("⚠️ No se encontró código, usando valor por defecto 'S/C'");
-  return 'S/C'; // Valor por defecto
-}
-
-// ------------------- DIAGNÓSTICO COMPLETO -------------------
-async function diagnosticarProblemaCompleto() {
-  // ... el resto de tu código existente ...
-}
-// ------------------- RENDER TABLE  -------------------
-function renderTable(products) {
-  if (!tableBody) {
-    console.error("❌ tableBody no encontrado en el DOM");
-    return;
-  }
-  
-  // Asegurarse de que products es un array válido
-  if (!products || !Array.isArray(products)) {
-    console.warn("⚠️ renderTable recibió datos inválidos, usando array vacío");
-    products = [];
-  }
-  
-  console.log("🎨 Renderizando tabla con", products.length, "productos");
-  tableBody.innerHTML = "";
-
-  if (products.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;">No hay productos que coincidan con la búsqueda</td></tr>`;
-    return;
-  }
-
-  products.forEach((p, index) => {
-    // Obtener el código S/C 
-    const codigoSC = extraerCodigoSC(p);
-    
-    // Obtener stocks usando las columnas específicas de tu BD
-    const i069 = getStockFromProduct(p, "I069");
-    const i078 = getStockFromProduct(p, "I078");
-    const i07f = getStockFromProduct(p, "I07F");
-    const i312 = getStockFromProduct(p, "I312");
-    const i073 = getStockFromProduct(p, "I073");
-
-    // Calcular total
-    const stockReal = i069 + i078 + i07f + i312 + i073;
-    
-    // Debug para los primeros 2 productos
-    if (index < 2) {
-      console.log(`📊 Producto ${index + 1}: Código=${codigoSC}, I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
-    }
-
-    // Determinar clase de stock
-    let stockClass = "stock-high";
-    if (stockReal <= 1) stockClass = "stock-low";
-    else if (stockReal <= 10) stockClass = "stock-medium";
-
-    // Crear fila
-    const row = document.createElement("tr");
-    row.className = stockClass;
-
-    // Usar las columnas reales de tu BD
-    const descripcion = p.DESCRIPCION || "";
-    const um = p.UM || "";
-
-    row.innerHTML = `
-      <td>${escapeHtml(codigoSC)}</td>
-      <td>${escapeHtml(descripcion)}</td>
-      <td>${um}</td>
-      <td>${formatShowValue(i069)}</td>
-      <td>${formatShowValue(i078)}</td>
-      <td>${formatShowValue(i07f)}</td>
-      <td>${formatShowValue(i312)}</td>
-      <td>${formatShowValue(i073)}</td>
-      <td>${formatShowValue(stockReal)}</td>
-      <td class="acciones">
-        <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>✏️</span>
-          <span class="label">Editar</span>
-        </button>
-        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
-          <span class="icon-wrap" aria-hidden>🗑️</span>
-          <span class="label">Eliminar</span>
-        </button>
-        <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>📦</span>
-          <span class="label">Salida</span>
-        </button>
-      </td>
-    `;
-
-    tableBody.appendChild(row);
-  });
-
-  console.log("✅ Tabla renderizada correctamente con columna de código");
-}
-// ------------------- FUNCIÓN DE DIAGNÓSTICO PARA VER COLUMNAS -------------------
-async function diagnosticarColumnas() {
-  console.log("🔍 DIAGNÓSTICO DE COLUMNAS - Iniciando...");
-  
-  try {
-    // Obtener un producto de muestra para ver todas las columnas
-    const { data: productoMuestra, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*")
-      .limit(1)
-      .single();
-    
-    if (error) {
-      console.error("❌ Error al obtener producto de muestra:", error);
-      return;
-    }
-    
-    if (productoMuestra) {
-      console.log("📋 TODAS LAS COLUMNAS DISPONIBLES en productos_sin_codigo:");
-      console.log("---------------------------------------------------");
-      Object.keys(productoMuestra).forEach((columna, index) => {
-        console.log(`${index + 1}. ${columna}: ${productoMuestra[columna]}`);
-      });
-      console.log("---------------------------------------------------");
-      
-      // Probar la extracción de código
-      console.log(`🔍 Probando extracción de código...`);
-      const codigoExtraido = extraerCodigoSC(productoMuestra);
-      console.log(`✅ Código extraído: "${codigoExtraido}"`);
-    }
-    
-  } catch (err) {
-    console.error("❌ Error en diagnóstico de columnas:", err);
-  }
-}
-
-// Ejecutar el diagnóstico cuando se cargue la página
-document.addEventListener('DOMContentLoaded', function() {
-  setTimeout(diagnosticarColumnas, 2000);
-});
-// ------------------- DIAGNÓSTICO COMPLETO -------------------
-async function diagnosticarProblemaCompleto() {
-  console.log("🔧 DIAGNÓSTICO COMPLETO INICIADO");
-  
-  try {
-    // 1. Contar productos totales
-    const { count, error: countError } = await supabase
-      .from("productos_sin_codigo")
-      .select("*", { count: 'exact', head: true });
-    
-    if (countError) {
-      console.error("❌ Error al contar productos:", countError);
-    } else {
-      console.log(`📊 TOTAL de productos en BD: ${count}`);
-    }
-
-    // 2. Obtener muestra de productos
-    const { data: productos, error: productosError } = await supabase
-      .from("productos_sin_codigo")
-      .select("*")
-      .limit(10);
-
-    if (productosError) {
-      console.error("❌ Error al obtener productos:", productosError);
-      return;
-    }
-
-    console.log(`📦 Muestra de ${productos.length} productos obtenida`);
-    
-    // 3. Verificar columnas de inventario
-    console.log("🔍 Verificando columnas de inventario...");
-    const inventarios = ['I069', 'I078', 'I07F', 'I312', 'I073'];
-    
-    inventarios.forEach(inv => {
-      const columna = getRealColForInventoryLabel(inv);
-      if (columna) {
-        console.log(`   ${inv} → ${columna}`);
-      } else {
-        console.log(`   ❌ ${inv} → NO ENCONTRADO`);
-      }
-    });
-
-    // 4. Verificar valores de stock para los primeros productos
-    console.log("📊 Verificando stocks para primeros 3 productos:");
-    productos.slice(0, 3).forEach((producto, index) => {
-      console.log(`   Producto ${index + 1}:`);
-      inventarios.forEach(inv => {
-        const stock = getStockFromProduct(producto, inv);
-        console.log(`     ${inv}: ${stock}`);
-      });
-    });
-
-  } catch (error) {
-    console.error("❌ Error en diagnóstico completo:", error);
-  }
-}
-
-function showLoadingIndicator(show, message = "Cargando más productos...") {
-  let indicator = document.getElementById('loadingIndicator');
-  
-  if (show) {
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'loadingIndicator';
-      indicator.style.cssText = `
-        text-align: center; 
-        padding: 20px; 
-        color: #666;
-        background: #f8f9fa;
-        border-top: 1px solid #e9ecef;
-      `;
-      
-      indicator.innerHTML = `
-        <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        <span style="margin-left: 10px;">${message}</span>
-        <div style="font-size: 12px; margin-top: 5px; color: #888;">
-          ${allLoadedProducts.length} productos cargados
-          ${!hasMoreData ? ' • Carga completa' : ''}
-        </div>
-      `;
-      
-      if (tableBody) {
-        tableBody.parentNode.appendChild(indicator);
-      }
-    } else {
-      indicator.style.display = 'block';
-    }
-  } else if (indicator) {
-    indicator.style.display = 'none';
-  }
-}
-
-// ------------------- CARGAR TODOS LOS PRODUCTOS DE UNA VEZ -------------------
-async function loadAllProductsAtOnce() {
-  try {
-    showLoadingIndicator(true, "Cargando todos los productos...");
-    
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*")
-      .limit(2000); // Aumentar límite
-    
-    if (error) throw error;
-    
-    allLoadedProducts = data || [];
-    hasMoreData = false;
-    currentOffset = allLoadedProducts.length;
-    
-    renderTable(allLoadedProducts);
-    showToast(`✅ Todos los ${allLoadedProducts.length} productos cargados`, true);
-    
-  } catch (error) {
-    console.error("Error cargando todos los productos:", error);
-    showToast("Error cargando todos los productos", false);
-  } finally {
-    showLoadingIndicator(false);
-  }
-}
-
-// ------------------- BÚSQUEDA MEJORADA -------------------
-function setupSearch() {
-  if (searchInput) {
-    searchInput.replaceWith(searchInput.cloneNode(true));
-    const newSearchInput = document.getElementById("searchInput");
-    
-    newSearchInput.addEventListener('input', debounce(async (e) => {
-      const term = e.target.value.trim();
-      
-      if (term === '') {
-        // Mostrar productos cargados localmente
-        renderTable(allLoadedProducts);
-        return;
-      }
-      
-      console.log(`🔍 Buscando en tiempo real: "${term}"`);
-      
-      try {
-        // Búsqueda en Supabase para resultados completos
-        const { data, error } = await supabase
-          .from("productos_sin_codigo")
-          .select("*")
-          .or(`DESCRIPCION.ilike.%${term}%`)
-          .limit(100);
-          
-        if (error) throw error;
-        
-        console.log(`✅ Resultados de búsqueda: ${data?.length || 0}`);
-        renderTable(data || []);
-        
-      } catch (error) {
-        console.error("Error en búsqueda:", error);
-        // Fallback a búsqueda local
-        const localResults = allLoadedProducts.filter(producto => {
-          const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-          return descripcion.includes(term.toLowerCase());
-        });
-        renderTable(localResults);
-      }
-    }, 300));
-  }
-}
-
-// ------------------- CARGA PROGRESIVA OPTIMIZADA -------------------
-async function loadMoreProducts() {
-  if (!supabase || isLoading || !hasMoreData) return;
-
-  try {
-    isLoading = true;
-    showLoadingIndicator(true);
-
-    console.log(`🔄 Cargando productos — offset ${currentOffset} (lote ${BATCH_SIZE})...`);
-
-    const { data, error, count } = await supabase
-      .from("productos_sin_codigo")
-      .select("*", { count: 'exact' })
-      .range(currentOffset, currentOffset + BATCH_SIZE - 1);
-
-    if (error) throw error;
-
-    if (!data || data.length === 0) {
-      hasMoreData = false;
-      console.log("✅ Todos los productos han sido cargados");
-      showToast(`Carga completa: ${allLoadedProducts.length} productos`, true);
-    } else {
-      // Acumular productos
-      allLoadedProducts = [...allLoadedProducts, ...data];
-      currentOffset += data.length;
-      
-      console.log(`✅ Lote cargado: ${data.length} items — Total acumulado: ${allLoadedProducts.length}`);
-      
-      // Solo renderizar si no hay término de búsqueda activo
-      if (!searchInput || !searchInput.value.trim()) {
-        renderTable(allLoadedProducts);
-      }
-      updatePendingCount();
-    }
-
-  } catch (ex) {
-    console.error("❌ Error en loadMoreProducts:", ex);
-    showToast("Error cargando productos", false);
-  } finally {
-    isLoading = false;
-    showLoadingIndicator(false);
-  }
-}
-
-// ------------------- BÚSQUEDA HÍBRIDA (LOCAL + SERVIDOR) -------------------
-let searchTimeout = null;
-let lastSearchTerm = "";
-
-function performHybridSearch(term) {
-  if (searchTimeout) clearTimeout(searchTimeout);
-  
-  if (term === '') {
-    renderTable(allLoadedProducts);
-    return;
-  }
-  
-  // Búsqueda inmediata en datos locales
-  const localResults = allLoadedProducts.filter(producto => {
-    const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-    const searchTerm = term.toLowerCase();
-    
-    return descripcion.includes(searchTerm);
-  });
-  
-  console.log(`🔍 Búsqueda local: ${localResults.length} resultados`);
-  renderTable(localResults);
-  
-  // Si tenemos todos los datos, no necesitamos buscar en servidor
-  if (!hasMoreData) return;
-  
-  // Búsqueda en servidor después de delay (para términos largos)
-  searchTimeout = setTimeout(async () => {
-    if (term.length >= 3) { // Solo buscar en servidor para términos de 3+ caracteres
-      await performServerSearch(term);
-    }
-  }, 800);
-}
-
-async function performServerSearch(term) {
-  try {
-    console.log(`🌐 Buscando en servidor: "${term}"`);
-    
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*")
-      .or(`DESCRIPCION.ilike.%${term}%`)
-      .limit(200);
-      
-    if (error) throw error;
-    
-    if (data && data.length > 0) {
-      console.log(`✅ Resultados servidor: ${data.length}`);
-      
-      // Combinar con resultados locales y eliminar duplicados
-      const combinedResults = [...data];
-      const existingIds = new Set(data.map(p => p.id));
-      
-      allLoadedProducts.forEach(producto => {
-        if (!existingIds.has(producto.id)) {
-          const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-          const searchTerm = term.toLowerCase();
-          
-          if (descripcion.includes(searchTerm)) {
-            combinedResults.push(producto);
-            existingIds.add(producto.id);
-          }
-        }
-      });
-      
-      renderTable(combinedResults);
-    }
-  } catch (error) {
-    console.error("Error en búsqueda servidor:", error);
-    // Mantener resultados locales en caso de error
-  }
-}
-
-function setupSearch() {
-  if (searchInput) {
-    searchInput.replaceWith(searchInput.cloneNode(true));
-    const newSearchInput = document.getElementById("searchInput");
-    
-    newSearchInput.addEventListener('input', (e) => {
-      const term = e.target.value.trim();
-      performHybridSearch(term);
-    });
-    
-    // Enter para forzar búsqueda en servidor
-    newSearchInput.addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') {
-        const term = e.target.value.trim();
-        if (term) performServerSearch(term);
-      }
-    });
-  }
-}
-
-function showLoadingIndicator(show, message = "Cargando más productos...") {
-  let indicator = document.getElementById('loadingIndicator');
-  
-  if (show) {
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'loadingIndicator';
-      indicator.style.cssText = `
-        text-align: center; 
-        padding: 20px; 
-        color: #666;
-        background: #f8f9fa;
-        border-top: 1px solid #e9ecef;
-      `;
-      
-      indicator.innerHTML = `
-        <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-        <span style="margin-left: 10px;">${message}</span>
-        <div style="font-size: 12px; margin-top: 5px; color: #888;">
-          ${allLoadedProducts.length} productos cargados
-          ${!hasMoreData ? ' • Carga completa' : ''}
-        </div>
-      `;
-      
-      if (tableBody) {
-        tableBody.parentNode.appendChild(indicator);
-      }
-    } else {
-      indicator.style.display = 'block';
-    }
-  } else if (indicator) {
-    indicator.style.display = 'none';
-  }
-}
-
-// ------------------- DEBOUNCE HELPER -------------------
-function debounce(func, wait, immediate) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      timeout = null;
-      if (!immediate) func.apply(this, args);
-    };
-    const callNow = immediate && !timeout;
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-    if (callNow) func.apply(this, args);
-  };
-}
-
-// Función para cargar inicialmente
-function loadInitialProducts() {
-  currentOffset = 0;
-  hasMoreData = true;
-  allLoadedProducts = [];
-  currentFilteredProducts = [];
-  
-  // Limpiar tabla
-  if (tableBody) {
-    tableBody.innerHTML = '';
-  }
-  
-  // Ocultar controles de paginación
-  const paginationControls = document.getElementById('paginationControls');
-  if (paginationControls) {
-    paginationControls.style.display = 'none';
-  }
-  
-  loadMoreProducts();
-}
-
-// Indicador de carga
-function showLoadingIndicator(show) {
-  let indicator = document.getElementById('loadingIndicator');
-  
-  if (show) {
-    if (!indicator) {
-      indicator = document.createElement('div');
-      indicator.id = 'loadingIndicator';
-      indicator.innerHTML = `
-        <div style="text-align: center; padding: 20px; color: #666;">
-          <div style="display: inline-block; width: 20px; height: 20px; border: 2px solid #f3f3f3; border-top: 2px solid #3498db; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-          <span style="margin-left: 10px;">Cargando más productos...</span>
-        </div>
-      `;
-      
-      // Agregar estilos CSS para la animación
-      if (!document.querySelector('#loadingStyles')) {
-        const style = document.createElement('style');
-        style.id = 'loadingStyles';
-        style.textContent = `
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `;
-        document.head.appendChild(style);
-      }
-      
-      if (tableBody) {
-        tableBody.parentNode.appendChild(indicator);
-      }
-    } else {
-      indicator.style.display = 'block';
-    }
-  } else if (indicator) {
-    indicator.style.display = 'none';
-  }
-}
-
-// Configurar infinite scroll
-function setupInfiniteScroll() {
-  const options = {
-    root: null,
-    rootMargin: '100px',
-    threshold: 0.1
-  };
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting && !isLoading && hasMoreData) {
-        loadMoreProducts();
-      }
-    });
-  }, options);
-
-  // Crear elemento observador
-  let sentinel = document.getElementById('scrollSentinel');
-  if (!sentinel) {
-    sentinel = document.createElement('div');
-    sentinel.id = 'scrollSentinel';
-    sentinel.style.height = '1px';
-    document.querySelector('.container').appendChild(sentinel);
-  }
-  
-  observer.observe(sentinel);
-}
-
-// ------------------- RENDER TABLE CORREGIDA -------------------
-function renderTable(products) {
-  if (!tableBody) {
-    console.error("❌ tableBody no encontrado en el DOM");
-    return;
-  }
-  
-  // Asegurarse de que products es un array válido
-  if (!products || !Array.isArray(products)) {
-    console.warn("⚠️ renderTable recibió datos inválidos, usando array vacío");
-    products = [];
-  }
-  
-  console.log("🎨 Renderizando tabla con", products.length, "productos");
-  tableBody.innerHTML = "";
-
-  if (products.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="11" style="text-align:center;">No hay productos que coincidan con la búsqueda</td></tr>`;
-    return;
-  }
-
-  products.forEach((p, index) => {
-    // Obtener el código S/C 
-    const codigoSC = extraerCodigoSC(p);
-    
-    // Obtener stocks usando las columnas específicas de tu BD
-    const i069 = getStockFromProduct(p, "I069");
-    const i078 = getStockFromProduct(p, "I078");
-    const i07f = getStockFromProduct(p, "I07F");
-    const i312 = getStockFromProduct(p, "I312");
-    const i073 = getStockFromProduct(p, "I073");
-
-    // Calcular total
-    const stockReal = i069 + i078 + i07f + i312 + i073;
-    
-    // Debug para los primeros 2 productos
-    if (index < 2) {
-      console.log(`📊 Producto ${index + 1}: Código=${codigoSC}, I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
-    }
-
-    // Determinar clase de stock
-    let stockClass = "stock-high";
-    if (stockReal <= 1) stockClass = "stock-low";
-    else if (stockReal <= 10) stockClass = "stock-medium";
-
-    // Crear fila
-    const row = document.createElement("tr");
-    row.className = stockClass;
-
-    // Usar las columnas reales de tu BD
-    const descripcion = p.DESCRIPCION || "";
-    const um = p.UM || "";
-
-    row.innerHTML = `
-      <td>${escapeHtml(codigoSC)}</td>
-      <td>${escapeHtml(descripcion)}</td>
-      <td>${um}</td>
-    `;
-
-    // Agregar las celdas de inventario
-    const inventarios = [i069, i078, i07f, i312, i073];
-    inventarios.forEach(stock => {
-      const td = document.createElement("td");
-      td.textContent = formatShowValue(stock);
-      row.appendChild(td);
-    });
-
-    // Agregar celda de total
-    const tdTotal = document.createElement("td");
-    tdTotal.textContent = formatShowValue(stockReal);
-    row.appendChild(tdTotal);
-
-    // Agregar celda de acciones
-    const tdAcciones = document.createElement("td");
-    tdAcciones.className = "acciones";
-    tdAcciones.innerHTML = `
-      <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-        <span class="icon-wrap" aria-hidden>✏️</span>
-        <span class="label">Editar</span>
-      </button>
-      <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
-        <span class="icon-wrap" aria-hidden>🗑️</span>
-        <span class="label">Eliminar</span>
-      </button>
-      <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-        <span class="icon-wrap" aria-hidden>📦</span>
-        <span class="label">Salida</span>
-      </button>
-    `;
-    row.appendChild(tdAcciones);
-
-    tableBody.appendChild(row);
-  });
-
-  console.log("✅ Tabla renderizada correctamente con columna de código");
-}
-
-// ------------------- INICIALIZACIÓN -------------------
-document.addEventListener('DOMContentLoaded', function() {
-  // Ocultar controles de paginación
-  const paginationControls = document.getElementById('paginationControls');
-  if (paginationControls) {
-    paginationControls.style.display = 'none';
-  }
-
-  // Configurar infinite scroll y búsqueda
-  setupInfiniteScroll();
-  setupSearch();
-  
-  // Carga inicial
-  loadInitialProducts();
-  
-  // Configurar botón de refresh
-  if (refreshBtn) {
-    refreshBtn.addEventListener('click', () => {
-      loadInitialProducts();
-    });
-  }
-  
-  // Configurar modal
-  if (btnOpenModal && modal) {
-    btnOpenModal.addEventListener('click', () => {
-      modal.style.display = 'block';
-    });
-  }
-  
-  if (btnCloseModal && modal) {
-    btnCloseModal.addEventListener('click', () => {
-      modal.style.display = 'none';
-    });
-  }
-});
-
-// ------------------- FUNCIONES DE ACTUALIZACIÓN (para mantener compatibilidad) -------------------
-function reloadAllProducts() {
-  loadInitialProducts();
-}
-
-// Función para mantener compatibilidad con tu código existente
-async function loadProducts(page = 0) {
-  console.warn("⚠️ loadProducts con paginación está obsoleta, usando carga progresiva");
-  loadInitialProducts();
-}
-
-// ------------------- MANTENER COMPATIBILIDAD CON FUNCIONES EXISTENTES -------------------
-// Estas funciones deben mantenerse igual que en tu código original
-function updatePendingCount() {
-  // Tu implementación existente
-}
-
-function clearProductFormFields() {
-  // Tu implementación existente  
-}
-
-function editarProducto(producto) {
-  // Tu implementación existente
-}
-
-function eliminarProducto(id) {
-  // Tu implementación existente
-}
-
-function openSalidaModal(producto) {
-  // Tu implementación existente
-}
-
-// ------------------- FUNCIONES RESTANTES DE TU CÓDIGO ORIGINAL -------------------
-
-// Función para escapar HTML (si no la tienes)
-function escapeHtml(text) {
-  if (text === null || text === undefined) return "";
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-function getRealColForName(preferredName) {
-  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
-  const norm = normalizeKeyName(preferredName);
-  return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm] || null;
-}
-
-// Inicializar cuando el DOM esté listo
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
-
-function init() {
-  console.log("🚀 Inicializando sistema de inventario con carga progresiva para productos sin código...");
-}
-
-// ------------------- RENDER TABLE MEJORADA -------------------
-function renderTable(products) {
-  if (!tableBody) {
-    console.error("❌ tableBody no encontrado en el DOM");
-    return;
-  }
-  
-  console.log("🎨 Renderizando tabla con", products.length, "productos");
-  tableBody.innerHTML = "";
-
-  if (!products || products.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">No hay productos</td></tr>`;
-    return;
-  }
-
-  products.forEach((p, index) => {
-    // Obtener stocks usando las columnas específicas de tu BD
-    const i069 = getStockFromProduct(p, "I069");
-    const i078 = getStockFromProduct(p, "I078");
-    const i07f = getStockFromProduct(p, "I07F");
-    const i312 = getStockFromProduct(p, "I312");
-    const i073 = getStockFromProduct(p, "I073");
-
-    // Calcular total
-    const stockReal = i069 + i078 + i07f + i312 + i073;
-    
-    // Debug para los primeros 2 productos
-    if (index < 2) {
-      console.log(`📊 Producto: I069=${i069}, I078=${i078}, I07F=${i07f}, I312=${i312}, I073=${i073}, TOTAL=${stockReal}`);
-    }
-
-    // Determinar clase de stock
-    let stockClass = "stock-high";
-    if (stockReal <= 1) stockClass = "stock-low";
-    else if (stockReal <= 10) stockClass = "stock-medium";
-
-    // Crear fila
-    const row = document.createElement("tr");
-    row.className = stockClass;
-
-    // Usar las columnas reales de tu BD
-    const descripcion = p.DESCRIPCION || "";
-    const um = p.UM || "";
-
-    row.innerHTML = `
-      <td>${escapeHtml(descripcion)}</td>
-      <td>${um}</td>
-      <td>${formatShowValue(i069)}</td>
-      <td>${formatShowValue(i078)}</td>
-      <td>${formatShowValue(i07f)}</td>
-      <td>${formatShowValue(i312)}</td>
-      <td>${formatShowValue(i073)}</td>
-      <td>${formatShowValue(stockReal)}</td>
-      <td class="acciones">
-        <button class="btn btn-edit" onclick="editarProducto(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>✏️</span>
-          <span class="label">Editar</span>
-        </button>
-        <button class="btn btn-delete" onclick="eliminarProducto('${p.id}')">
-          <span class="icon-wrap" aria-hidden>🗑️</span>
-          <span class="label">Eliminar</span>
-        </button>
-        <button class="btn btn-salida" onclick="openSalidaModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-          <span class="icon-wrap" aria-hidden>📦</span>
-          <span class="label">Salida</span>
-        </button>
-      </td>
-    `;
-
-    tableBody.appendChild(row);
-  });
-
-  console.log("✅ Tabla renderizada correctamente");
-}
-
-// ------------------- CONFIGURACIÓN DE PAGINACIÓN MEJORADA -------------------
-let currentPage = 1;
-const ITEMS_PER_PAGE = 500;
-let totalProducts = 0;
-let paginatedProducts = [];
-let allProductsFromServer = [];
-
-// ------------------- FUNCIONES DE PAGINACIÓN -------------------
-function setupPagination() {
-    // Crear controles de paginación si no existen
-    let paginationContainer = document.getElementById('paginationControls');
-    
-    if (!paginationContainer) {
-        paginationContainer = document.createElement('div');
-        paginationContainer.id = 'paginationControls';
-        paginationContainer.style.cssText = `
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            margin: 20px 0;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            flex-wrap: wrap;
-            border: 1px solid #e9ecef;
-        `;
-        
-        // Insertar después de la tabla
-        const table = document.getElementById('inventoryTable');
-        if (table) {
-            table.parentNode.insertBefore(paginationContainer, table.nextSibling);
-        }
-    }
-    
-    // MOSTRAR LA PAGINACIÓN AUTOMÁTICAMENTE
-    paginationContainer.style.display = 'flex';
-    
-    updatePaginationControls();
-}
-
-function updatePaginationControls() {
-    const paginationContainer = document.getElementById('paginationControls');
-    if (!paginationContainer) return;
-    
-    const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
-    const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
-    
-    paginationContainer.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <button id="firstPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
-                ⏮️ Primera
-            </button>
-            <button id="prevPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
-                ◀️ Anterior
-            </button>
-            
-            <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
-                <span style="font-weight: 600; color: #495057;">Página</span>
-                <input 
-                    type="number" 
-                    id="pageInput" 
-                    value="${currentPage}" 
-                    min="1" 
-                    max="${totalPages}" 
-                    style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ced4da; border-radius: 4px; font-weight: bold;"
-                >
-                <span style="font-weight: 600; color: #495057;">de ${totalPages}</span>
-            </div>
-            
-            <button id="nextPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
-                Siguiente ▶️
-            </button>
-            <button id="lastPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
-                Última ⏭️
-            </button>
-            
-            <div style="margin-left: 10px; font-weight: 600; color: #495057; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
-                📊 Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${totalProducts}</strong> productos
-            </div>
-        </div>
-    `;
-    
-    // Agregar estilos a los botones si no existen
-    if (!document.querySelector('#paginationStyles')) {
-        const style = document.createElement('style');
-        style.id = 'paginationStyles';
-        style.textContent = `
-            .pagination-btn {
-                padding: 10px 16px;
-                border: 1px solid #007bff;
-                background: #007bff;
-                color: white;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                min-width: 100px;
-            }
-            .pagination-btn:hover:not(:disabled) {
-                background: #0056b3;
-                border-color: #0056b3;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,123,255,0.3);
-            }
-            .pagination-btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-                background: #6c757d;
-                border-color: #6c757d;
-                transform: none;
-                box-shadow: none;
-            }
-            #pageInput:focus {
-                outline: none;
-                border-color: #007bff;
-                box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // Event listeners
-    document.getElementById('firstPage').addEventListener('click', () => goToPage(1));
-    document.getElementById('prevPage').addEventListener('click', () => goToPage(currentPage - 1));
-    document.getElementById('nextPage').addEventListener('click', () => goToPage(currentPage + 1));
-    document.getElementById('lastPage').addEventListener('click', () => goToPage(totalPages));
-    
-    const pageInput = document.getElementById('pageInput');
-    pageInput.addEventListener('change', (e) => {
-        const page = parseInt(e.target.value);
-        if (page >= 1 && page <= totalPages) {
-            goToPage(page);
-        } else {
-            e.target.value = currentPage;
-            showToast(`Por favor ingresa un número entre 1 y ${totalPages}`, false);
-        }
-    });
-    
-    pageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const page = parseInt(e.target.value);
-            if (page >= 1 && page <= totalPages) {
-                goToPage(page);
-            }
-        }
-    });
-}
-
-function goToPage(page) {
-    if (page < 1 || page > Math.ceil(totalProducts / ITEMS_PER_PAGE)) return;
-    
-    currentPage = page;
-    renderCurrentPage();
-    updatePaginationControls();
-    
-    // Scroll suave hacia la parte superior de la tabla
-    const table = document.querySelector('#inventoryTable');
-    if (table) {
-        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    
-    console.log(`📄 Navegando a página ${page}`);
-}
-
-function getCurrentPageItems() {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return paginatedProducts.slice(startIndex, endIndex);
-}
-
-function renderCurrentPage() {
-    const currentItems = getCurrentPageItems();
-    renderTable(currentItems);
-    
-    // Actualizar información en consola
-    console.log(`🎨 Renderizando página ${currentPage}: ${currentItems.length} productos`);
-}
-
-// ------------------- CARGA COMPLETA DE TODOS LOS PRODUCTOS -------------------
-async function loadAllProductsWithPagination() {
-    if (!supabase) {
-        console.error("Supabase no inicializado");
-        showToast("Supabase no está inicializado", false);
-        return;
-    }
-
     try {
-        console.log("🔄 Cargando TODOS los productos de Supabase desde productos_sin_codigo...");
-        showToast("Cargando todos los productos...", true);
+      const { data, error } = await supabase.from("productos_sin_codigo").select("*").limit(1);
+      if (error) {
+        console.warn("ensureProductosSinCodigoColumnMap error:", error);
+        showActionToast("general", false, "Error al cargar mapa de columnas");
+        return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
+      }
+      if (data && data.length > 0) {
+        const sample = data[0];
+        Object.keys(sample).forEach(k => { PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(k)] = k; });
+        showActionToast("general", true, "Mapa de columnas cargado");
+      }
+    } catch (e) { 
+      console.warn(e);
+      showActionToast("general", false, "Excepción en mapa de columnas");
+    }
+    return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
+  }
+
+  function getRealColForInventoryLabel(invLabel) {
+    if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
+    if (!invLabel) return null;
+    const candidates = [
+      `INVENTARIO ${invLabel}`,
+      `INVENTARIO_${invLabel}`,
+      `${invLabel}`,
+      invLabel.toLowerCase(),
+      `inventario_${invLabel.toLowerCase()}`,
+      `inventario ${invLabel}`
+    ];
+    for (const c of candidates) {
+      const nk = normalizeKeyName(c);
+      if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP[nk]) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[nk];
+    }
+    for (const k in PRODUCTOS_SIN_CODIGO_COLUMN_MAP) {
+      if (k.includes("inventario") && k.includes(normalizeKeyName(invLabel))) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[k];
+    }
+    for (const k in PRODUCTOS_SIN_CODIGO_COLUMN_MAP) {
+      if (k.includes("inventario")) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[k];
+    }
+    return null;
+  }
+
+  function getStockFromProduct(productObj, inventoryLabel) {
+    if (!productObj) return 0;
+    const keys = Object.keys(productObj);
+    const normMap = new Map(keys.map(k => [normalizeKeyName(k), k]));
+    const variants = [`inventario ${inventoryLabel}`, `inventario_${inventoryLabel}`, `${inventoryLabel}`, `${inventoryLabel.toLowerCase()}`];
+    for (const v of variants) {
+      const nk = normalizeKeyName(v);
+      if (normMap.has(nk)) return toNumber(productObj[normMap.get(nk)]);
+    }
+    for (const k of keys) {
+      const nk = normalizeKeyName(k);
+      if (nk.includes("inventario") || nk.includes("almacen")) return toNumber(productObj[k]);
+    }
+    return 0;
+  }
+
+  // -------------------- TABLE SCROLL CONTAINER --------------------
+  function ensureTableScrollContainer() {
+    let wrapper = document.querySelector(".table-scroll-container");
+    if (!wrapper && inventoryTable) {
+      wrapper = document.createElement("div");
+      wrapper.className = "table-scroll-container";
+      wrapper.style.overflow = "auto";
+      wrapper.style.maxHeight = "64vh";
+      wrapper.style.padding = "6px";
+      wrapper.style.borderRadius = "8px";
+      wrapper.style.border = "1px solid rgba(0,0,0,0.04)";
+      inventoryTable.parentNode.insertBefore(wrapper, inventoryTable);
+      wrapper.appendChild(inventoryTable);
+    }
+    return wrapper;
+  }
+
+  // -------------------- BÚSQUEDA LOCAL MEJORADA --------------------
+  let localSearchIndex = [];
+
+  function prepareLocalSearchIndex() {
+    if (!allProductsFromServer || allProductsFromServer.length === 0) {
+      showActionToast("search", false, "No hay datos para indexar");
+      return;
+    }
+    
+    try {
+      localSearchIndex = allProductsFromServer.map(product => {
+        const searchableText = [
+          product.CODIGO || '',
+          product.DESCRIPCION || '',
+          product.UM || ''
+        ].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
-        // Forzar recreación del mapa de columnas
-        PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
-        await ensureProductosSinCodigoColumnMap();
-        
-        // Primero obtener el conteo total
-        const { count, error: countError } = await supabase
-            .from("productos_sin_codigo")
-            .select("*", { count: 'exact', head: true });
-        
-        if (countError) throw countError;
-        
-        console.log(`📊 Total de productos en BD: ${count}`);
-        
-        // Cargar todos los productos usando paginación interna
-        const allProducts = [];
-        const BATCH_SIZE = 1000;
-        let hasMore = true;
-        let from = 0;
-        
-        while (hasMore) {
-            console.log(`📦 Cargando lote desde ${from}...`);
-            
-            const { data, error } = await supabase
-                .from("productos_sin_codigo")
-                .select("*")
-                .range(from, from + BATCH_SIZE - 1);
-            
-            if (error) throw error;
-            
-            if (data && data.length > 0) {
-                allProducts.push(...data);
-                console.log(`✅ Lote cargado: ${data.length} productos`);
-                
-                if (data.length < BATCH_SIZE) {
-                    hasMore = false;
-                    console.log("🏁 Último lote alcanzado");
-                } else {
-                    from += BATCH_SIZE;
-                }
-            } else {
-                hasMore = false;
-                console.log("🏁 No hay más productos");
-            }
+        return {
+          id: product.id,
+          searchableText: searchableText,
+          product: product
+        };
+      });
+      showActionToast("search", true, `Índice local creado con ${localSearchIndex.length} productos`);
+    } catch (error) {
+      console.error("Error creando índice local:", error);
+      showActionToast("search", false, "Error creando índice de búsqueda");
+    }
+  }
+
+  function performLocalSearch(term) {
+    if (!term || term.length === 0) {
+      return allProductsFromServer.slice();
+    }
+    
+    const normalizedTerm = term.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    const results = localSearchIndex
+      .filter(item => item.searchableText.includes(normalizedTerm))
+      .map(item => item.product)
+      .slice(0, 1000);
+
+    return results;
+  }
+
+  // -------------------- LOAD / SEARCH (PAGINATED) MEJORADO --------------------
+  async function loadAllProductsWithPagination() {
+    if (!supabase) { 
+      showActionToast("load", false, "Supabase no inicializado"); 
+      return; 
+    }
+    try {
+      showActionToast("load", true, "Cargando productos...");
+      PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
+      await ensureProductosSinCodigoColumnMap();
+
+      // cargar en lotes
+      const BATCH = 1000;
+      let offset = 0;
+      allProductsFromServer = [];
+      while (true) {
+        const { data, error } = await supabase.from("productos_sin_codigo").select("*").order("id", { ascending: true }).range(offset, offset + BATCH - 1);
+        if (error) {
+          showActionToast("load", false, `Error en lote ${offset}: ${error.message}`);
+          throw error;
         }
-        
-        // Actualizar variables globales
-        window.allProducts = allProducts;
-        allProductsFromServer = [...allProducts];
-        paginatedProducts = [...allProducts];
-        totalProducts = allProducts.length;
-        
-        console.log(`🎉 CARGA COMPLETADA: ${totalProducts} productos cargados`);
-        
-        // CONFIGURAR PAGINACIÓN AUTOMÁTICAMENTE
-        setupPagination();
-        
-        // Mostrar primera página
+        if (!data || data.length === 0) break;
+        allProductsFromServer = allProductsFromServer.concat(data);
+        if (data.length < BATCH) break;
+        offset += data.length;
+      }
+
+      paginatedProducts = allProductsFromServer.slice();
+      currentPage = 1;
+      totalProducts = paginatedProducts.length;
+      ensureTableScrollContainer();
+      ensurePaginationControlsExist();
+      renderCurrentPage();
+      updatePaginationControls();
+      
+      // Preparar índice de búsqueda local
+      prepareLocalSearchIndex();
+      
+      showActionToast("load", true, `${allProductsFromServer.length} productos cargados exitosamente`);
+    } catch (err) {
+      console.error("loadAllProductsWithPagination err:", err);
+      showActionToast("load", false, `Error: ${err.message}`);
+    }
+  }
+
+  async function performServerSearchWithPagination(term) {
+    if (!supabase) {
+      showActionToast("search", false, "Conexión no disponible");
+      return;
+    }
+    try {
+      showActionToast("search", true, "Buscando en servidor...");
+      
+      const q = term.replace(/'/g, "''");
+      const { data, error } = await supabase.from("productos_sin_codigo").select("*").or(`DESCRIPCION.ilike.%${q}%,CODIGO.ilike.%${q}%`).order("id", { ascending: true }).limit(5000);
+      
+      if (error) {
+        showActionToast("search", false, `Error del servidor: ${error.message}`);
+        throw error;
+      }
+      
+      paginatedProducts = data || [];
+      currentPage = 1;
+      renderCurrentPage();
+      updatePaginationControls();
+      
+      const resultCount = paginatedProducts.length;
+      if (resultCount > 0) {
+        showActionToast("search", true, `${resultCount} productos encontrados en servidor`);
+      } else {
+        showActionToast("search", false, "No se encontraron productos en el servidor");
+      }
+    } catch (err) {
+      console.error("search err:", err);
+      showActionToast("search", false, `Error en búsqueda: ${err.message}`);
+      
+      // Fallback a búsqueda local
+      const localResults = performLocalSearch(term);
+      paginatedProducts = localResults;
+      currentPage = 1;
+      renderCurrentPage();
+      updatePaginationControls();
+      
+      if (localResults.length > 0) {
+        showActionToast("search", true, `${localResults.length} productos encontrados localmente`);
+      }
+    }
+  }
+
+  function setupSearchWithPagination() {
+    if (!searchInput) {
+      showActionToast("general", false, "Campo de búsqueda no encontrado");
+      return;
+    }
+    
+    let lastSearchTerm = '';
+    let searchMode = 'local';
+    
+    const performSearch = debounce((term) => {
+      term = term.trim();
+      
+      if (!term) {
+        searchMode = 'local';
+        paginatedProducts = allProductsFromServer.slice();
         currentPage = 1;
         renderCurrentPage();
-        updatePendingCount();
+        updatePaginationControls();
+        showActionToast("search", true, "Búsqueda limpiada");
+        return;
+      }
+      
+      // Si el término es muy corto, usar búsqueda local
+      if (term.length <= 2) {
+        searchMode = 'local';
+        const localResults = performLocalSearch(term);
+        paginatedProducts = localResults;
         
-        showToast(`✅ ${totalProducts} productos cargados - Página 1 de ${Math.ceil(totalProducts / ITEMS_PER_PAGE)}`, true);
-        
-    } catch (ex) {
-        console.error("❌ Error cargando productos:", ex);
-        showToast("Error cargando todos los productos", false);
-    }
-}
-
-// ------------------- BÚSQUEDA COMPATIBLE CON PAGINACIÓN -------------------
-function setupSearchWithPagination() {
-    if (searchInput) {
-        searchInput.replaceWith(searchInput.cloneNode(true));
-        const newSearchInput = document.getElementById("searchInput");
-        
-        newSearchInput.addEventListener('input', debounce(async (e) => {
-            const term = e.target.value.trim();
-            
-            if (term === '') {
-                // Restaurar todos los productos con paginación
-                paginatedProducts = [...allProductsFromServer];
-                totalProducts = paginatedProducts.length;
-                currentPage = 1;
-                renderCurrentPage();
-                updatePaginationControls();
-                console.log("🔄 Búsqueda limpiada - Mostrando todos los productos");
-                return;
-            }
-            
-            console.log(`🔍 Buscando: "${term}" en ${allProductsFromServer.length} productos`);
-            
-            try {
-                // Búsqueda en los datos locales (más rápido)
-                const searchResults = allProductsFromServer.filter(producto => {
-                    const descripcion = String(producto.DESCRIPCION || "").toLowerCase();
-                    const searchTerm = term.toLowerCase();
-                    
-                    return descripcion.includes(searchTerm);
-                });
-                
-                console.log(`✅ Búsqueda local: ${searchResults.length} resultados`);
-                
-                // Actualizar productos paginados con resultados de búsqueda
-                paginatedProducts = searchResults;
-                totalProducts = paginatedProducts.length;
-                currentPage = 1;
-                renderCurrentPage();
-                updatePaginationControls();
-                
-                if (searchResults.length === 0) {
-                    showToast("No se encontraron productos con ese criterio", false);
-                } else {
-                    showToast(`Encontrados ${searchResults.length} productos`, true);
-                }
-                
-            } catch (error) {
-                console.error("Error en búsqueda:", error);
-                showToast("Error en la búsqueda", false);
-            }
-        }, 300));
-        
-        // Enter para búsqueda en servidor como respaldo
-        newSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const term = e.target.value.trim();
-                if (term) performServerSearchWithPagination(term);
-            }
-        });
-    }
-}
-
-async function performServerSearchWithPagination(term) {
-    try {
-        console.log(`🌐 Búsqueda en servidor: "${term}"`);
-        
-        const { data, error } = await supabase
-            .from("productos_sin_codigo")
-            .select("*", { count: 'exact' })
-            .or(`DESCRIPCION.ilike.%${term}%`)
-            .order("id", { ascending: true });
-            
-        if (error) throw error;
-        
-        console.log(`✅ Resultados servidor: ${data?.length || 0}`);
-        
-        if (data && data.length > 0) {
-            paginatedProducts = data;
-            totalProducts = data.length;
-            currentPage = 1;
-            renderCurrentPage();
-            updatePaginationControls();
-            showToast(`Encontrados ${data.length} productos en servidor`, true);
-        }
-    } catch (error) {
-        console.error("Error en búsqueda servidor:", error);
-        // Mantener resultados locales en caso de error
-    }
-}
-
-// ------------------- BOTÓN MOSTRAR TODOS TEMPORALMENTE -------------------
-function addShowAllButton() {
-    const showAllBtn = document.createElement('button');
-    showAllBtn.innerHTML = '📋 Ver Todos los Productos';
-    showAllBtn.id = 'showAllBtn';
-    showAllBtn.style.cssText = `
-        position: fixed;
-        bottom: 140px;
-        right: 10px;
-        z-index: 10000;
-        background: #28a745;
-        color: white;
-        border: none;
-        padding: 12px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    `;
-    
-    showAllBtn.addEventListener('mouseenter', () => {
-        showAllBtn.style.background = '#218838';
-        showAllBtn.style.transform = 'translateY(-2px)';
-    });
-    
-    showAllBtn.addEventListener('mouseleave', () => {
-        showAllBtn.style.background = '#28a745';
-        showAllBtn.style.transform = 'translateY(0)';
-    });
-    
-    showAllBtn.addEventListener('click', () => {
-        // Mostrar todos los productos sin paginación
-        renderTable(allProductsFromServer);
-        
-        // Ocultar controles de paginación
-        const paginationControls = document.getElementById('paginationControls');
-        if (paginationControls) {
-            paginationControls.style.display = 'none';
-        }
-        
-        showAllBtn.innerHTML = '✅ Todos Visibles';
-        showToast(`Mostrando todos los ${allProductsFromServer.length} productos`, true);
-        
-        // Restaurar paginación después de 8 segundos automáticamente
-        setTimeout(() => {
-            renderCurrentPage();
-            if (paginationControls) {
-                paginationControls.style.display = 'flex';
-            }
-            showAllBtn.innerHTML = '📋 Ver Todos los Productos';
-            showToast("Paginación restaurada", true);
-        }, 8000);
-    });
-    
-    document.body.appendChild(showAllBtn);
-}
-
-function updatePaginationControls() {
-    const paginationContainer = document.getElementById('paginationControls');
-    if (!paginationContainer) return;
-    
-    const totalPages = Math.ceil(totalProducts / ITEMS_PER_PAGE);
-    const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1;
-    const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalProducts);
-    
-    paginationContainer.innerHTML = `
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-            <button id="firstPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
-                ⏮️ Primera
-            </button>
-            <button id="prevPage" class="pagination-btn" ${currentPage === 1 ? 'disabled' : ''}>
-                ◀️ Anterior
-            </button>
-            
-            <div style="display: flex; align-items: center; gap: 8px; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
-                <span style="font-weight: 600; color: #495057;">Página</span>
-                <input 
-                    type="number" 
-                    id="pageInput" 
-                    value="${currentPage}" 
-                    min="1" 
-                    max="${totalPages}" 
-                    style="width: 70px; padding: 6px; text-align: center; border: 1px solid #ced4da; border-radius: 4px; font-weight: bold;"
-                >
-                <span style="font-weight: 600; color: #495057;">de ${totalPages}</span>
-            </div>
-            
-            <button id="nextPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
-                Siguiente ▶️
-            </button>
-            <button id="lastPage" class="pagination-btn" ${currentPage === totalPages ? 'disabled' : ''}>
-                Última ⏭️
-            </button>
-            
-            <div style="margin-left: 10px; font-weight: 600; color: #495057; background: white; padding: 8px 12px; border-radius: 6px; border: 1px solid #dee2e6;">
-                📊 Mostrando <strong>${startItem}-${endItem}</strong> de <strong>${totalProducts}</strong> productos
-            </div>
-        </div>
-    `;
-    
-    // Agregar estilos a los botones si no existen
-    if (!document.querySelector('#paginationStyles')) {
-        const style = document.createElement('style');
-        style.id = 'paginationStyles';
-        style.textContent = `
-            .pagination-btn {
-                padding: 10px 16px;
-                border: 1px solid #007bff;
-                background: #007bff;
-                color: white;
-                border-radius: 6px;
-                cursor: pointer;
-                font-size: 14px;
-                font-weight: 600;
-                transition: all 0.3s ease;
-                min-width: 100px;
-            }
-            .pagination-btn:hover:not(:disabled) {
-                background: #0056b3;
-                border-color: #0056b3;
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,123,255,0.3);
-            }
-            .pagination-btn:disabled {
-                opacity: 0.5;
-                cursor: not-allowed;
-                background: #6c757d;
-                border-color: #6c757d;
-                transform: none;
-                box-shadow: none;
-            }
-            #pageInput:focus {
-                outline: none;
-                border-color: #007bff;
-                box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
-            }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    // Event listeners
-    document.getElementById('firstPage').addEventListener('click', () => goToPage(1));
-    document.getElementById('prevPage').addEventListener('click', () => goToPage(currentPage - 1));
-    document.getElementById('nextPage').addEventListener('click', () => goToPage(currentPage + 1));
-    document.getElementById('lastPage').addEventListener('click', () => goToPage(totalPages));
-    
-    const pageInput = document.getElementById('pageInput');
-    pageInput.addEventListener('change', (e) => {
-        const page = parseInt(e.target.value);
-        if (page >= 1 && page <= totalPages) {
-            goToPage(page);
+        if (localResults.length > 0) {
+          showActionToast("search", true, `${localResults.length} productos encontrados localmente`);
         } else {
-            e.target.value = currentPage;
-            showToast(`Por favor ingresa un número entre 1 y ${totalPages}`, false);
+          showActionToast("search", false, "No se encontraron productos localmente");
         }
-    });
-    
-    pageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const page = parseInt(e.target.value);
-            if (page >= 1 && page <= totalPages) {
-                goToPage(page);
-            }
-        }
-    });
-}
+      } 
+      // Si el término es más largo, buscar en servidor
+      else {
+        searchMode = 'server';
+        performServerSearchWithPagination(term);
+        return;
+      }
+      
+      currentPage = 1;
+      renderCurrentPage();
+      updatePaginationControls();
+      
+    }, 300);
 
-function goToPage(page) {
-    if (page < 1 || page > Math.ceil(totalProducts / ITEMS_PER_PAGE)) return;
-    
-    currentPage = page;
-    renderCurrentPage();
-    updatePaginationControls();
-    
-    // Scroll suave hacia la parte superior de la tabla
-    const table = document.querySelector('#inventoryTable');
-    if (table) {
-        table.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    searchInput.addEventListener("input", (e) => {
+      const term = e.target.value.trim();
+      
+      if (!term) {
+        searchMode = 'local';
+        paginatedProducts = allProductsFromServer.slice();
+        currentPage = 1;
+        renderCurrentPage();
+        updatePaginationControls();
+        return;
+      }
+      
+      if (!term.startsWith(lastSearchTerm)) {
+        searchMode = 'local';
+      }
+      
+      lastSearchTerm = term;
+      performSearch(term);
+    });
+
+    // También buscar al pegar texto
+    searchInput.addEventListener("paste", (e) => {
+      setTimeout(() => {
+        const term = searchInput.value.trim();
+        if (term) {
+          searchMode = 'local';
+          performSearch(term);
+        }
+      }, 100);
+    });
+  }
+
+  // -------------------- RENDER TABLA --------------------
+  function formatShowValue(v) { return v === null || v === undefined ? "0" : String(v); }
+
+  function renderTable(products) {
+    if (!tableBody) { 
+      showActionToast("general", false, "Tabla no encontrada en el DOM");
+      return; 
     }
     
-    console.log(`📄 Navegando a página ${page}`);
-}
+    try {
+      tableBody.innerHTML = "";
+      
+      if (!products || products.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:#666;">No hay productos que coincidan con la búsqueda</td></tr>`;
+        return;
+      }
 
-function getCurrentPageItems() {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    return paginatedProducts.slice(startIndex, endIndex);
-}
+      const frag = document.createDocumentFragment();
+      
+      products.forEach((p) => {
+        const i069 = getStockFromProduct(p, "I069");
+        const i078 = getStockFromProduct(p, "I078");
+        const i07f = getStockFromProduct(p, "I07F");
+        const i312 = getStockFromProduct(p, "I312");
+        const i073 = getStockFromProduct(p, "I073");
+        const almacen = getStockFromProduct(p, "ALMACEN") || 0;
+        const stockReal = i069 + i078 + i07f + i312 + i073 + almacen;
 
-function renderCurrentPage() {
-    const currentItems = getCurrentPageItems();
-    renderTable(currentItems);
-    
-    // Actualizar información en consola
-    console.log(`🎨 Renderizando página ${currentPage}: ${currentItems.length} productos`);
-}
+        const tr = document.createElement("tr");
+        if (stockReal <= 1) tr.classList.add("stock-low");
+        else if (stockReal <= 10) tr.classList.add("stock-medium");
+        else tr.classList.add("stock-high");
 
-// Botones flotantes compactos
-function addForceRefreshButton() {
-    const btn = document.createElement('button');
-    btn.innerHTML = '🔄 Recargar';
-    btn.style.cssText = `
-        position: fixed;
-        bottom: 80px;
-        right: 10px;
-        z-index: 10000;
-        background: #ff6b35;
-        color: white;
-        border: none;
-        padding: 12px 16px;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: bold;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-        transition: all 0.3s ease;
-    `;
-    
-    btn.addEventListener('mouseenter', () => {
-        btn.style.background = '#e55a2b';
-        btn.style.transform = 'translateY(-2px)';
-    });
-    
-    btn.addEventListener('mouseleave', () => {
-        btn.style.background = '#ff6b35';
-        btn.style.transform = 'translateY(0)';
-    });
-    
-    btn.addEventListener('click', async () => {
-        console.log("💥 Forzando recarga completa de todos los productos...");
-        btn.disabled = true;
-        btn.innerHTML = '⏳ Cargando...';
-        
-        PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
-        allProductsFromServer = [];
-        paginatedProducts = [];
-        
-        await loadAllProductsWithPagination();
-        
-        btn.disabled = false;
-        btn.innerHTML = '🔄 Recargar Todos';
-        setTimeout(() => {
-            btn.innerHTML = '🔄 Recargar';
-        }, 2000);
-    });
-    
-    document.body.appendChild(btn);
-}
+        // Crear celdas más eficientemente
+        tr.innerHTML = `
+          <td>${escapeHtml(nl(p.CODIGO) || "S/C")}</td>
+          <td>${escapeHtml(nl(p.DESCRIPCION))}</td>
+          <td>${escapeHtml(nl(p.UM))}</td>
+          <td>${String(i069)}</td>
+          <td>${String(i078)}</td>
+          <td>${String(i07f)}</td>
+          <td>${String(i312)}</td>
+          <td>${String(i073)}</td>
+          <td>${String(stockReal)}</td>
+          <td class="acciones">
+            <button class="btn-edit" title="Editar">✏️</button>
+            <button class="btn-delete" title="Eliminar">🗑️</button>
+            <button class="btn-salida" title="Registrar Salida">📦</button>
+            <button class="btn-entrada" title="Registrar Entrada">📥</button>
+            <button class="btn-historial" title="Historial de entradas">📜</button>
+          </td>
+        `;
 
-// ------------------- FUNCIÓN LOADPRODUCTS CON PAGINACIÓN AUTOMÁTICA -------------------
-async function loadProducts() {
-    // Usar la función que incluye paginación automática
+        // Añadir event listeners
+        const btnEdit = tr.querySelector(".btn-edit");
+        const btnDelete = tr.querySelector(".btn-delete");
+        const btnSalida = tr.querySelector(".btn-salida");
+        const btnEntrada = tr.querySelector(".btn-entrada");
+        const btnHist = tr.querySelector(".btn-historial");
+
+        btnEdit.addEventListener("click", () => editarProductoById(p.id));
+        btnDelete.addEventListener("click", () => eliminarProducto(String(p.id)));
+        btnSalida.addEventListener("click", () => registrarSalida(p));
+        btnEntrada.addEventListener("click", () => openEntradaModalById(p));
+        btnHist.addEventListener("click", () => openEntradaHistoryModal(p));
+
+        frag.appendChild(tr);
+      });
+
+      tableBody.appendChild(frag);
+      showActionToast("general", true, `${products.length} productos renderizados`);
+      
+    } catch (error) {
+      console.error("Error renderizando tabla:", error);
+      showActionToast("general", false, "Error al renderizar la tabla");
+    }
+  }
+
+  // -------------------- PAGINACIÓN --------------------
+  function ensurePaginationControlsExist() {
+    let container = document.getElementById("paginationControls");
+    if (!container) {
+      container = document.createElement("div");
+      container.id = "paginationControls";
+      container.className = "pagination-compact";
+      container.style.margin = "12px 0";
+      const wrapper = document.querySelector(".table-scroll-container") || inventoryTable.parentNode;
+      wrapper.parentNode.insertBefore(container, wrapper.nextSibling);
+    }
+    return container;
+  }
+
+  function updatePaginationControls() {
+    try {
+      const container = ensurePaginationControlsExist();
+      const total = paginatedProducts.length;
+      totalProducts = total;
+      const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+      if (currentPage > totalPages) currentPage = totalPages;
+      const start = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+      const end = Math.min(currentPage * ITEMS_PER_PAGE, total);
+
+      container.style.display = "";
+      container.innerHTML = `
+        <div style="display:flex;gap:8px;align-items:center;justify-content:center;padding:8px;flex-wrap:wrap">
+          <button id="firstPage" ${currentPage===1?'disabled':''} title="Primera página">⏮️</button>
+          <button id="prevPage" ${currentPage===1?'disabled':''} title="Página anterior">◀️</button>
+          <span>Página</span>
+          <input id="pageInput" type="number" value="${currentPage}" min="1" max="${totalPages}" style="width:60px;text-align:center" title="Ir a página" />
+          <span>de ${totalPages}</span>
+          <button id="nextPage" ${currentPage===totalPages?'disabled':''} title="Página siguiente">▶️</button>
+          <button id="lastPage" ${currentPage===totalPages?'disabled':''} title="Última página">⏭️</button>
+          <div style="margin-left:12px">📊 ${total===0?0:start}-${end} de ${total}</div>
+        </div>
+      `;
+      
+      container.querySelector("#firstPage").addEventListener("click", ()=>goToPage(1));
+      container.querySelector("#prevPage").addEventListener("click", ()=>goToPage(currentPage-1));
+      container.querySelector("#nextPage").addEventListener("click", ()=>goToPage(currentPage+1));
+      container.querySelector("#lastPage").addEventListener("click", ()=>goToPage(totalPages));
+      container.querySelector("#pageInput").addEventListener("change", (e)=> {
+        let p = parseInt(e.target.value) || 1;
+        if (p < 1) p = 1;
+        if (p > totalPages) p = totalPages;
+        goToPage(p);
+      });
+      
+    } catch (error) {
+      console.error("Error actualizando controles de paginación:", error);
+      showActionToast("general", false, "Error en controles de paginación");
+    }
+  }
+
+  function getCurrentPageItems() {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return paginatedProducts.slice(start, start + ITEMS_PER_PAGE);
+  }
+
+  function renderCurrentPage() { 
+    try {
+      renderTable(getCurrentPageItems());
+    } catch (error) {
+      showActionToast("general", false, "Error al renderizar página actual");
+    }
+  }
+  // intenta encontrar el botón (por id o por texto) y crear/actualizar badge
+(function ensureVerSalidasBadgeOnProductsPage(){
+  try {
+    // buscar botón por id o por texto "ver salidas"
+    const btn = document.getElementById('btnVerSalidas') ||
+                Array.from(document.querySelectorAll('button,a')).find(el => el.textContent && /ver\s+salidas/i.test(el.textContent));
+    if (!btn) {
+      console.debug("ensureVerSalidasBadge: botón 'Ver Salidas' no encontrado en esta página");
+      return;
+    }
+    // añadir clase para posicionar badge
+    if (!btn.classList.contains('has-badge')) btn.classList.add('has-badge');
+
+    // crear badge si no existe
+    let badge = document.getElementById('verSalidasBadge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.id = 'verSalidasBadge';
+      badge.className = 'button-badge';
+      btn.appendChild(badge);
+    }
+
+    // actualizar con el número real
+    const count = (typeof getPendingSalidas === 'function') ? getPendingSalidas().length : 0;
+    if (!count) badge.style.display = 'none';
+    else { badge.style.display = 'inline-block'; badge.textContent = count > 99 ? '99+' : String(count); }
+    console.debug("ensureVerSalidasBadge: aplicado, count=", count);
+  } catch (err) {
+    console.error("ensureVerSalidasBadge error:", err);
+  }
+})();
+
+
+  function goToPage(page) {
+    try {
+      const totPages = Math.max(1, Math.ceil(paginatedProducts.length / ITEMS_PER_PAGE));
+      if (page < 1) page = 1;
+      if (page > totPages) page = totPages;
+      currentPage = page;
+      renderCurrentPage();
+      updatePaginationControls();
+      showActionToast("general", true, `Página ${page} de ${totPages}`);
+    } catch (error) {
+      showActionToast("general", false, "Error al cambiar de página");
+    }
+  }
+
+  // -------------------- CRUD PRODUCTOS --------------------
+// Reemplaza la función saveProductFromForm por esta versión
+async function saveProductFromForm(ev) {
+  ev && ev.preventDefault && ev.preventDefault();
+  if (!productForm) {
+    showActionToast("general", false, "Formulario no disponible");
+    return;
+  }
+
+  const btnSave = productForm.querySelector(".btn-save");
+  const prevText = btnSave ? btnSave.textContent : null;
+
+  // --- Helpers de similitud (se definen si no existen) ---
+  if (typeof normalizeTextForCompare === "undefined") {
+    window.normalizeTextForCompare = function(s){
+      if (!s) return "";
+      return String(s)
+        .trim()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    };
+  }
+  if (typeof levenshteinDistance === "undefined") {
+    window.levenshteinDistance = function(a,b){
+      const as = String(a||""), bs = String(b||"");
+      if (as === bs) return 0;
+      const la = as.length, lb = bs.length;
+      if (la === 0) return lb;
+      if (lb === 0) return la;
+      let v0 = new Array(lb+1), v1 = new Array(lb+1);
+      for (let j=0;j<=lb;j++) v0[j]=j;
+      for (let i=0;i<la;i++){
+        v1[0]=i+1;
+        for (let j=0;j<lb;j++){
+          const cost = as[i] === bs[j] ? 0 : 1;
+          v1[j+1] = Math.min(v1[j] + 1, v0[j+1] + 1, v0[j] + cost);
+        }
+        const tmp = v0; v0 = v1; v1 = tmp;
+      }
+      return v0[lb];
+    };
+  }
+  if (typeof similarityRatio === "undefined") {
+    window.similarityRatio = function(a,b){
+      const na = normalizeTextForCompare(a);
+      const nb = normalizeTextForCompare(b);
+      if (!na && !nb) return 1;
+      if (!na || !nb) return 0;
+      const dist = levenshteinDistance(na, nb);
+      const maxLen = Math.max(na.length, nb.length);
+      return maxLen === 0 ? 1 : (1 - (dist / maxLen));
+    };
+  }
+
+  try {
+    if (!supabase) { showActionToast("create", false, "Conexión a BD no disponible"); return; }
+
+    if (btnSave) { btnSave.disabled = true; btnSave.textContent = editMode ? "Guardando..." : "Creando..."; }
+
+    const descripcion = (productForm.querySelector('[name="descripcion"]')?.value || "").trim();
+    const um = (productForm.querySelector('[name="um"]')?.value || "").trim();
+
+    if (!descripcion) {
+      showActionToast("create", false, "La descripción es obligatoria");
+      if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
+      return;
+    }
+
+    // --- comprobar similitud con productos existentes (solo en creación) ---
+    if (!editMode) {
+      try {
+        // buscar candidatos por texto parecido (ilike) para limitar resultados
+        const q = descripcion.replace(/'/g, "''");
+        const { data: candidates, error: candErr } = await supabase
+          .from("productos_sin_codigo")
+          .select("id, DESCRIPCION")
+          .ilike("DESCRIPCION", `%${q}%`)
+          .limit(30);
+
+        if (candErr) {
+          console.warn("saveProductFromForm: error buscando candidatos:", candErr);
+          // no bloqueamos si falla la búsqueda; procedemos a inserción
+        } else if (Array.isArray(candidates) && candidates.length > 0) {
+          const THRESHOLD = 0.70; // ajustar si quieres más o menos estricto
+          const similars = [];
+          for (const c of candidates) {
+            const candDesc = c.DESCRIPCION || "";
+            const sim = similarityRatio(descripcion, candDesc);
+            if (sim >= THRESHOLD) similars.push({ id: c.id, descripcion: candDesc, score: sim });
+          }
+          if (similars.length > 0) {
+            similars.sort((a,b) => b.score - a.score);
+            const top = similars.slice(0,3).map(s => `• "${s.descripcion}" (${Math.round(s.score*100)}%)`).join("\n");
+            showActionToast("create", false, `Existe(n) producto(s) muy similar(es):\n${top}`);
+            if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("saveProductFromForm: excepción al buscar similares:", err);
+        // no bloqueamos; continuamos
+      }
+    }
+
+    // --- insertar o actualizar ---
+    if (editMode && editingId) {
+      const upd = { DESCRIPCION: descripcion, UM: um };
+      const { error } = await supabase.from("productos_sin_codigo").update(upd).eq("id", editingId);
+
+      if (error) {
+        showActionToast("update", false, error.message || "Error al actualizar");
+        throw error;
+      }
+
+      showActionToast("update", true, `"${descripcion}" actualizado`);
+        } else {
+        // --- NUEVO: comprobación de duplicados por DESCRIPCION (similar) ---
+        // normalizamos la descripcion para la búsqueda
+        const descripcionNorm = descripcion.replace(/'/g, "''").trim();
+        if (!descripcionNorm) {
+          showActionToast("create", false, "Descripción vacía");
+          return;
+        }
+
+        try {
+          // Buscar coincidencias aproximadas en servidor: usamos ilike con la frase completa
+          // y una sub-frase (primeros 10 caracteres) para aumentar chances de detectar "similares".
+          const short = descripcionNorm.substring(0, Math.min(10, descripcionNorm.length));
+          const orQuery = `DESCRIPCION.ilike.%${descripcionNorm}%,DESCRIPCION.ilike.%${short}%`;
+          const { data: dup, error: dupErr } = await supabase
+            .from("productos_sin_codigo")
+            .select("id, DESCRIPCION")
+            .or(orQuery)
+            .limit(1);
+
+          if (dupErr) {
+            console.warn("Error buscando duplicados:", dupErr);
+            // no bloqueamos por fallo de búsqueda, pero avisamos
+            showActionToast("create", false, "Error comprobando duplicados (revisa consola)");
+            return;
+          }
+          if (dup && dup.length > 0) {
+            // Si hay una coincidencia devolvemos un mensaje y no insertamos
+            showActionToast("create", false, `Ya existe un producto con descripción parecida: "${dup[0].DESCRIPCION}"`);
+            return;
+          }
+        } catch (err) {
+          console.error("Error en check duplicados:", err);
+          showActionToast("create", false, "Error comprobando duplicados");
+          return;
+        }
+
+        // --- Preparar objeto a insertar ---
+        await ensureProductosSinCodigoColumnMap();
+        const insertObj = {
+          CODIGO: "S/C",               // <-- importante: no puede ser null; usamos "S/C"
+          DESCRIPCION: descripcion,
+          UM: um || null
+        };
+
+        // inicializar las columnas de inventario (si existen) a 0
+        ["I069","I078","I07F","I312","I073","ALMACEN"].forEach(lbl => {
+          const col = getRealColForInventoryLabel(lbl);
+          if (col) insertObj[col] = 0;
+        });
+
+        // finalmente insertar
+        const { error } = await supabase.from("productos_sin_codigo").insert([insertObj]);
+
+        if (error) {
+          console.error("Error al insertar producto:", error);
+          showActionToast("create", false, error.message || "Error al crear producto");
+          throw error;
+        }
+
+        showActionToast("create", true, `"${descripcion}" creado`);
+      }
+
+
+    closeProductModal();
     await loadAllProductsWithPagination();
+
+  } catch (err) {
+    console.error("saveProductFromForm err:", err);
+    showActionToast(editMode ? "update" : "create", false, (err && err.message) ? err.message : "Error inesperado");
+  } finally {
+    if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
+    editMode = false; editingId = null;
+  }
 }
 
-function setupSearch() {
-    setupSearchWithPagination();
-}
+  function clearProductFormFields() {
+    if (!productForm) return;
+    productForm.reset();
+    editMode = false; 
+    editingId = null;
+  }
 
-// ------------------- INICIALIZACIÓN -------------------
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("📄 DOM cargado - Iniciando con paginación automática para productos sin código...");
+  function openProductModal() {
+    if (!modal) {
+      showActionToast("general", false, "Modal no disponible");
+      return;
+    }
     
-    // Configurar búsqueda con paginación
-    setupSearchWithPagination();
+    try {
+      modal.style.display = "flex";
+      const title = modal.querySelector("#modalTitle");
+      if (title) title.textContent = "Agregar Producto";
+      const saveBtn = productForm?.querySelector(".btn-save");
+      if (saveBtn) saveBtn.textContent = "💾 Guardar";
+      showActionToast("general", true, "Modal de producto abierto");
+    } catch (error) {
+      showActionToast("general", false, "Error al abrir modal");
+    }
+  }
+
+  function closeProductModal() {
+    if (!modal) return;
     
-    // CARGAR PRODUCTOS CON PAGINACIÓN AUTOMÁTICAMENTE
-    loadAllProductsWithPagination();
-});
+    try {
+      modal.style.display = "none";
+      clearProductFormFields();
+      showActionToast("general", true, "Modal cerrado");
+    } catch (error) {
+      showActionToast("general", false, "Error al cerrar modal");
+    }
+  }
 
-// Mantener compatibilidad con funciones existentes
-function reloadAllProducts() {
-    loadAllProductsWithPagination();
-}
+  function editarProductoById(id) {
+    try {
+      const prod = allProductsFromServer.find(x => String(x.id) === String(id));
+      if (!prod) { 
+        showActionToast("update", false, "Producto no encontrado"); 
+        return; 
+      }
+      
+      if (!modal || !productForm) { 
+        showActionToast("update", false, "Formulario no disponible"); 
+        return; 
+      }
+      
+      editMode = true;
+      editingId = prod.id;
+      modal.style.display = "flex";
+      const setVal = (name, val) => { 
+        const el = productForm.querySelector(`[name="${name}"]`); 
+        if (el) el.value = val ?? ""; 
+      };
+      
+      setVal("descripcion", prod.DESCRIPCION ?? "");
+      setVal("um", prod.UM ?? "");
+      
+      const title = modal.querySelector("#modalTitle"); 
+      if (title) title.textContent = "Editar Producto";
+      
+      const saveBtn = productForm.querySelector(".btn-save"); 
+      if (saveBtn) saveBtn.textContent = "Guardar Cambios";
+      
+      showActionToast("update", true, `Editando: ${prod.DESCRIPCION}`);
+      
+    } catch (error) {
+      showActionToast("update", false, "Error al preparar edición");
+    }
+  }
 
-// ------------------- INIT COMPLETO -------------------
-async function initializeApp() {
-  console.log("🚀 Inicializando aplicación para productos sin código...");
+  async function eliminarProducto(id) {
+    if (!id) {
+      showActionToast("delete", false, "ID no válido");
+      return;
+    }
+    
+    try {
+      const { data: producto, error: fetchErr } = await supabase.from("productos_sin_codigo").select("DESCRIPCION").eq("id", id).maybeSingle();
+      
+      if (fetchErr) {
+        showActionToast("delete", false, fetchErr.message);
+        throw fetchErr;
+      }
+      
+      const nombre = producto?.DESCRIPCION || `id ${id}`;
+      
+      showConfirm(`¿Eliminar el producto "${nombre}"? Esta acción no se puede deshacer.`, 
+        async ()=> {
+          try {
+            const { error } = await supabase.from("productos_sin_codigo").delete().eq("id", id);
+            
+            if (error) { 
+              showActionToast("delete", false, error.message); 
+              throw error; 
+            }
+            
+            showActionToast("delete", true, `"${nombre}" eliminado`);
+            await loadAllProductsWithPagination();
+            
+          } catch (err) {
+            console.error("eliminarProducto err:", err);
+            showActionToast("delete", false, err.message);
+          }
+        }, 
+        ()=>{
+          showActionToast("delete", true, "Eliminación cancelada");
+        }
+      );
+      
+    } catch (err) {
+      console.error("eliminarProducto err:", err);
+      showActionToast("delete", false, err.message);
+    }
+  }
+// -------------------- BADGE PARA VER SALIDAS --------------------
+function updateVerSalidasBadge(count) {
+  const btn = document.getElementById('btnVerSalidas');
+  if (!btn) return;
   
+  // Asegurar que el botón tenga posición relativa para el badge
+  if (!btn.classList.contains('has-badge')) {
+    btn.classList.add('has-badge');
+    btn.style.position = 'relative';
+  }
+
+  let badge = document.getElementById('verSalidasBadge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = 'verSalidasBadge';
+    badge.className = 'ver-salidas-badge';
+    badge.style.cssText = `
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    `;
+    btn.appendChild(badge);
+  }
+
+  if (!count || count === 0) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  badge.style.display = 'flex';
+  badge.textContent = count > 99 ? '99+' : String(count);
+}
+
+// Modificar la función addPendingSalida para actualizar el badge
+// Lee pendientes intentando múltiples keys y normalizando
+function getPendingSalidas(){
   try {
-    // Paso 1: Forzar detección de columnas
-    PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
-    await ensureProductosSinCodigoColumnMap();
-    
-    // Paso 2: Diagnóstico completo
-    await diagnosticarProblemaCompleto();
-    
-    // Paso 3: Cargar productos
-    await loadProducts();
-    
-    // Paso 4: Actualizar UI
-    await renderPendingList();
-    await cargarHistorialSalidas();
-    updatePendingCount();
-    
-    console.log("✅ Aplicación inicializada correctamente");
-    
-  } catch (error) {
-    console.error("❌ Error en inicialización:", error);
-  }
-}
-
-// ------------------- REEMPLAZAR EL EVENTO DOMContentLoaded -------------------
-document.addEventListener("DOMContentLoaded", async () => {
-  console.log("📄 DOM cargado, iniciando aplicación para productos sin código...");
-  
-  await setResponsableFromAuth();
-  await initializeApp();
-  
-  // Event listeners
-  if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
-  if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
-  if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
-});
-
-// Agregar el botón después de que cargue la página
-setTimeout(addForceRefreshButton, 2000);
-
-// Función para escapar HTML (si no la tienes)
-function escapeHtml(text) {
-  if (text === null || text === undefined) return "";
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}
-
-// ------------------- FUNCIÓN CORREGIDA PARA OBTENER NOMBRES DE COLUMNAS -------------------
-function getRealColForName(preferredName) {
-  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return preferredName;
-  
-  const norm = normalizeKeyName(preferredName);
-  const realName = PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
-  
-  console.log(`🔍 Buscando columna: "${preferredName}" -> normalizada: "${norm}" -> encontrada: "${realName}"`);
-  
-  return realName || preferredName;
-}
-
-function getRealColForInventoryLabel(invLabel) {
-  if (!PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return null;
-
-  const variants = inventoryKeyVariants(invLabel);
-
-  // soporte explícito para ALMACEN -> incluir nombres esperables
-  if (String(invLabel || "").trim().toUpperCase() === "ALMACEN") {
-    variants.push("INVENTARIO FISICO EN ALMACEN");
-    variants.push("inventario_fisico_en_almacen");
-    variants.push("almacen");
-    variants.push("stock_almacen");
-  }
-
-  for (const v of variants) {
-    const norm = normalizeKeyName(v);
-    if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm]) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
-  }
-  // fallback: primera columna que contenga 'inventario' o 'almacen'
-  for (const norm in PRODUCTOS_SIN_CODIGO_COLUMN_MAP) {
-    if (norm.includes("inventario") || norm.includes("almacen")) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP[norm];
-  }
-  return null;
-}
-
-// ------------------- Helpers para 'salidas pendientes' en localStorage -------------------
-function getPendingSalidas() {
-  try {
-    const raw = localStorage.getItem("salidas_pendientes_sin_codigo");
-    return raw ? JSON.parse(raw) : [];
-  } catch {
+    // primero la key canonical
+    let raw = localStorage.getItem(PENDING_KEY);
+    // si no hay nada, buscar en legacy keys
+    if (!raw) {
+      for (const k of LEGACY_PENDING_KEYS) {
+        const v = localStorage.getItem(k);
+        if (v) { raw = v; break; }
+      }
+    }
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("getPendingSalidas error:", err);
     return [];
   }
 }
 
-function savePendingSalidas(list) {
-  localStorage.setItem("salidas_pendientes_sin_codigo", JSON.stringify(list));
-}
+// Guarda pendientes usando la key canonical y actualiza el badge
+function savePendingSalidas(list){
+  try {
+    if (!Array.isArray(list)) {
+      console.warn("savePendingSalidas recibió no-array, convirtiendo a []");
+      list = [];
+    }
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    // opcional: también mantener legacy keys sincronizadas (descomenta si lo deseas)
+    // for (const k of LEGACY_PENDING_KEYS) localStorage.setItem(k, JSON.stringify(list));
 
-function addPendingSalida(pendiente) {
-  const list = getPendingSalidas();
-  // Si ya existe el mismo id+origen+responsable, sumar cantidades en vez de duplicar
-  const idx = list.findIndex(
-    (s) =>
-      s.id === pendiente.id &&
-      s.INVENTARIO_ORIGEN === pendiente.INVENTARIO_ORIGEN &&
-      ((s.RESPONSABLE_NOMBRE ?? "") === (pendiente.RESPONSABLE_NOMBRE ?? "")) &&
-      ((s.RESPONSABLE_APELLIDO ?? "") === (pendiente.RESPONSABLE_APELLIDO ?? ""))
-  );
-  if (idx >= 0) {
-    list[idx].CANTIDAD =
-      (parseInt(list[idx].CANTIDAD, 10) || 0) + parseInt(pendiente.CANTIDAD, 10);
-    list[idx].RESPONSABLE = pendiente.RESPONSABLE;
-    list[idx].OBSERVACIONES = pendiente.OBSERVACIONES;
-    list[idx].AVAILABLE = pendiente.AVAILABLE ?? list[idx].AVAILABLE;
-    list[idx].ADDED_AT = pendiente.ADDED_AT;
-  } else {
-    list.push(pendiente);
+    // actualizar badge si existe la función
+    try { if (typeof updateVerSalidasBadge === 'function') updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ console.warn("badge update failed", e); }
+
+    return true;
+  } catch (err) {
+    console.error("savePendingSalidas error:", err);
+    showToast("Error al guardar pendientes", false);
+    return false;
   }
-  savePendingSalidas(list);
 }
 
-function removePendingSalida(index) {
-  const list = getPendingSalidas();
-  list.splice(index, 1);
-  savePendingSalidas(list);
-}
 
-function clearPendingSalidas() {
-  localStorage.removeItem("salidas_pendientes_sin_codigo");
-}
-
-// ------------------- Render tabla pendientes (en salidas.html) -------------------
-function renderPendingTable() {
-  const table = document.getElementById("pendingTableBody");
-  if (!table) return;
-
-  table.innerHTML = "";
-  const list = getPendingSalidas();
-
-  list.forEach((s, idx) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${s.ICONO_COLOR} ${escapeHtml(s.DESCRIPCION)}</td>
-      <td>${escapeHtml(s.UM)}</td>
-      <td>${escapeHtml(s.INVENTARIO_ORIGEN)}</td>
-      <td>${escapeHtml(String(s.CANTIDAD))}</td>
-      <td>${escapeHtml(s.RESPONSABLE)}</td>
-      <td>${escapeHtml(s.OBSERVACIONES)}</td>
-      <td>
-        <button class="btn-delete-pend" data-idx="${idx}">❌</button>
-      </td>
-    `;
-    table.appendChild(row);
-  });
-
-  // listeners para borrar
-  table.querySelectorAll(".btn-delete-pend").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = parseInt(e.currentTarget.dataset.idx, 10);
-      removePendingSalida(idx);
-      renderPendingTable();
+// Modificar renderPendingList para actualizar el badge
+function renderPendingList() {
+  if (!tablaPendientesBody) {
+    showActionToast("pendiente", false, "Tabla de pendientes no encontrada");
+    return;
+  }
+  
+  try {
+    const list = getPendingSalidas();
+    tablaPendientesBody.innerHTML = "";
+    
+    if (!list || list.length === 0) {
+      tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
       updatePendingCount();
-    });
-  });
-}
-
-// ------------------- Mostrar contador en el botón 'Ver Salidas' -------------------
-function updatePendingCount() {
-  const btn = document.getElementById("btnVerSalidas");
-  if (!btn) return;
-  const count = getPendingSalidas().length;
-  let badge = document.getElementById("pendingCountBadge");
-  if (!badge) {
-    badge = document.createElement("span");
-    badge.id = "pendingCountBadge";
-    badge.style.background = "#ff5e5e";
-    badge.style.color = "#fff";
-    badge.style.borderRadius = "999px";
-    badge.style.padding = "2px 8px";
-    badge.style.marginLeft = "8px";
-    badge.style.fontSize = "12px";
-    badge.style.verticalAlign = "middle";
-    btn.appendChild(badge);
+      updateVerSalidasBadge(0); // ← Actualizar badge a 0
+      showActionToast("pendiente", true, "No hay pendientes");
+      return;
+    }
+    
+    // ... resto del código de renderizado ...
+    
+    updatePendingCount();
+    updateVerSalidasBadge(list.length); // ← Actualizar badge con el conteo actual
+    showActionToast("pendiente", true, `${list.length} pendientes cargados`);
+    
+  } catch (error) {
+    console.error("Error renderizando pendientes:", error);
+    showActionToast("pendiente", false, "Error al cargar pendientes");
   }
-  badge.textContent = count;
-  badge.style.display = count > 0 ? "inline-block" : "none";
 }
 
-// ------------------- Helpers inventario y stock -------------------
-const INVENTORY_COLORS = {
-  "INVENTARIO I069": "#fff714ff",
-  "INVENTARIO I078": "#0b78f5ff",
-  "INVENTARIO I07F": "#f79125ff",
-  "INVENTARIO I312": "#ff1495ff",
-  "INVENTARIO I073": "#f4ff27ff",
-  // soporte por claves cortas
-  "I069": "#f4ff20ff",
-  "I078": "#0b65f5ff",
-  "I07F": "#ffb73bff",
-  "I312": "#f545c9ff",
-  "I073": "#ffee36ff",
+// Modificar confirmAllPendings para actualizar el badge
+async function confirmAllPendings() {
+  const list = getPendingSalidas();
+  if (!list || list.length === 0) { 
+    showActionToast("confirm", false, "No hay pendientes para confirmar"); 
+    return; 
+  }
+  
+  showConfirm(`Confirmar todas las pendientes (${list.length})?`, 
+    async () => {
+      try {
+        await processPendings(list, "salidas");
+        savePendingSalidas([]);
+        renderPendingList();  
+        updateVerSalidasBadge(0); // ← Actualizar badge a 0 después de confirmar
+        await loadAllProductsWithPagination();
+        showActionToast("confirm", true, `${list.length} pendientes confirmados`);
+      } catch (error) {
+        showActionToast("confirm", false, "Error al confirmar pendientes");
+      }
+    },
+    () => {
+      showActionToast("confirm", true, "Confirmación cancelada");
+    }
+  );
+}
+  // -------------------- PENDIENTES SALIDAS --------------------
+  function getPendingSalidas() { 
+    try {
+      return JSON.parse(localStorage.getItem(PENDINGS_KEY_SALIDAS) || "[]");
+    } catch (error) {
+      showActionToast("pendiente", false, "Error al leer pendientes");
+      return [];
+    }
+  }
+  
+function savePendingSalidas(list){ 
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    // actualizar badge cuando cambian los pendientes (longitud real)
+    try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ /* noop */ }
+  } catch (err) {
+    console.error("savePendingSalidas error:", err);
+    showToast("Error al guardar pendientes", false);
+  }
+}
+
+
+
+  function addPendingSalida(pendiente) {
+    try {
+      const list = getPendingSalidas();
+      pendiente.id = pendiente.id || String(Date.now());
+      list.push(pendiente);
+      savePendingSalidas(list);
+      showActionToast("salida", true, "Salida agregada a pendientes");
+      renderPendingList();
+      updatePendingCount();
+    
+    } catch (error) {
+      showActionToast("salida", false, "Error al agregar salida pendiente");
+    }
+  }
+
+  function renderPendingList() {
+  if (!tablaPendientesBody) {
+    showActionToast("pendiente", false, "Tabla de pendientes no encontrada");
+    return;
+  }
+  updatePendingCount();
+// actualizar badge basado en la longitud actual
+try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
+
+  
+  try {
+    const list = getPendingSalidas();
+    tablaPendientesBody.innerHTML = "";
+    
+    if (!list || list.length === 0) {
+      tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
+      updatePendingCount();
+      // actualizar badge
+      try { updateVerSalidasBadge(0); } catch(e){/* noop */ }
+      showActionToast("pendiente", true, "No hay pendientes");
+      return;
+    }
+    
+    list.forEach((it, idx) => {
+      const codigo = (it.CODIGO && String(it.CODIGO).trim() !== "") ? String(it.CODIGO) : "S/C";
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(codigo)}</td>
+        <td>${escapeHtml(it.DESCRIPCION || "")}</td>
+        <td>${escapeHtml(it.UM || "")}</td>
+        <td>${escapeHtml(it.INVENTARIO_ORIGEN || "")}</td>
+        <td><input type="number" min="1" value="${escapeHtml(String(it.CANTIDAD || 0))}" data-idx="${idx}" class="pending-cantidad" style="width:90px" /></td>
+        <td>${escapeHtml(it.RESPONSABLE || "")}</td>
+        <td>${escapeHtml(it.DESTINATARIO || "")}</td>
+        <td>${escapeHtml(it.OBSERVACIONES || "")}</td>
+        <td>
+          <button class="confirm-single" data-idx="${idx}">Confirmar</button>
+          <button class="remove-pend" data-idx="${idx}">Eliminar</button>
+        </td>
+      `;
+      tablaPendientesBody.appendChild(tr);
+    });
+
+    // events
+    tablaPendientesBody.querySelectorAll(".confirm-single").forEach(b => {
+      b.addEventListener("click", async (e) => {
+        const idx = Number(e.currentTarget.dataset.idx);
+        const listNow = getPendingSalidas();
+        if (!listNow[idx]) {
+          showActionToast("pendiente", false, "Pendiente no encontrado");
+          return;
+        }
+        
+        try {
+          // procesar solo ese item
+          await processPendings([listNow[idx]], "salidas");
+          // reconstruir la lista actualizada a partir de localStorage (por si processPendings la modificó)
+          const newList = getPendingSalidas().filter((_,i) => i !== idx);
+          savePendingSalidas(newList);
+          renderPendingList();
+          // actualizar badge con la longitud real
+          updateVerSalidasBadge(newList.length);
+          await loadAllProductsWithPagination();
+          showActionToast("confirm", true, "Pendiente confirmado individualmente");
+        } catch (error) {
+          console.error("Error confirm-single:", error);
+          showActionToast("confirm", false, "Error al confirmar pendiente individual");
+        }
+      });
+    });
+    
+    tablaPendientesBody.querySelectorAll(".remove-pend").forEach(b => {
+      b.addEventListener("click", (e) => {
+        const idx = Number(e.currentTarget.dataset.idx);
+        const listNow = getPendingSalidas();
+        if (!listNow[idx]) {
+          showActionToast("pendiente", false, "Pendiente no encontrado");
+          return;
+        }
+        
+        listNow.splice(idx, 1);
+        savePendingSalidas(listNow);
+        renderPendingList();
+        updateVerSalidasBadge(listNow.length);
+
+        showActionToast("pendiente", true, "Pendiente eliminado");
+      });
+    });
+    
+    tablaPendientesBody.querySelectorAll(".pending-cantidad").forEach(inp => {
+      inp.addEventListener("change", (e) => {
+        const idx = Number(e.target.dataset.idx);
+        const v = Number(e.target.value || 0);
+        const listNow = getPendingSalidas();
+        if (!listNow[idx]) return;
+        listNow[idx].CANTIDAD = v;
+        listNow[idx].ADDED_AT = new Date().toISOString();
+        savePendingSalidas(listNow);
+        showActionToast("pendiente", true, "Cantidad actualizada");
+        // badge no cambia al actualizar cantidad
+      });
+    });
+
+    updatePendingCount();
+    // actualizar badge (longitud actual)
+    updateVerSalidasBadge(list.length);
+    showActionToast("pendiente", true, `${list.length} pendientes cargados`);
+    
+  } catch (error) {
+    console.error("Error renderizando pendientes:", error);
+    showActionToast("pendiente", false, "Error al cargar pendientes");
+  }
+}
+
+
+  function updatePendingCount() {
+    try {
+      const count = getPendingSalidas().length;
+      if (btnConfirmAll) btnConfirmAll.textContent = `Confirmar pendientes (${count})`;
+    } catch (error) {
+      showActionToast("pendiente", false, "Error actualizando contador");
+    }
+  }
+
+  async function confirmAllPendings() {
+    const list = getPendingSalidas();
+    if (!list || list.length === 0) { 
+      showActionToast("confirm", false, "No hay pendientes para confirmar"); 
+      return; 
+    }
+    
+    showConfirm(`Confirmar todas las pendientes (${list.length})?`, 
+      async () => {
+        try {
+          await processPendings(list, "salidas");
+          savePendingSalidas([]);
+          renderPendingList();  
+        try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ /* noop */ }
+        await loadAllProductsWithPagination();
+          showActionToast("confirm", true, `${list.length} pendientes confirmados`);
+        } catch (error) {
+          showActionToast("confirm", false, "Error al confirmar pendientes");
+        }
+      },
+      () => {
+        showActionToast("confirm", true, "Confirmación cancelada");
+      }
+    );
+  }
+
+  // processPendings: salidas o entradas (entradas no se usan aquí pero soportado)
+  async function processPendings(items, mode = "salidas") {
+    if (!supabase) { 
+      showActionToast("pendiente", false, "Conexión no disponible"); 
+      return; 
+    }
+    
+    let successes = 0, errors = 0;
+    
+    for (const it of items) {
+      try {
+        if (mode === "salidas" || (it.INVENTARIO_ORIGEN && mode !== "entradas")) {
+          // insertar en salidas_sin_codigo
+          const salidaObj = {
+            PRODUCT_ID: it.PRODUCT_ID ?? null,
+            CODIGO: it.CODIGO ?? null,
+            DESCRIPCION: it.DESCRIPCION ?? "",
+            CANTIDAD: it.CANTIDAD,
+            INVENTARIO_ORIGEN: it.INVENTARIO_ORIGEN,
+            RESPONSABLE: it.RESPONSABLE,
+            DESTINATARIO: it.DESTINATARIO || null,
+            OBSERVACIONES: it.OBSERVACIONES || null,
+            FECHA: new Date().toISOString()
+          };
+          const { error: insErr } = await supabase.from("salidas_sin_codigo").insert([salidaObj]);
+          if (insErr) throw insErr;
+
+          // restar stock en productos_sin_codigo
+          await ensureProductosSinCodigoColumnMap();
+          const realCol = getRealColForInventoryLabel(it.INVENTARIO_ORIGEN);
+          if (realCol && it.PRODUCT_ID) {
+            const { data: prodRow, error: selErr } = await supabase.from("productos_sin_codigo").select(realCol).eq("id", it.PRODUCT_ID).maybeSingle();
+            if (selErr) throw selErr;
+            const current = toNumber(prodRow ? prodRow[realCol] : 0);
+            const nuevo = Math.max(0, current - Number(it.CANTIDAD || 0));
+            const upd = {}; upd[realCol] = nuevo;
+            const { error: updErr } = await supabase.from("productos_sin_codigo").update(upd).eq("id", it.PRODUCT_ID);
+            if (updErr) throw updErr;
+          }
+        } else {
+          // entradas (si se usa)
+          const entradaObj = {
+            PRODUCT_ID: it.PRODUCT_ID ?? null,
+            DESCRIPCION: it.DESCRIPCION ?? "",
+            CANTIDAD: it.CANTIDAD,
+            INVENTARIO_DESTINO: it.INVENTARIO_DESTINO || null,
+            RESPONSABLE: it.RESPONSABLE || null,
+            OBSERVACIONES: it.OBSERVACIONES || null,
+            FECHA: new Date().toISOString()
+          };
+          const { error: insErr } = await supabase.from("entradas_sin_codigo").insert([entradaObj]);
+          if (insErr) throw insErr;
+
+          await ensureProductosSinCodigoColumnMap();
+          const realCol = getRealColForInventoryLabel(it.INVENTARIO_DESTINO);
+          if (realCol && it.PRODUCT_ID) {
+            const { data: prodRow, error: selErr } = await supabase.from("productos_sin_codigo").select(realCol).eq("id", it.PRODUCT_ID).maybeSingle();
+            if (selErr) throw selErr;
+            const current = toNumber(prodRow ? prodRow[realCol] : 0);
+            const nuevo = current + Number(it.CANTIDAD || 0);
+            const upd = {}; upd[realCol] = nuevo;
+            const { error: updErr } = await supabase.from("productos_sin_codigo").update(upd).eq("id", it.PRODUCT_ID);
+            if (updErr) throw updErr;
+          }
+        }
+        successes++;
+      } catch (err) {
+        console.error("Error procesando pendiente:", err, it);
+        errors++;
+      }
+    }
+    
+    if (errors === 0) {
+      showActionToast("confirm", true, `${successes} pendientes procesados exitosamente`);
+    } else {
+      showActionToast("confirm", false, `${successes} exitos, ${errors} errores`);
+    }
+    
+    return { successes, errors };
+  }
+  
+// --- Fallbacks ligeros para toasts (si no existen) ---
+if (!window.MessageSystem) {
+  class _MS {
+    static createContainer() {
+      if (document.getElementById("message-system-container")) return;
+      const c = document.createElement("div");
+      c.id = "message-system-container";
+      c.style.cssText = "position:fixed;top:18px;right:18px;z-index:20000;display:flex;flex-direction:column;gap:8px;max-width:420px";
+      document.body.appendChild(c);
+    }
+    static show(msg, type='info', timeout=4000) {
+      try {
+        this.createContainer();
+        const cont = document.getElementById("message-system-container");
+        const el = document.createElement("div");
+        el.style.cssText = "padding:10px;border-radius:8px;background:#fff;border:1px solid #e6e6e6;box-shadow:0 6px 20px rgba(0,0,0,0.06);font-family:Inter,system-ui;max-width:360px";
+        el.textContent = String(msg);
+        cont.prepend(el);
+        if (timeout>0) setTimeout(()=>el.remove(), timeout);
+      } catch(e){ console.log(msg); }
+    }
+  }
+  window.MessageSystem = _MS;
+}
+
+// compat wrappers (no-op pero útiles)
+window.showAlertToast = window.showAlertToast || function(message, type="info", time=4000) {
+  try { return window.MessageSystem.show(message, type, time); } catch(e){ console.log(message); };
+};
+window.showDetailedToast = window.showDetailedToast || function(title, lines = [], options = {}) {
+  const parts = [title].concat(lines.map(l => typeof l==='string'?l:(l.label?`${l.label}: ${l.value}`:JSON.stringify(l))));
+  return window.MessageSystem.show(parts.join("\n"), 'info', options.timeoutMs ?? 5000);
 };
 
-function normalizeInventoryKey(orig) {
-  if (!orig) return "";
-  let s = String(orig).trim();
-  if (s.toUpperCase() === "ALMACEN") return "INVENTARIO FISICO EN ALMACEN";
-  if (s.toUpperCase().startsWith("INVENTARIO ")) return s.toUpperCase();
-  // corto -> prefijo INVENTARIO
-  return `INVENTARIO ${s.toUpperCase()}`;
-}
-
-function invColorFor(name) {
-  if (!name) return "#6b7280";
-  const long = normalizeInventoryKey(name);
-  return INVENTORY_COLORS[long] || INVENTORY_COLORS[name] || "#6b7280";
-}
-
-// ------------------- fetchStockForProduct (robusto) -------------------
-async function fetchStockForProduct(id, inventoryCol) {
-  try {
-    if (!supabase) return null;
-    await ensureProductosSinCodigoColumnMap();
-
-    const { data: prodRow, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*")
-      .eq("id", id)
-      .maybeSingle();
-
-    if (error) {
-      console.warn("fetchStockForProduct - error fetching product:", error);
-      return null;
+  // -------------------- SALIDAS: modal dinámico --------------------
+  async function registrarSalida(producto) {
+    try {
+      await openSalidaModal(producto);
+      showActionToast("salida", true, `Preparando salida para: ${producto.DESCRIPCION}`);
+    } catch (error) {
+      showActionToast("salida", false, "Error al abrir modal de salida");
     }
-    if (!prodRow) return null;
-
-    const val = getStockFromProduct(prodRow, inventoryCol);
-    return val;
-  } catch (err) {
-    console.error("fetchStockForProduct error:", err);
-    return null;
   }
-}
 
-// ------------------- Registrar Salida (alias para abrir modal) -------------------
-function registrarSalida(producto) {
-  // Abre el modal dinámico para registrar la salida
-  openSalidaModal(producto);
-}
-
-// ------------------- openSalidaModal actualizado ----------------
+ // ---------- openSalidaModal (reemplaza la versión anterior) ----------
 async function openSalidaModal(producto) {
+  // eliminar modal previo si existe
   const existing = document.getElementById("salidaModalOverlay");
   if (existing) existing.remove();
 
-  // overlay & modal
+  // overlay
   const overlay = document.createElement("div");
   overlay.id = "salidaModalOverlay";
-  overlay.style.position = "fixed";
-  overlay.style.inset = "0";
-  overlay.style.display = "flex";
-  overlay.style.alignItems = "center";
-  overlay.style.justifyContent = "center";
-  overlay.style.background = "rgba(0,0,0,0.45)";
-  overlay.style.zIndex = "10000";
+  overlay.className = "salida-overlay";
 
-  const modalDiv = document.createElement("div");
-  modalDiv.className = "salida-modal";
-  modalDiv.style.width = "560px";
-  modalDiv.style.maxWidth = "95%";
-  modalDiv.style.background = "#fffffff6";
-  modalDiv.style.borderRadius = "8px";
-  modalDiv.style.padding = "18px";
-  modalDiv.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-  modalDiv.style.fontFamily = "'Quicksand', sans-serif";
-  modalDiv.style.color = "#222";
-  modalDiv.setAttribute("role", "dialog");
-  modalDiv.setAttribute("aria-modal", "true");
-  modalDiv.style.position = "relative"; // para posicionar toasts dentro
+  // modal (con scroll y max-height)
+  const modal = document.createElement("div");
+  modal.className = "salida-modal";
+  modal.style.overflow = "auto";
+  modal.style.maxHeight = "86vh";
 
-  modalDiv.innerHTML = `
-    <h3 class="modal-title" style="margin:0 0 8px 0">Salida: ${escapeHtml(producto.DESCRIPCION || "")}</h3>
+  modal.innerHTML = `
+    <div class="header">
+      <h3>Salida — ${escapeHtml(producto.CODIGO || "")} ${producto.DESCRIPCION ? "— " + escapeHtml(producto.DESCRIPCION) : ""}</h3>
+      <button id="salidaCloseX" aria-label="Cerrar" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
+    </div>
 
-    <!-- Contenedor para mensajes locales dentro del modal (banner grande) -->
-    <div id="modalInlineMsg" style="position:relative;margin-bottom:12px;"></div>
-
-    <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:10px">
-      <div style="flex:1">
-        <label style="font-size:13px;color:#374151">Cantidad total requerida</label>
-        <!-- <<< permitir decimales: min="0" step="any" -->
-        <input id="salidaCantidadInputModal" type="number" min="0" step="any" class="input-text" style="width:100%;box-sizing:border-box" />
+    <div class="salida-grid">
+      <div>
+        <label style="font-size:13px;color:#334155">Cantidad total requerida</label>
+        <input id="salidaCantidadInputModal" class="input-text" type="number" min="0" step="any" placeholder="Ej. 5" />
       </div>
-      <div style="width:140px">
-        <label style="font-size:13px;color:#374151">UM</label>
-        <input id="salidaUM" type="text" value="${escapeHtml(producto.UM || '')}" readonly class="input-text readonly" style="width:100%;box-sizing:border-box" />
+      <div>
+        <label style="font-size:13px;color:#334155">UM</label>
+        <input id="salidaUM" class="input-text" type="text" value="${escapeHtml(producto.UM || '')}" readonly />
       </div>
     </div>
 
-    <div style="margin:8px 0">
-      <strong>Repartir entre inventarios</strong>
-      <div id="salidaDistribucionContainer" style="margin-top:8px"></div>
-      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-        <button id="salidaClearDistribBtn" class="btn-cancel">Limpiar</button>
-      </div>
+    <div style="margin-top:6px;font-weight:600;color:#0b2545">Repartir entre inventarios</div>
+    <div class="distrib-list" id="salidaDistribContainer" style="margin-bottom:8px;"></div>
+
+    <div style="display:flex;justify-content:flex-end;margin-top:6px">
+      <button id="btnLimpiarDistrib" class="btn btn-clear" style="margin-right:10px">Limpiar</button>
     </div>
 
-    <div style="margin-top:10px">
-      <label style="font-size:13px;color:#374151">Responsable (autocompletado)</label>
-      <input id="salidaResponsableInputModal" type="text" readonly class="input-text" style="width:100%;box-sizing:border-box" />
+    <div class="form-row" style="margin-top:10px">
+      <label>Responsable (autocompletado)</label>
+      <input id="salida_responsable" class="input-text readonly" readonly />
+      <label>Destinatario</label>
+      <input id="salida_destinatario" class="input-text" placeholder="Ej. Cliente XYZ" />
+      <label>Observaciones (opcional)</label>
+      <textarea id="salida_obs" class="input-text" rows="3" style="resize:vertical"></textarea>
     </div>
 
-    <div style="margin-top:8px">
-      <label style="font-size:13px;color:#374151">Destinatario</label>
-      <input id="salidaDestinatarioInputModal" type="text" placeholder="Ej. Cliente XYZ" class="input-text" style="width:100%;box-sizing:border-box" />
-    </div>
-
-    <div style="margin-top:8px">
-      <label style="font-size:13px;color:#374151">Observaciones (opcional)</label>
-      <textarea id="salidaObservacionesInputModal" rows="2" class="input-text" style="width:100%;box-sizing:border-box"></textarea>
-    </div>
-
-    <div class="modal-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-      <button id="salidaCancelBtn" type="button" class="btn-cancel">Cancelar</button>
-      <button id="salidaConfirmBtn" type="button" class="btn-primary">Agregar a pendientes</button>
+    <div class="salida-actions">
+      <button id="salidaCancelBtn" class="btn btn-cancel">Cancelar</button>
+      <button id="salidaConfirmBtn" class="btn btn-primary" style="min-width:160px" disabled>Agregar a pendientes</button>
     </div>
   `;
 
-  overlay.appendChild(modalDiv);
+  overlay.appendChild(modal);
   document.body.appendChild(overlay);
 
-  // referencias locales
-  const modalMsgWrap = modalDiv.querySelector("#modalInlineMsg");
-  const cantidadInput = modalDiv.querySelector("#salidaCantidadInputModal");
-  const distribContainer = modalDiv.querySelector("#salidaDistribucionContainer");
-  const respInput = modalDiv.querySelector("#salidaResponsableInputModal");
-  const destInput = modalDiv.querySelector("#salidaDestinatarioInputModal");
-  const obsInput = modalDiv.querySelector("#salidaObservacionesInputModal");
-  const btnClear = modalDiv.querySelector("#salidaClearDistribBtn");
-  const btnCancel = modalDiv.querySelector("#salidaCancelBtn");
-  const btnConfirm = modalDiv.querySelector("#salidaConfirmBtn");
+  // elementos
+  const cantidadInput = modal.querySelector("#salidaCantidadInputModal");
+  const distribContainer = modal.querySelector("#salidaDistribContainer");
+  const btnCancel = modal.querySelector("#salidaCancelBtn");
+  const btnConfirm = modal.querySelector("#salidaConfirmBtn");
+  const btnLimpiar = modal.querySelector("#btnLimpiarDistrib");
+  const responsableField = modal.querySelector("#salida_responsable");
+  const destinatarioField = modal.querySelector("#salida_destinatario");
+  const obsField = modal.querySelector("#salida_obs");
+  const closeX = modal.querySelector("#salidaCloseX");
 
-  // set responsable: preferir email del auth user; fallback a nombre completo o valor del input global
-  try {
-    const { data: authData } = await supabase.auth.getUser();
-    const user = authData?.user ?? null;
-    if (user && user.email) {
-      respInput.value = user.email;
-    } else {
-      respInput.value = CURRENT_USER_FULLNAME || (nombreResponsableInput?.value || "");
+  // precargar responsable desde sesión (si existe)
+  (async () => {
+    try {
+      if (supabase && supabase.auth) {
+        const { data: authData } = await supabase.auth.getUser();
+        const user = authData?.user ?? null;
+        if (user && user.email) {
+          responsableField.value = user.email;
+        } else {
+          responsableField.value = "";
+          responsableField.placeholder = "No autenticado";
+        }
+      }
+    } catch (e) {
+      responsableField.placeholder = "No disponible";
     }
-  } catch (e) {
-    // si algo falla, usamos fallback
-    respInput.value = CURRENT_USER_FULLNAME || (nombreResponsableInput?.value || "");
+  })();
+
+  // helper stock
+  function safeStock(prod, inv) {
+    try { const s = getStockFromProduct(prod, inv); return Number.isFinite(Number(s)) ? Number(s) : 0; } catch(e){ return 0; }
   }
 
-  // SOLO los 5 inventarios
   const invs = ["I069","I078","I07F","I312","I073"];
 
-  // helper seguro para leer stock (usa getStockFromProduct si existe)
-  function safeStock(producto, inv) {
-    try {
-      const s = typeof getStockFromProduct === "function" ? getStockFromProduct(producto, inv) : (producto[`INVENTARIO ${inv}`] ?? producto[inv] ?? 0);
-      // <<< usar parseFloat para preservar decimales (p.ej. 70.5)
-      const n = parseFloat(String(s).replace(',', '.'));
-      return Number.isFinite(n) ? n : 0;
-    } catch (e) { return 0; }
-  }
-
-  // formatea cantidades para mostrar (quita .0 innecesarios)
-  function formatQty(n) {
-    if (!Number.isFinite(n)) return "0";
-    if (Math.abs(n - Math.round(n)) < 1e-9) return String(Math.round(n));
-    return String(n).replace(/\.?0+$/, '');
-  }
-
-  // ===================== Modal-toast más visible =====================
-  let _modalToastTimer = null;
-  function modalToast(message, success = true, autoCloseMs = 3000, persistent = false) {
-    modalMsgWrap.innerHTML = "";
-    if (_modalToastTimer) { clearTimeout(_modalToastTimer); _modalToastTimer = null; }
-
-    const banner = document.createElement("div");
-    banner.className = "modal-banner";
-    banner.style.display = "flex";
-    banner.style.alignItems = "center";
-    banner.style.justifyContent = "space-between";
-    banner.style.gap = "12px";
-    banner.style.padding = "12px 14px";
-    banner.style.borderRadius = "10px";
-    banner.style.boxShadow = "0 12px 30px rgba(2,6,23,0.12)";
-    banner.style.fontSize = "14px";
-    banner.style.fontWeight = "600";
-    banner.style.lineHeight = "1.1";
-    banner.style.maxWidth = "100%";
-    banner.style.boxSizing = "border-box";
-    banner.style.transform = "translateY(-6px)";
-    banner.style.opacity = "0";
-    banner.style.transition = "transform .18s ease, opacity .18s ease";
-
-    const left = document.createElement("div");
-    left.style.display = "inline-flex";
-    left.style.alignItems = "center";
-    left.style.gap = "10px";
-
-    const icon = document.createElement("div");
-    icon.style.fontSize = "20px";
-    icon.textContent = success ? "✅" : "⚠️";
-    left.appendChild(icon);
-
-    const text = document.createElement("div");
-    text.style.flex = "1";
-    text.style.whiteSpace = "normal";
-    text.style.fontWeight = "700";
-    text.style.color = success ? "#065f46" : "#7f1d1d";
-    text.textContent = message;
-    left.appendChild(text);
-
-    const right = document.createElement("div");
-    right.style.marginLeft = "12px";
-    const closeBtn = document.createElement("button");
-    closeBtn.type = "button";
-    closeBtn.innerHTML = "✕";
-    closeBtn.title = "Cerrar mensaje";
-    closeBtn.style.border = "none";
-    closeBtn.style.background = "transparent";
-    closeBtn.style.cursor = "pointer";
-    closeBtn.style.fontSize = "16px";
-    closeBtn.style.color = "rgba(0,0,0,0.6)";
-    closeBtn.style.padding = "4px";
-    right.appendChild(closeBtn);
-
-    banner.appendChild(left);
-    banner.appendChild(right);
-    banner.style.background = success ? "linear-gradient(90deg,#ecfdf5,#f0fdf4)" : "linear-gradient(90deg,#fff1f2,#fff7f7)";
-    banner.style.border = success ? "1px solid rgba(6,95,70,0.08)" : "1px solid rgba(127,29,29,0.08)";
-
-    modalMsgWrap.appendChild(banner);
-    requestAnimationFrame(() => {
-      banner.style.transform = "translateY(0)";
-      banner.style.opacity = "1";
-    });
-
-    function closeBanner() {
-      banner.style.transform = "translateY(-6px)";
-      banner.style.opacity = "0";
-      setTimeout(() => { if (banner.parentNode) banner.parentNode.removeChild(banner); }, 180);
-      if (_modalToastTimer) { clearTimeout(_modalToastTimer); _modalToastTimer = null; }
-    }
-    closeBtn.addEventListener("click", closeBanner);
-
-    if (!persistent && autoCloseMs && autoCloseMs > 0) {
-      _modalToastTimer = setTimeout(closeBanner, autoCloseMs);
-    }
-    return closeBanner;
-  }
-  // ===================================================================
-
-  // --- handlers mejorados para inputs de distribución (soportan decimales sin "pelear" con el typing) ---
-  function onDistribKeydown(e) {
-    // permitir coma como separador decimal: la convertimos a punto en el input
-    if (e.key === ',') {
-      e.preventDefault();
-      const el = e.target;
-      const start = el.selectionStart || 0;
-      const end = el.selectionEnd || 0;
-      const val = el.value || "";
-      const newVal = val.slice(0, start) + '.' + val.slice(end);
-      el.value = newVal;
-      // mover caret después del punto
-      const pos = start + 1;
-      setTimeout(() => { el.setSelectionRange(pos, pos); }, 0);
-      // disparar input manualmente para que se valide
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      return;
-    }
-    // dejamos al browser manejar el resto (números, punto, backspace, etc.)
-  }
-
-  function onDistribInputChange() {
-    const inp = this;
-    const inv = inp.dataset.inv;
-    const avail = Number(safeStock(producto, inv)) || 0;
-
-    const raw = (inp.value || "").toString().trim();
-    if (raw === "" || raw === "-") {
-      updateConfirmState();
-      return;
-    }
-
-    const parsed = parseFloat(raw.replace(',', '.'));
-    if (Number.isNaN(parsed)) {
-      updateConfirmState();
-      return;
-    }
-
-    // validaciones inmediatas sin sobrescribir mientras el usuario escribe
-    if (parsed < 0) {
-      modalToast(`No se permiten valores negativos.`, false, 2000, false);
-    } else if (parsed > avail) {
-      modalToast(`La cantidad ingresada (${parsed}) excede el stock disponible (${avail}).`, false, 2200, false);
-    }
-
-    updateConfirmState();
-  }
-
-  function onDistribInputBlur() {
-    const inp = this;
-    const inv = inp.dataset.inv;
-    const avail = Number(safeStock(producto, inv)) || 0;
-    let v = parseFloat((inp.value || "0").toString().replace(',', '.'));
-    if (Number.isNaN(v) || v < 0) v = 0;
-    if (v > avail) {
-      v = avail;
-      modalToast(`Ajustado ${inv} al stock disponible (${formatQty(avail)})`, false, 2500, false);
-    }
-    // normalizar visualmente (si prefieres 2 decimales usa v.toFixed(2))
-    inp.value = String(v);
-    updateConfirmState();
-  }
-
-  function attachDistribListeners() {
-    distribContainer.querySelectorAll('input[data-inv]').forEach(i => {
-      i.removeEventListener("input", onDistribInputChange);
-      i.removeEventListener("blur", onDistribInputBlur);
-      i.removeEventListener("keydown", onDistribKeydown);
-      i.addEventListener("input", onDistribInputChange);
-      i.addEventListener("blur", onDistribInputBlur);
-      i.addEventListener("keydown", onDistribKeydown);
-    });
-  }
-
-  // render rows (muestra "No disponible" y desactiva input si stock == 0)
-  async function renderDistribRows() {
+  // render filas inventarios (con data-inv)
+  function renderDistribRows() {
     distribContainer.innerHTML = "";
-    const stocks = {};
-    for (const inv of invs) stocks[inv] = safeStock(producto, inv);
-
-    invs.forEach((inv) => {
+    for (const inv of invs) {
+      const avail = safeStock(producto, inv);
       const row = document.createElement("div");
-      row.className = "salida-distrib-row";
-      row.style.display = "flex";
-      row.style.alignItems = "center";
-      row.style.justifyContent = "space-between";
-      row.style.gap = "8px";
-      row.style.marginBottom = "6px";
+      row.className = "distrib-row";
 
       const left = document.createElement("div");
-      left.style.flex = "1";
-      left.style.fontSize = "14px";
-
-      if ((stocks[inv] || 0) <= 0) {
-        left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — <span style="color:#9ca3af;font-style:italic">No disponible</span>`;
-      } else {
-        left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — Disponible: <span data-inv-stock="${inv}">${formatQty(stocks[inv])}</span>`;
-      }
+      left.className = "distrib-left";
+      const small = avail > 0 ? `<span class="small">Disponible: ${String(avail)}</span>` : `<span class="small" style="color:#9ca3af">No disponible</span>`;
+      left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — ${small}`;
 
       const right = document.createElement("div");
-      right.style.display = "flex";
-      right.style.alignItems = "center";
-      right.style.gap = "8px";
-
+      right.className = "distrib-right";
       const input = document.createElement("input");
-      input.setAttribute("data-inv", inv);
       input.type = "number";
+      input.step = "any";
       input.min = "0";
-      input.step = "any";                // <<< permitir decimales
       input.value = "0";
-      input.className = "input-text";
-      input.style.width = "90px";
-      input.style.boxSizing = "border-box";
-
-      if ((stocks[inv] || 0) <= 0) {
+      input.setAttribute("data-inv", inv);
+      input.className = "input-num";
+      if (avail <= 0) {
         input.disabled = true;
         input.title = "Sin stock";
-        input.style.opacity = "0.6";
       }
+      // permitir pegar / escribir decimales
+      input.addEventListener("input", () => {
+        // normalizar valor (evitar NaN)
+        if (input.value === "" || input.value === null) input.value = "0";
+        // actualizar estado del botón confirmar
+        updateConfirmState();
+      });
 
       right.appendChild(input);
+
       row.appendChild(left);
       row.appendChild(right);
       distribContainer.appendChild(row);
-    });
-
-    // registrar listeners robustos que permiten typing con decimales
-    attachDistribListeners();
-
-    updateConfirmState();
+    }
   }
 
-  // calcula total disponible (sum stocks) - usa floats
-  function totalAvailable() {
+  renderDistribRows();
+
+  // obtener distribución actual
+  function getDistrib() {
     const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
-    return inputs.reduce((acc, inp) => {
-      const inv = inp.dataset.inv;
-      const avail = safeStock(producto, inv) || 0;
-      return acc + avail;
-    }, 0);
+    return inputs.map(i => ({ inv: i.getAttribute('data-inv'), qty: Number(i.value || 0), el: i }));
   }
 
-  // <-- ÚNICA versión de updateConfirmState: usa parseFloat (no dejar duplicados) -->
+  // habilitar/inhabilitar confirmar según reglas
   function updateConfirmState() {
-    const totalNeeded = parseFloat((cantidadInput.value || "0").toString().replace(',', '.')) || 0;
-    const avail = totalAvailable();
-
-    // limpiar banners temporales
-    modalMsgWrap.innerHTML = "";
-    if (_modalToastTimer) { clearTimeout(_modalToastTimer); _modalToastTimer = null; }
-
-    if (avail <= 0) {
-      btnConfirm.disabled = true;
-      modalToast("No hay stock disponible en ningún inventario.", false, 0, true);
-      return;
-    }
-
-    if (!totalNeeded || totalNeeded <= 0) {
-      btnConfirm.disabled = true;
-      return;
-    }
-
-    // tolerancia para comparar floats (ej. 0.000001)
-    const EPS = 1e-6;
-    if (totalNeeded - avail > EPS) {
-      btnConfirm.disabled = true;
-      modalToast(`La cantidad solicitada (${formatQty(totalNeeded)}) excede el total disponible (${formatQty(avail)}).`, false, 0, true);
-      return;
-    }
-
+    const totalNeeded = Number(cantidadInput.value || 0);
+    if (!totalNeeded || totalNeeded <= 0) { btnConfirm.disabled = true; return; }
+    const distrib = getDistrib();
+    const sum = distrib.reduce((s,d) => s + Number(d.qty || 0), 0);
+    const availTotal = distrib.reduce((s,d) => s + safeStock(producto, d.inv), 0);
+    if (!Number.isFinite(sum)) { btnConfirm.disabled = true; return; }
+    if (Math.abs(sum - totalNeeded) > 1e-6 || totalNeeded > availTotal) { btnConfirm.disabled = true; return; }
     btnConfirm.disabled = false;
   }
 
-  // helpers para marcar campo inválido y limpiar marcación cuando el usuario escribe
-  function markInvalid(el) {
-    if (!el) return;
-    el.style.outline = "2px solid rgba(220,38,38,0.25)";
-    el.style.border = "1px solid #dc2626";
-    const clear = () => {
-      el.style.outline = "";
-      el.style.border = "";
-      el.removeEventListener("input", clear);
-      el.removeEventListener("change", clear);
-    };
-    el.addEventListener("input", clear);
-    el.addEventListener("change", clear);
-  }
-
-  // Clear distrib
-  const clearDistribHandler = () => {
-    distribContainer.querySelectorAll('input[data-inv]').forEach(i => i.value = "0");
-    modalMsgWrap.innerHTML = "";
-    updateConfirmState();
-  };
-
-  // Cancel handler (cierra y limpia)
-  const cancelHandler = (e) => {
-    e?.preventDefault?.();
-    cleanupAndClose();
-  };
-
-  // VALIDACIÓN ANTES DE CONFIRMAR (todos obligatorios excepto observaciones)
-  function validateBeforeConfirm() {
-    const missing = [];
-    // aceptar decimales en cantidad total
-    const totalNeeded = parseFloat((cantidadInput.value || "0").toString().replace(',', '.')) || 0;
-    if (!totalNeeded || totalNeeded <= 0) {
-      missing.push("Cantidad total requerida");
-      markInvalid(cantidadInput);
-    }
-
-    const destinatario = (destInput.value || "").trim();
-    if (!destinatario) {
-      missing.push("Destinatario");
-      markInvalid(destInput);
-    }
-
-    // revisar distribución: al menos un inventario con cantidad > 0 (usar float)
-    const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
-    const origenes = inputs.map(inp => {
-      const inv = inp.dataset.inv;
-      const qty = parseFloat((inp.value || "0").toString().replace(',', '.')) || 0;
-      const avail = Number(safeStock(producto, inv)) || 0;
-      return { INVENTARIO_ORIGEN: `INVENTARIO ${inv}`, CANTIDAD: qty, AVAILABLE: avail, el: inp };
-    }).filter(o => o.CANTIDAD > 0);
-
-    const sum = origenes.reduce((s,o) => s + (Number(o.CANTIDAD) || 0), 0);
-
-    // comparación con tolerancia
-    const EPS = 1e-6;
-
-    if (origenes.length === 0) {
-      missing.push("Distribución entre inventarios (elige al menos un inventario)");
-      inputs.forEach(i => markInvalid(i));
-    } else {
-      if (Math.abs(sum - totalNeeded) > EPS) {
-        modalToast(`La suma por inventario (${formatQty(sum)}) no coincide con la cantidad total (${formatQty(totalNeeded)}). Ajusta los valores.`, false, 4000);
-        origenes.forEach(o => markInvalid(o.el));
-        return { ok: false, focusEl: origenes[0]?.el || cantidadInput };
-      }
-      for (const o of origenes) {
-        if (o.CANTIDAD - o.AVAILABLE > EPS) {
-          modalToast(`La cantidad para ${o.INVENTARIO_ORIGEN} (${formatQty(o.CANTIDAD)}) excede su stock (${formatQty(o.AVAILABLE)}).`, false, 4000);
-          markInvalid(o.el);
-          return { ok: false, focusEl: o.el };
-        }
-      }
-    }
-
-    const responsable = (respInput.value || "").trim();
-    if (!responsable) {
-      missing.push("Responsable (inicia sesión)");
-      markInvalid(respInput);
-    }
-
-    if (missing.length > 0) {
-      const ms = `Completa los campos obligatorios: ${missing.join(", ")}`;
-      modalToast(ms, false, 4500);
-      if (missing[0].includes("Cantidad")) cantidadInput.focus();
-      else if (missing[0].includes("Destinatario")) destInput.focus();
-      else if (missing[0].includes("Distribución")) {
-        const firstDistrib = distribContainer.querySelector('input[data-inv]');
-        if (firstDistrib) firstDistrib.focus();
-      } else if (missing[0].includes("Responsable")) respInput.focus();
-      return { ok: false, focusEl: null };
-    }
-
-    return { ok: true, origenes, totalNeeded };
-  }
-
-  // Confirm handler (usa el email mostrado en el campo responsable)
-  const confirmHandler = () => {
-    const validation = validateBeforeConfirm();
-    if (!validation.ok) return;
-
-    const { origenes, totalNeeded } = validation;
-
-    // RESPONSABLE: tomamos el valor mostrado (email preferido)
-    const responsable = (respInput.value || "").trim();
-    const destinatario = (destInput.value || "").trim();
-    const observaciones = (obsInput.value || "").trim();
-
-    // Build pendiente (RESPONSABLE_NOMBRE/APELLIDO vacíos para no introducir datos inconsistentes)
-    if (origenes.length === 1) {
-      const o = origenes[0];
-      const pendiente = {
-        id: producto.id,
-        DESCRIPCION: producto.DESCRIPCION,
-        UM: producto.UM ?? "",
-        INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN,
-        ICONO_COLOR: "⚪",
-        CANTIDAD: o.CANTIDAD,
-        RESPONSABLE: responsable,
-        RESPONSABLE_NOMBRE: "",
-        RESPONSABLE_APELLIDO: "",
-        DESTINATARIO: destinatario,
-        OBSERVACIONES: observaciones,
-        AVAILABLE: o.AVAILABLE,
-        ADDED_AT: new Date().toISOString()
-      };
-      addPendingSalida(pendiente);
-    } else {
-      const pendiente = {
-        id: producto.id,
-        DESCRIPCION: producto.DESCRIPCION,
-        UM: producto.UM ?? "",
-        ORIGENES: origenes.map(o => ({ INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN, CANTIDAD: o.CANTIDAD, AVAILABLE: o.AVAILABLE })),
-        CANTIDAD: totalNeeded,
-        ICONO_COLOR: "🔀",
-        RESPONSABLE: responsable,
-        RESPONSABLE_NOMBRE: "",
-        RESPONSABLE_APELLIDO: "",
-        DESTINATARIO: destinatario,
-        OBSERVACIONES: observaciones,
-        ADDED_AT: new Date().toISOString()
-      };
-      addPendingSalida(pendiente);
-    }
-
-    modalToast("✅ Agregado a la lista de salidas pendientes", true, 1800);
-    try { updatePendingCountBadge(); } catch(e){ /* noop */ }
-    try { renderPendingList(); } catch(e){ /* noop */ }
-    setTimeout(() => cleanupAndClose(), 450);
-  };
-
-  // cleanup: quitar listeners y overlay
-  function cleanupAndClose() {
-    try { btnClear.removeEventListener("click", clearDistribHandler); } catch(e) {}
-    try { btnCancel.removeEventListener("click", cancelHandler); } catch(e) {}
-    try { btnConfirm.removeEventListener("click", confirmHandler); } catch(e) {}
-    try { document.removeEventListener("keydown", escHandler); } catch(e) {}
-    try {
-      distribContainer.querySelectorAll('input[data-inv]').forEach(i => {
-        i.removeEventListener("input", onDistribInputChange);
-        i.removeEventListener("blur", onDistribInputBlur);
-        i.removeEventListener("keydown", onDistribKeydown);
-      });
-    } catch(e) {}
-    if (_modalToastTimer) { clearTimeout(_modalToastTimer); _modalToastTimer = null; }
-    overlay.remove();
-  }
-
-  // ESC para cerrar
-  const escHandler = (ev) => {
-    if (ev.key === "Escape") cleanupAndClose();
-  };
-  document.addEventListener("keydown", escHandler);
-
   // listeners
-  btnClear.addEventListener("click", clearDistribHandler);
-  btnCancel.addEventListener("click", cancelHandler);
-  btnConfirm.addEventListener("click", confirmHandler);
+  cantidadInput.addEventListener("input", updateConfirmState);
+  // si se quiere, escuchar cambios de todos los inputs delegadamente:
+  distribContainer.addEventListener("input", updateConfirmState);
 
-  // click fuera del modal -> cerrar
-  overlay.addEventListener("click", (e) => {
-    if (e.target === overlay) cleanupAndClose();
+  btnLimpiar.addEventListener("click", () => {
+    distribContainer.querySelectorAll('input[data-inv]').forEach(i => { if (!i.disabled) i.value = "0"; });
+    cantidadInput.value = "";
+    updateConfirmState();
   });
 
-  // foco inicial y validación en tiempo real desde el campo cantidad
-  setTimeout(() => {
-    try { cantidadInput.focus(); } catch(e) {}
-  }, 50);
-  cantidadInput.addEventListener("input", updateConfirmState);
+  const closeOverlay = () => overlay.remove();
+  btnCancel.addEventListener("click", closeOverlay);
+  closeX.addEventListener("click", closeOverlay);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeOverlay(); });
+  window.addEventListener("keydown", function onEsc(ev){ if (ev.key === "Escape") { closeOverlay(); window.removeEventListener("keydown", onEsc); } });
 
-  // -- refresca producto (si usas supabase) para evitar salir con stock desactualizado
-  async function refreshProductLive(producto) {
+  // asegurar evaluación inicial (por si ya había valores)
+  setTimeout(updateConfirmState, 50);
+
+  // Confirm — agrega uno o varios pendientes usando addPendingSalida
+  btnConfirm.addEventListener("click", () => {
     try {
-      if (typeof supabase !== "undefined") {
-        const { data, error } = await supabase
-          .from('productos_sin_codigo')
-          .select('*')
-          .eq('id', producto.id)
-          .limit(1)
-          .maybeSingle();
-        if (!error && data) return data;
+      const totalNeeded = Number(cantidadInput.value || 0);
+      if (!totalNeeded || totalNeeded <= 0) { showAlertToast("Cantidad inválida", "warning"); return; }
+
+      const distrib = getDistrib().filter(d => Number(d.qty) > 0);
+      if (distrib.length === 0) { showAlertToast("Distribución inválida", "warning"); return; }
+      if (Math.abs(distrib.reduce((s,d) => s + Number(d.qty || 0), 0) - totalNeeded) > 1e-6) { showAlertToast("La suma por inventario debe coincidir con el total", "warning"); return; }
+
+      const responsableVal = responsableField.value || "";
+      const destinatarioVal = destinatarioField.value || "";
+      const obsVal = obsField.value || "";
+
+      // construir y añadir pendiente(s)
+      if (distrib.length === 1) {
+        const d = distrib[0];
+        const pend = {
+          PRODUCT_ID: producto.id,
+          CODIGO: producto.CODIGO,
+          DESCRIPCION: producto.DESCRIPCION,
+          UM: producto.UM,
+          INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`,
+          CANTIDAD: Number(d.qty),
+          RESPONSABLE: responsableVal,
+          DESTINATARIO: destinatarioVal,
+          OBSERVACIONES: obsVal,
+          ADDED_AT: new Date().toISOString()
+        };
+        addPendingSalida(pend);
+      } else {
+        const pend = {
+          PRODUCT_ID: producto.id,
+          CODIGO: producto.CODIGO,
+          DESCRIPCION: producto.DESCRIPCION,
+          UM: producto.UM,
+          ORIGENES: distrib.map(d => ({ INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`, CANTIDAD: Number(d.qty) })),
+          CANTIDAD: totalNeeded,
+          RESPONSABLE: responsableVal,
+          DESTINATARIO: destinatarioVal,
+          OBSERVACIONES: obsVal,
+          ADDED_AT: new Date().toISOString()
+        };
+        addPendingSalida(pend);
       }
-    } catch (e) { /* noop */ }
-    // fallback: devuelve el producto que ya tenías
-    return producto;
-  }
 
-  producto = await refreshProductLive(producto);
+      // mostrar toast detallado y simple
+      const lines = [
+        { label: "Producto", value: producto.DESCRIPCION || producto.CODIGO || "(sin descripción)" },
+        { label: "Total", value: totalNeeded },
+        ...getDistrib().filter(d=>d.qty>0).map(d => ({ label: d.inv, value: d.qty }))
+      ];
+      showDetailedToast("✅ Salida agregada a pendientes", lines, { timeoutMs: 5000 });
+      showToast("Salida agregada a pendientes", true, 3000);
 
-  // render inicial
-  await renderDistribRows();
-  updateConfirmState();
+      // refrescar vista de pendientes
+      renderPendingList();
+
+      // cerrar modal
+      closeOverlay();
+    } catch (err) {
+      console.error("Error al agregar pendiente desde modal salida:", err);
+      showAlertToast("Error al agregar pendiente", "error");
+    }
+  });
 }
-
-async function renderPendingList() {
-  if (!tablaPendientesBody) return;
-
-  // inyectar estilos si no existen
-  if (!document.getElementById("salidas-inline-styles")) {
-    const style = document.createElement("style");
-    style.id = "salidas-inline-styles";
-    style.textContent = `
-      .inv-select-wrap { display:inline-flex; align-items:center; gap:8px; }
-      .inv-dot { display:inline-block; width:12px; height:12px; border-radius:50%; vertical-align:middle; flex:0 0 12px; box-shadow: 0 0 0 1px rgba(0,0,0,0.06) inset; }
-      .pending-inv-select { min-width:110px; padding:6px 8px; border-radius:6px; border:1px solid #ddd; background:#fff; font-size:13px; }
-      .inv-stock { margin-left:6px; font-size:12px; color:#444; }
-      #pendingTable td { white-space:nowrap; }
-      @media (max-width:700px) { .pending-inv-select { min-width:90px; } }
-    `;
-    document.head.appendChild(style);
+  // -------------------- Helper cleanObjectForInsert --------------------
+  function cleanObjectForInsert(obj) {
+    const out = {};
+    for (const k in obj) {
+      if (obj[k] === undefined) continue;
+      out[k] = obj[k];
+    }
+    return out;
   }
 
-  const list = getPendingSalidas();
-  tablaPendientesBody.innerHTML = "";
-
-  if (!list || list.length === 0) {
-    tablaPendientesBody.innerHTML = `<tr><td colspan="8" class="empty-note">No hay salidas pendientes</td></tr>`;
-    updatePendingCount();
-    return;
+  // -------------------- UTIL DETECT COLUMNS --------------------
+  async function detectColumnsOfEntradasSinCodigo() {
+    if (!supabase) {
+      showActionToast("general", false, "Conexión no disponible para detectar columnas");
+      return null;
+    }
+    
+    try {
+      const { data, error } = await supabase.from("entradas_sin_codigo").select("*").limit(1);
+      if (error) {
+        console.warn("detectColumnsOfEntradasSinCodigo warning:", error);
+        showActionToast("general", false, "Error al detectar columnas");
+        return null;
+      }
+      if (!data || data.length === 0) {
+        showActionToast("general", true, "Tabla de entradas vacía");
+        return null;
+      }
+      
+      showActionToast("general", true, "Columnas de entradas detectadas");
+      return Object.keys(data[0]);
+    } catch (e) {
+      console.error("detectColumnsOfEntradasSinCodigo ex:", e);
+      showActionToast("general", false, "Excepción al detectar columnas");
+      return null;
+    }
   }
 
-  const inventoryOptions = [
-    "INVENTARIO I069",
-    "INVENTARIO I078",
-    "INVENTARIO I07F",
-    "INVENTARIO I312",
-    "INVENTARIO I073",
-    "INVENTARIO FISICO EN ALMACEN"
-  ];
+  function pickAllowed(obj, allowed) {
+    const out = {};
+    for (const k of Object.keys(obj)) {
+      // allowed names are case-sensitive (returned by supabase)
+      if (allowed.includes(k)) out[k] = obj[k];
+    }
+    return out;
+  }
 
-  for (let idx = 0; idx < list.length; idx++) {
-    const item = list[idx];
+  // -------------------- ENTRADAS _entradas_sin_codigo (modal registrar) --------------------
+  function openEntradaModalById(producto) {
+    const existing = document.getElementById("entradaModalOverlay");
+    if (existing) existing.remove();
 
-    // responsable: preferimos el almacenado en el pendiente; si no existe usamos el usuario actual
-    const responsableFull = item.RESPONSABLE || CURRENT_USER_FULLNAME || `${item.RESPONSABLE_NOMBRE ?? ""} ${item.RESPONSABLE_APELLIDO ?? ""}`.trim() || "Sin responsable";
+    const overlay = document.createElement("div");
+    overlay.id = "entradaModalOverlay";
+    Object.assign(overlay.style, {
+      position: "fixed",
+      inset: "0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.45)",
+      zIndex: 12000
+    });
 
-    const selectedInv = item.INVENTARIO_ORIGEN ? item.INVENTARIO_ORIGEN : inventoryOptions[0];
-    const dotColor = invColorFor(selectedInv);
+    const modal = document.createElement("div");
+    modal.className = "entrada-modal";
+    Object.assign(modal.style, {
+      width: "720px",
+      maxWidth: "96%",
+      background: "#fff",
+      borderRadius: "8px",
+      padding: "16px",
+      boxShadow: "0 12px 36px rgba(0,0,0,0.28)",
+      fontFamily: "'Quicksand', sans-serif",
+      color: "#111"
+    });
 
-    const tr = document.createElement("tr");
-
-    const invSelectHTML = `
-      <div class="inv-select-wrap">
-        <span class="inv-dot" data-dot-idx="${idx}" style="background:${dotColor}"></span>
-        <select class="pending-inv-select" data-idx="${idx}">
-          ${inventoryOptions
-            .map(opt => {
-              const short = opt.replace("INVENTARIO ", "");
-              const selected = normalizeInventoryKey(item.INVENTARIO_ORIGEN) === normalizeInventoryKey(opt) ? "selected" : "";
-              return `<option value="${escapeHtml(opt)}" ${selected}>${escapeHtml(short)}</option>`;
-            }).join("")}
-        </select>
-        <span class="inv-stock" data-idx="${idx}"></span>
+    modal.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <h3 style="margin:0">Registrar entrada — ${escapeHtml(producto.DESCRIPCION || producto.CODIGO || '')}</h3>
+        <button id="entradaCloseBtn" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:8px">
+        <label>I069<input id="ent_i069" type="number" min="0" step="any" class="input-text" /></label>
+        <label>I078<input id="ent_i078" type="number" min="0" step="any" class="input-text" /></label>
+        <label>I07F<input id="ent_i07f" type="number" min="0" step="any" class="input-text" /></label>
+        <label>I312<input id="ent_i312" type="number" min="0" step="any" class="input-text" /></label>
+        <label>I073<input id="ent_i073" type="number" min="0" step="any" class="input-text" /></label>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <div style="flex:1">
+          <label>Responsable
+            <input id="ent_responsable" type="text" class="input-text" />
+          </label>
+        </div>
+        <div style="width:160px">
+          <label>Total
+            <input id="ent_total" type="text" readonly class="input-text readonly" />
+          </label>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+        <button id="ent_cancel" class="btn-cancel">Cancelar</button>
+        <button id="ent_register" class="btn-primary">Registrar entrada</button>
       </div>
     `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
 
-    tr.innerHTML = `
-      <td class="col-desc"><span class="desc-text" title="${escapeHtml(item.DESCRIPCION)}">${escapeHtml(item.DESCRIPCION)}</span></td>
-      <td class="col-um">${escapeHtml(item.UM ?? '')}</td>
-      <td class="col-inv">${invSelectHTML}</td>
-      <td class="col-cant"><input type="number" min="1" value="${escapeHtml(String(item.CANTIDAD))}" data-idx="${idx}" class="pending-cantidad" style="width:90px"></td>
-      <td class="col-resp"><span class="resp-text" data-idx="${idx}">${escapeHtml(responsableFull)}</span></td>
-      <td class="col-dest"><input type="text" value="${escapeHtml(item.DESTINATARIO ?? '')}" data-idx="${idx}" class="pending-dest" placeholder="Destinatario"></td>
-      <td class="col-obs"><input type="text" value="${escapeHtml(item.OBSERVACIONES ?? '')}" data-idx="${idx}" class="pending-observaciones" placeholder="Observaciones"></td>
-      <td class="col-acc"><button class="btn-remove" data-idx="${idx}">Eliminar</button></td>
-    `;
-    tablaPendientesBody.appendChild(tr);
+    const i069 = modal.querySelector("#ent_i069");
+    const i078 = modal.querySelector("#ent_i078");
+    const i07f = modal.querySelector("#ent_i07f");
+    const i312 = modal.querySelector("#ent_i312");
+    const i073 = modal.querySelector("#ent_i073");
+    const totalField = modal.querySelector("#ent_total");
+    const responsableField = modal.querySelector("#ent_responsable");
+    const registerBtn = modal.querySelector("#ent_register");
+    const cancelBtn = modal.querySelector("#ent_cancel");
+    const closeX = modal.querySelector("#entradaCloseBtn");
 
-    // mostrar stock y fijar max en el input cantidad
+    // make responsable autocompleted and read-only (not editable)
+    responsableField.readOnly = true;
+    responsableField.tabIndex = -1;
+    responsableField.title = "Autocompletado desde sesión (no editable)";
+    // style visually as non-editable
+    Object.assign(responsableField.style, {
+      backgroundColor: "#f3f4f6",
+      cursor: "not-allowed",
+      borderColor: "rgba(0,0,0,0.08)"
+    });
+
+    // Prellenar responsable si hay sesión activa
     (async () => {
-      const stockSpan = tablaPendientesBody.querySelector(`.inv-stock[data-idx="${idx}"]`);
-      const sel = tablaPendientesBody.querySelector(`.pending-inv-select[data-idx="${idx}"]`);
-      const qtyInput = tablaPendientesBody.querySelector(`.pending-cantidad[data-idx="${idx}"]`);
-      if (!stockSpan || !sel || !qtyInput) return;
-      const chosen = sel.value;
-
-      if (typeof item.AVAILABLE === "number" && item.AVAILABLE !== null && item.AVAILABLE !== undefined) {
-        stockSpan.textContent = `Disponible: ${item.AVAILABLE}`;
-        qtyInput.max = String(item.AVAILABLE);
-      } else {
-        const fetched = await fetchStockForProduct(item.id, chosen);
-        if (fetched !== null) {
-          stockSpan.textContent = `Disponible: ${fetched}`;
-          item.AVAILABLE = fetched;
-          qtyInput.max = String(fetched);
-          savePendingSalidas(list);
-        } else {
-          stockSpan.textContent = "";
-          qtyInput.removeAttribute("max");
+      try {
+        if (supabase) {
+          const { data: authData } = await supabase.auth.getUser();
+          const user = authData?.user ?? null;
+          if (user && user.email) {
+            responsableField.value = user.email;
+            showActionToast("auth", true, "Sesión autenticada");
+          } else {
+            // si no hay sesión, dejar vacío pero no editable; mostrar placeholder
+            responsableField.placeholder = "No autenticado";
+            responsableField.value = "";
+            showActionToast("auth", false, "No hay sesión activa");
+          }
         }
-      }
-
-      // if current qty > available, adjust and force user to change inventory if they need more
-      const avail = parseInt(item.AVAILABLE || 0, 10);
-      const curQty = parseInt(item.CANTIDAD || 0, 10);
-      if (avail > 0 && curQty > avail) {
-        // ajustamos al disponible y avisamos
-        const list2 = getPendingSalidas();
-        list2[idx].CANTIDAD = avail;
-        list2[idx].AVAILABLE = avail;
-        savePendingSalidas(list2);
-        qtyInput.value = avail;
-        stockSpan.textContent = `Disponible: ${avail}`;
-        showToast(`Stock insuficiente en ${sel.value}. Cantidad ajustada a ${avail}. Elige otro inventario si necesitas más.`, false);
+      } catch (e) {
+        // fallback: dejar placeholder
+        responsableField.placeholder = "No disponible";
+        responsableField.value = "";
+        showActionToast("auth", false, "Error al verificar sesión");
       }
     })();
-  }
 
-  // cuando cambia inventario: actualizamos AVAILABLE, puntito y max del input cantidad
-  tablaPendientesBody.querySelectorAll(".pending-inv-select").forEach((sel) => {
-    sel.addEventListener("change", async (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const newInv = e.target.value;
-      const list = getPendingSalidas();
-      if (!list[idx]) return;
-      list[idx].INVENTARIO_ORIGEN = newInv;
-      const fetched = await fetchStockForProduct(list[idx].id, newInv);
-      if (fetched !== null) {
-        list[idx].AVAILABLE = fetched;
-      } else {
-        delete list[idx].AVAILABLE;
-      }
-      savePendingSalidas(list);
-
-      // actualizar puntito
-      const dot = tablaPendientesBody.querySelector(`.inv-dot[data-dot-idx="${idx}"]`);
-      if (dot) dot.style.background = invColorFor(newInv);
-      // actualizar stock visible y ajustar input max/value
-      const stockSpan = tablaPendientesBody.querySelector(`.inv-stock[data-idx="${idx}"]`);
-      const qtyInput = tablaPendientesBody.querySelector(`.pending-cantidad[data-idx="${idx}"]`);
-      const available = parseInt(list[idx].AVAILABLE || 0, 10);
-      if (stockSpan) stockSpan.textContent = available ? `Disponible: ${available}` : "";
-      if (qtyInput) {
-        if (available) {
-          qtyInput.max = String(available);
-          if (parseInt(qtyInput.value || "0", 10) > available) {
-            qtyInput.value = available;
-            list[idx].CANTIDAD = available;
-            savePendingSalidas(list);
-            showToast(`Cantidad ajustada a stock disponible (${available}). Si necesitas más, elige otro inventario.`, false);
-          }
-        } else {
-          qtyInput.removeAttribute("max");
-        }
-      }
-    });
-  });
-
-  // cantidad: validar contra AVAILABLE y forzar ajuste si supera
-  tablaPendientesBody.querySelectorAll(".pending-cantidad").forEach((input) => {
-    input.addEventListener("change", (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const v = parseInt(e.target.value, 10);
-      const list = getPendingSalidas();
-      if (Number.isNaN(v) || v <= 0) {
-        showToast("Cantidad inválida", false);
-        renderPendingList();
-        return;
-      }
-      const available = parseInt(list[idx].AVAILABLE || 0, 10);
-      if (available > 0 && v > available) {
-        showToast(`Stock insuficiente (${available}) en ${list[idx].INVENTARIO_ORIGEN}. Cambia de inventario si necesitas más.`, false);
-        input.value = available;
-        list[idx].CANTIDAD = available;
-        savePendingSalidas(list);
-        renderPendingList();
-        return;
-      }
-      list[idx].CANTIDAD = v;
-      list[idx].ADDED_AT = new Date().toISOString();
-      savePendingSalidas(list);
-      updatePendingCount();
-    });
-  });
-
-  // destinatario / observaciones / eliminar (igual que antes)
-  tablaPendientesBody.querySelectorAll(".pending-dest").forEach((input) => {
-    input.addEventListener("change", (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const v = String(e.target.value || "").trim();
-      const list = getPendingSalidas();
-      list[idx].DESTINATARIO = v;
-      list[idx].ADDED_AT = new Date().toISOString();
-      savePendingSalidas(list);
-    });
-  });
-
-  tablaPendientesBody.querySelectorAll(".pending-observaciones").forEach((input) => {
-    input.addEventListener("change", (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const v = String(e.target.value || "").trim();
-      const list = getPendingSalidas();
-      list[idx].OBSERVACIONES = v;
-      list[idx].ADDED_AT = new Date().toISOString();
-      savePendingSalidas(list);
-    });
-  });
-
-  tablaPendientesBody.querySelectorAll(".btn-remove").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const list = getPendingSalidas();
-      list.splice(idx, 1);
-      savePendingSalidas(list);
-      renderPendingList();
-      updatePendingCount();
-    });
-  });
-
-  updatePendingCount();
-}
-
-// ------------------- Renderizar tabla (robusta, con Stock Real y clases) -------------------
-function renderTable(products) {
-  if (!tableBody) return;
-  tableBody.innerHTML = "";
-
-  products.forEach((p) => {
-    // Inventarios parciales siempre como números
-    const i069 = toNumber(getStockFromProduct(p, "I069"));
-    const i078 = toNumber(getStockFromProduct(p, "I078"));
-    const i07f = toNumber(getStockFromProduct(p, "I07F"));
-    const i312 = toNumber(getStockFromProduct(p, "I312"));
-    const i073 = toNumber(getStockFromProduct(p, "I073"));
-
-    // Valor físico: primero leer directo, si no hay usar suma
-    let rawFisico = getStockFromProduct(p, "INVENTARIO FISICO EN ALMACEN");
-    if (rawFisico === null || rawFisico === undefined || rawFisico === "") {
-      rawFisico = getStockFromProduct(p, "ALMACEN"); // fallback si existe con otro nombre
-    }
-    const fisicoVal =
-      rawFisico === null || rawFisico === undefined || rawFisico === ""
-        ? i069 + i078 + i07f + i312 + i073
-        : toNumber(rawFisico);
-
-    // Stock real = suma
-    const stockReal = i069 + i078 + i07f + i312 + i073;
-
-    // Colorear filas según stock
-    let stockClass = "stock-high";
-    if (stockReal <= 1) stockClass = "stock-low";
-    else if (stockReal <= 10) stockClass = "stock-medium";
-
-    // Crear fila
-    const row = document.createElement("tr");
-    row.className = stockClass;
-
-    // Columnas - CORREGIDO CON CÓDIGO
-const tdCodigo = document.createElement("td");
-tdCodigo.textContent = extraerCodigoSC(p) ?? "";
-
-const tdDesc = document.createElement("td");
-tdDesc.textContent = p["DESCRIPCION"] ?? "";
-
-const tdUm = document.createElement("td");
-tdUm.textContent = p["UM"] ?? "";
-
-const tdI069 = document.createElement("td");
-tdI069.textContent = formatShowValue(i069);
-
-const tdI078 = document.createElement("td");
-tdI078.textContent = formatShowValue(i078);
-
-const tdI07F = document.createElement("td");
-tdI07F.textContent = formatShowValue(i07f);
-
-const tdI312 = document.createElement("td");
-tdI312.textContent = formatShowValue(i312);
-
-const tdI073 = document.createElement("td");
-tdI073.textContent = formatShowValue(i073);
-
-const tdFisico = document.createElement("td");
-tdFisico.textContent = formatShowValue(fisicoVal);
-    // Columna Acciones
-    const tdAcciones = document.createElement("td");
-    tdAcciones.className = "acciones"; // coincide con el CSS que usarás
-
-    const createBtn = (btnClass, emoji, text, handler) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `btn ${btnClass}`;
-      // estructura: cuadrito del icono + etiqueta
-      btn.innerHTML = `<span class="icon-wrap" aria-hidden>${emoji}</span><span class="label">${text}</span>`;
-      if (handler) btn.addEventListener("click", handler);
-      return btn;
+    const parseQ = (el) => {
+      const s = String(el?.value || "0").trim().replace(",", ".");
+      const n = Number(s);
+      return Number.isFinite(n) ? n : 0;
     };
 
-    const btnEdit = createBtn("btn-edit", "✏️", "Editar", () => editarProducto(p));
-    const btnDelete = createBtn("btn-delete", "🗑️", "Eliminar", () => eliminarProducto(p["id"]));
-    const btnSalida = createBtn("btn-salida", "📦", "Salida", () => openSalidaModal(p));
+    const computeTotal = () => {
+      const t = parseQ(i069) + parseQ(i078) + parseQ(i07f) + parseQ(i312) + parseQ(i073);
+      // mostrar con hasta 3 decimales (como en tu UI)
+      totalField.value = Number.isFinite(t) ? t.toFixed(3) : "0.000";
+      return t;
+    };
+    
+    [i069, i078, i07f, i312, i073].forEach(inp => inp.addEventListener("input", computeTotal));
+    computeTotal();
 
-    // agrega los botones (en una sola fila — el gap lo controla CSS)
-    tdAcciones.appendChild(btnEdit);
-    tdAcciones.appendChild(btnDelete);
-    tdAcciones.appendChild(btnSalida);
+    const closeOverlay = () => {
+      overlay.remove();
+      showActionToast("entrada", true, "Entrada cancelada");
+    };
+    
+    cancelBtn.addEventListener("click", closeOverlay);
+    closeX.addEventListener("click", closeOverlay);
+    overlay.addEventListener("click", e => { 
+      if (e.target === overlay) closeOverlay(); 
+    });
+    
+    window.addEventListener("keydown", function onEsc(ev) {
+      if (ev.key === "Escape") { 
+        closeOverlay(); 
+        window.removeEventListener("keydown", onEsc); 
+      }
+    });
 
-    // Agregar a la fila
-row.appendChild(tdCodigo);    // Primero: Código
-row.appendChild(tdDesc);      // Segundo: Descripción
-row.appendChild(tdUm);        // Tercero: UM
-row.appendChild(tdI069);      // Cuarto: I069
-row.appendChild(tdI078);      // Quinto: I078
-row.appendChild(tdI07F);      // Sexto: I07F
-row.appendChild(tdI312);      // Séptimo: I312
-row.appendChild(tdI073);      // Octavo: I073
-row.appendChild(tdFisico);    // Noveno: Inventario Físico
-row.appendChild(tdAcciones);  // Décimo: Acciones
-    tableBody.appendChild(row);
-  });
-}
+    registerBtn.addEventListener("click", async () => {
+      registerBtn.disabled = true;
+      registerBtn.textContent = "Registrando...";
 
-// ------------------- Helper: limpiar formulario de producto -------------------
-function clearProductFormFields() {
-  if (!productForm) return;
-  try {
-    // reset nativo
-    productForm.reset();
-  } catch (e) {}
-  
-  // limpiar manualmente todos los inputs/textarea/check
-  productForm.querySelectorAll('input,textarea,select').forEach(i => {
-    try {
-      if (i.type === "checkbox" || i.type === "radio") i.checked = false;
-      else i.value = "";
-      
-      // Resetear estilos
-      i.removeAttribute('readonly');
-      i.disabled = false;
-      i.style.backgroundColor = '';
-      i.style.cursor = '';
-    } catch (e) {}
-  });
-  
-  // Mostrar checkbox 'sumar' por defecto
-  const chk = productForm.querySelector('[name="sumar"]');
-  if (chk) {
-    chk.disabled = false;
-    const parent = chk.closest('div');
-    if (parent) parent.style.display = 'block';
+      try {
+        const q069v = parseQ(i069), q078v = parseQ(i078), q07fv = parseQ(i07f), q312v = parseQ(i312), q073v = parseQ(i073);
+        const total = q069v + q078v + q07fv + q312v + q073v;
+        const responsable = (responsableField.value || "").trim();
+
+        if (total <= 0) {
+          showActionToast("entrada", false, "Ingresa al menos una cantidad mayor a 0");
+          registerBtn.disabled = false; 
+          registerBtn.textContent = "Registrar entrada"; 
+          return;
+        }
+        
+        if (!responsable) {
+          showActionToast("entrada", false, "Responsable requerido (no autenticado)");
+          registerBtn.disabled = false; 
+          registerBtn.textContent = "Registrar entrada"; 
+          return;
+        }
+
+        // --- INSERCIÓN ENTRADAS_SIN_CODIGO (forzado) ---
+        const inserted = await registerEntradaImmediate(producto, {
+          q069: q069v, q078: q078v, q07f: q07fv, q312: q312v, q073: q073v, total, responsable, nota: ""
+        });
+
+        // Mostrar toast detallado
+        showActionToast("entrada", true, `Entrada registrada - Total: ${total}`);
+
+        // refrescar productos
+        try { 
+          await loadAllProductsWithPagination(); 
+        } catch (e) {
+          showActionToast("load", false, "Error al actualizar productos después de entrada");
+        }
+
+        // cerrar modal un poco después para que se vea el toast
+        setTimeout(closeOverlay, 700);
+      } catch (err) {
+        console.error("Error registrar entrada inmediata (UI):", err);
+        showActionToast("entrada", false, `Error: ${err.message}`);
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.textContent = "Registrar entrada";
+      }
+    });
+    
+    showActionToast("entrada", true, `Modal de entrada abierto para: ${producto.DESCRIPCION}`);
   }
-}
 
-// ------------------- Editar Producto -------------------
-function editarProducto(producto) {
-  if (!modal || !productForm) {
-    showToast("Formulario de producto no disponible", false);
-    return;
+// Reemplazar la función existente registerEntradaImmediate por esta versión mejorada
+async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312=0, q073=0, total=0, responsable="", nota="" } = {}) {
+  if (!supabase) throw new Error("Supabase no inicializado");
+
+  // fecha fallback
+  function _getNowISO() {
+    try { return (new Date()).toISOString(); } catch(e){ return null; }
   }
+  const fechaNow = (typeof getCurrentLocalDate === 'function') ? getCurrentLocalDate() : _getNowISO();
 
-  editMode = true;
-  editingCodigo = producto?.id ?? null;
-
-  if (editingCodigo !== null && editingCodigo !== undefined) {
-    editingCodigo = String(editingCodigo).trim();
-  }
-
-  // Abrir modal
-  modal.style.display = "flex";
-
-  // Helper para setear valor defensivamente
-  const setVal = (name, value) => {
-    const el = productForm.querySelector(`[name="${name}"]`);
-    if (el) el.value = (value === undefined || value === null) ? "" : value;
+  // insertar entrada (mantener la tabla entradas_sin_codigo)
+  const entradaToInsert = {
+    descripcion: producto?.DESCRIPCION ?? producto?.descripcion ?? producto?.CODIGO ?? "",
+    cantidad: Number(total || 0),
+    i069: Number(q069 || 0),
+    i078: Number(q078 || 0),
+    i07f: Number(q07f || 0),
+    i312: Number(q312 || 0),
+    i073: Number(q073 || 0),
+    responsable: responsable || null,
+    fecha: fechaNow
   };
 
-  // Rellenar SOLO descripción y UM
-  setVal('descripcion', producto?.DESCRIPCION ?? producto?.descripcion ?? "");
-  setVal('um', producto?.UM ?? producto?.um ?? "");
-
-  // OCULTAR completamente los campos de inventarios y almacén
-  const camposOcultar = ['i069', 'i078', 'i07f', 'i312', 'i073', 'almacen', 'sumar'];
-  
-  camposOcultar.forEach(campo => {
-    const field = productForm.querySelector(`[name="${campo}"]`);
-    if (field) {
-      const formGroup = field.closest('.form-group') || field.closest('div');
-      if (formGroup) {
-        formGroup.style.display = 'none';
-      }
-    }
-  });
-
-  // En modo EDICIÓN: BLOQUEAR UM, solo dejar descripción editable
-  const camposBloquear = ['um'];
-  
-  camposBloquear.forEach(campo => {
-    const field = productForm.querySelector(`[name="${campo}"]`);
-    if (field) {
-      field.setAttribute('readonly', 'true');
-      field.disabled = true;
-      field.style.backgroundColor = '#f5f5f5';
-      field.style.cursor = 'not-allowed';
-    }
-  });
-
-  // Habilitar solo descripción
-  const desc = productForm.querySelector('[name="descripcion"]');
-  if (desc) {
-    desc.removeAttribute('readonly');
-    desc.disabled = false;
-    desc.style.backgroundColor = '';
-    desc.style.cursor = '';
-    try { desc.focus(); desc.select?.(); } catch (e) { /* noop */ }
-  }
-  
-  // Cambiar el texto del botón para indicar que es edición
-  const saveBtn = productForm.querySelector('.btn-save');
-  if (saveBtn) {
-    saveBtn.textContent = "Guardar Cambios";
-  }
-}
-
-// ------------------- Eliminar Producto -------------------
-async function eliminarProducto(id) {
-  if (!supabase) {
-    showToast("Supabase no está inicializado", false);
-    return;
-  }
-
-  showConfirm(`⚠ ¿Seguro que deseas eliminar el producto?`, async () => {
-    const { error } = await supabase
-      .from("productos_sin_codigo")
-      .delete()
-      .eq("id", id);
-
-    if (error) {
-      console.error("❌ Error al eliminar:", error);
-      showToast("No se pudo eliminar el producto", false);
-    } else {
-      showToast("✅ Producto eliminado correctamente", true);
-      loadProducts();
-    }
-  });
-}
-
-// ------------------- Modal del formulario producto (abrir/cerrar) -------------------
-if (btnOpenModal) {
-  btnOpenModal.addEventListener("click", () => {
-    if (!productForm || !modal) return;
-    editMode = false;
-    editingCodigo = null;
-    clearProductFormFields();
-    
-    // En modo NUEVO: Mostrar solo descripción y UM
-    const camposMostrar = ['descripcion', 'um'];
-    const camposOcultar = ['i069', 'i078', 'i07f', 'i312', 'i073', 'almacen', 'sumar'];
-    
-    // Mostrar campos básicos
-    camposMostrar.forEach(campo => {
-      const field = productForm.querySelector(`[name="${campo}"]`);
-      if (field) {
-        const formGroup = field.closest('.form-group') || field.closest('div');
-        if (formGroup) {
-          formGroup.style.display = 'block';
-        }
-        field.removeAttribute('readonly');
-        field.disabled = false;
-        field.style.backgroundColor = '';
-        field.style.cursor = '';
-      }
-    });
-    
-    // Ocultar campos de inventarios
-    camposOcultar.forEach(campo => {
-      const field = productForm.querySelector(`[name="${campo}"]`);
-      if (field) {
-        const formGroup = field.closest('.form-group') || field.closest('div');
-        if (formGroup) {
-          formGroup.style.display = 'none';
-        }
-      }
-    });
-
-    modal.style.display = "flex";
-    
-    // Cambiar texto del botón para nuevo producto
-    const saveBtn = productForm.querySelector('.btn-save');
-    if (saveBtn) {
-      saveBtn.textContent = "Crear Producto";
-    }
-    
-    // Enfocar el campo descripción
-    const descField = productForm.querySelector('[name="descripcion"]');
-    if (descField) {
-      setTimeout(() => descField.focus(), 100);
-    }
-  });
-}
-
-if (btnCloseModal) {
-  btnCloseModal.addEventListener("click", () => {
-    if (!productForm || !modal) return;
-    modal.style.display = "none";
-    clearProductFormFields();
-    editMode = false;
-    editingCodigo = null;
-    
-    // Resetear texto del botón
-    const saveBtn = productForm.querySelector('.btn-save');
-    if (saveBtn) {
-      saveBtn.textContent = "Crear Producto";
-    }
-  });
-}
-
-window.addEventListener("click", (e) => {
-  if (e.target === modal) {
-    if (!productForm || !modal) return;
-    modal.style.display = "none";
-    clearProductFormFields();
-    editMode = false;
-    editingCodigo = null;
-    
-    // Resetear texto del botón
-    const saveBtn = productForm.querySelector('.btn-save');
-    if (saveBtn) {
-      saveBtn.textContent = "Crear Producto";
-    }
-  }
-});
-
-// ------------------- GUARDAR PRODUCTO CORREGIDO - SIN COLUMNA "No." -------------------
-productForm?.addEventListener('submit', async (ev) => {
-  ev.preventDefault();
-  if (!productForm) return;
-
-  const saveBtn = productForm.querySelector('.btn-save');
-  const originalBtnText = saveBtn?.textContent ?? "";
-
-  try {
-    if (!supabase) {
-      showToast("Supabase no inicializado", false);
-      return;
-    }
-
-    if (saveBtn) {
-      saveBtn.disabled = true;
-      saveBtn.textContent = editMode ? "Guardando..." : "Creando...";
-    }
-
-    // Obtener datos del formulario
-    const formData = new FormData(productForm);
-    const rawData = Object.fromEntries(formData.entries());
-    
-    console.log("📝 Datos del formulario:", rawData);
-
-    // Validaciones básicas
-    const descripcion = (rawData['descripcion'] || "").trim();
-    const um = (rawData['um'] || "").trim();
-
-    if (!descripcion) {
-      showToast("La descripción es obligatoria", false);
-      if (saveBtn) {
-        saveBtn.disabled = false;
-        saveBtn.textContent = originalBtnText;
-      }
-      return;
-    }
-
-    // Construir objeto para insertar - SIN LA COLUMNA "No."
-    const insertData = {
-      "DESCRIPCION": descripcion,
-      "UM": um,
-      "CODIGO": "S/C",
-      "INVENTARIO I069": 0,
-      "INVENTARIO I078": 0,
-      "INVENTARIO I07F": 0,
-      "INVENTARIO I312": 0,
-      "INVENTARIO I073": 0,
-      "INVENTARIO FISICO EN ALMACEN": 0
-    };
-
-    console.log("📤 Datos a insertar (sin columna 'No.'):", insertData);
-
-    // Intentar inserción SIN especificar columnas (deja que Supabase use valores por defecto)
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .insert([insertData])
-      .select();
-
-    if (error) {
-      console.error("❌ Error Supabase:", error);
-      
-      if (error.code === '23502') {
-        // Si aún da error, intentar con un valor por defecto para "No."
-        console.log("🔄 Intentando con valor por defecto para 'No.'...");
-        insertData["No."] = 0; // Valor temporal
-        return await reintentarInsercion(insertData);
-      } else {
-        showToast(`Error al crear producto: ${error.message}`, false);
-      }
-      
-      throw error;
-    }
-
-    // Éxito
-    console.log("✅ Producto creado:", data);
-    showToast("✅ Producto creado exitosamente", true);
-    
-    // Recargar productos y cerrar modal
-    await loadProducts();
-    if (modal) modal.style.display = 'none';
-    clearProductFormFields();
-
-  } catch (error) {
-    console.error("❌ Error general creando producto:", error);
-    showToast("❌ Error al crear producto. Ver consola para detalles.", false);
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = originalBtnText;
-    }
-  }
-});
-
-// Función para reintentar inserción con valor por defecto
-async function reintentarInsercion(datos) {
-  const { data, error } = await supabase
-    .from("productos_sin_codigo")
-    .insert([datos])
+  const { data: insertData, error: insertErr } = await supabase
+    .from("entradas_sin_codigo")
+    .insert([entradaToInsert])
     .select();
 
-  if (error) throw error;
-  return data;
-}
-
-// ------------------- Cargar productos -------------------
-async function loadProducts() {
-  if (!supabase) {
-    console.error("Supabase no inicializado");
-    showToast("Supabase no está inicializado", false);
-    return;
+  if (insertErr) {
+    showActionToast("entrada", false, `Error BD (insert entrada): ${insertErr.message}`);
+    throw insertErr;
   }
 
-  try {
-    // traemos todas las columnas (más robusto si renombraste columnas)
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*");
+  // cargar mapa columnas (intentar)
+  try { await ensureProductosSinCodigoColumnMap(); } catch(e) { console.warn("Mapa columnas no cargado:", e); }
 
-    if (error) {
-      console.error("❌ Error al cargar productos:", error);
-      showToast("Error al cargar productos", false);
-      return;
+  // buscar producto objetivo (primero por id, sino por CODIGO)
+  let prodRow = null;
+  try {
+    if (producto && (producto.id || producto.ID || producto.Id)) {
+      const idVal = producto.id ?? producto.ID ?? producto.Id;
+      const { data: pData, error: pErr } = await supabase.from("productos_sin_codigo").select("*").eq("id", idVal).maybeSingle();
+      if (pErr) console.warn("Error buscando producto por id:", pErr);
+      prodRow = (pErr ? null : pData) || null;
     }
-    
 
-    // inicializar map de columnas para futuras operaciones
-    await ensureProductosSinCodigoColumnMap();
-
-    renderTable(data || []);
-    updatePendingCount(); // actualizar contador cada vez que recargue la tabla
-  } catch (ex) {
-    console.error("loadProducts exception:", ex);
-    showToast("Error cargando productos (ver consola)", false);
-  }
-}
-
-// ------------------- Suscripción en tiempo real -------------------
-if (supabase?.channel) {
-  try {
-    supabase
-      .channel("realtime:productos_sin_codigo")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "productos_sin_codigo" },
-        (payload) => {
-          console.log("📢 Cambio detectado:", payload);
-          loadProducts();
-        }
-      )
-      .subscribe();
+    if (!prodRow) {
+      const codigoVal = (producto?.CODIGO ?? producto?.codigo ?? "").toString().trim();
+      if (codigoVal) {
+        const { data: pData2, error: pErr2 } = await supabase.from("productos_sin_codigo").select("*").ilike("CODIGO", codigoVal).limit(1).maybeSingle();
+        if (pErr2) console.warn("Error buscando producto por codigo:", pErr2);
+        prodRow = (pErr2 ? null : pData2) || null;
+      }
+    }
   } catch (err) {
-    console.warn("No se pudo crear canal realtime (versión supabase?):", err);
+    console.warn("Excepción buscando producto:", err);
   }
-}
 
-// ------------------- Botón Ver Salidas -------------------
-const btnVerSalidas = document.getElementById("btnVerSalidas");
-if (btnVerSalidas) {
-  btnVerSalidas.addEventListener("click", () => {
-    // Redireccionar a salidas.html
-    window.location.href = "salidas.html";
+  // Si no encontramos producto, devolvemos la inserción pero avisamos
+  if (!prodRow) {
+    showActionToast("entrada", true, "Entrada registrada; no se encontró producto para actualizar stock");
+    return Array.isArray(insertData) ? insertData[0] : insertData;
+  }
+
+  // preparar cantidades por inventario
+  const additions = {
+    "I069": Number(q069 || 0),
+    "I078": Number(q078 || 0),
+    "I07F": Number(q07f || 0),
+    "I312": Number(q312 || 0),
+    "I073": Number(q073 || 0)
+  };
+
+  // construir objeto updates sumando a las columnas reales
+  const updates = {};
+  const prodKeys = Object.keys(prodRow || {});
+
+  for (const shortInv of Object.keys(additions)) {
+    const qty = Number(additions[shortInv] || 0);
+    if (!qty) continue;
+
+    // intentar obtener la columna real con tu helper
+    let colName = null;
+    try { colName = getRealColForInventoryLabel(shortInv); } catch(e) { colName = null; }
+
+    // fallback: buscar en prodRow keys alguna que contenga el shortInv normalizado
+    if (!colName) {
+      const nkShort = normalizeKeyName(shortInv);
+      colName = prodKeys.find(k => normalizeKeyName(k).includes(nkShort) && normalizeKeyName(k).includes("inventario")) || null;
+    }
+
+    // si aún no hay columna, buscar la primer columna que contenga 'inventario' + dígitos (fallback amplio)
+    if (!colName) {
+      colName = prodKeys.find(k => normalizeKeyName(k).includes("inventario") && /\d{2,}/.test(k)) || null;
+    }
+
+    if (colName) {
+      const current = toNumber(prodRow[colName]);
+      updates[colName] = roundFloat(current + qty);
+      console.debug("Preparando update:", { colName, current, add: qty, newVal: updates[colName] });
+    } else {
+      console.warn("No se encontró columna para", shortInv, "producto id:", prodRow.id);
+    }
+  }
+
+  // ahora recalcular "inventario físico" / "almacen físico" si existe alguna columna que lo represente
+  // buscamos la columna física en prodRow: preferimos nombres que contengan 'fisico' o 'físico' o 'inventariofisico' o 'almacen'
+  const physCol = prodKeys.find(k => {
+    const nk = normalizeKeyName(k);
+    return nk.includes("fisico") || nk.includes("fisinco") || nk.includes("inventariofisico") || nk.includes("inventariofisicoenalmacen") || nk.includes("fisic") || (nk.includes("almacen") && !nk.includes("inventario"));
+  }) || prodKeys.find(k => normalizeKeyName(k).includes("inventario") && normalizeKeyName(k).includes("fisico")) || null;
+
+  // calcular suma de todos los inventarios detectables (usamos prodKeys que incluyan 'inventario' o 'almacen' excepto physCol)
+  let totalComputed = 0;
+  prodKeys.forEach(k => {
+    const nk = normalizeKeyName(k);
+    if (k === physCol) return;
+    // contar keys que representen inventarios (ej: inventarioi069, inventario i069, almacen)
+    if (nk.includes("inventario") || nk.includes("almacen") || /\bi0?69\b/.test(nk) || /\bi0?78\b/.test(nk) || /\bi0?7f\b/.test(nk) || /\bi312\b/.test(nk) || /\bi073\b/.test(nk)) {
+      // si en updates ya calculamos el nuevo valor, usarlo; si no, tomar valor actual prodRow[k]
+      const val = updates.hasOwnProperty(k) ? toNumber(updates[k]) : toNumber(prodRow[k]);
+      totalComputed += Number(val || 0);
+    }
   });
-}
 
-// ------------------- Historial desde DB -------------------
-async function cargarHistorialSalidas() {
-  if (!tablaHistorialBody) {
-    console.log("ℹ️ tablaHistorialBody no encontrado - probablemente no estás en la página de salidas");
-    return;
-  }
-
-  try {
-    console.log("🔍 Cargando historial de salidas desde tabla 'salidas'...");
-    
-    // Usar la tabla 'salidas' en lugar de 'salidas_sin_codigo'
-    const { data, error } = await supabase
-      .from("salidas")
-      .select("*")
-      .order("FECHA_SALIDA", { ascending: false })
-      .limit(50);
-
-    if (error) {
-      console.error("❌ Error al cargar historial:", error);
-      tablaHistorialBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
-            Error cargando historial de salidas
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      tablaHistorialBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
-            No hay registros de salidas
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    // Filtrar solo salidas de productos sin código o mostrar todas
-    const salidasFiltradas = data.filter(item => 
-      item.CODIGO === 'S/C' || !item.CODIGO || item.CODIGO === ''
-    );
-
-    if (salidasFiltradas.length === 0) {
-      tablaHistorialBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align:center; color:#666; padding:20px;">
-            No hay registros de salidas para productos sin código
-          </td>
-        </tr>
-      `;
-      return;
-    }
-
-    // Renderizar los datos
-    tablaHistorialBody.innerHTML = "";
-    salidasFiltradas.forEach((item) => {
-      const codigo = item.CODIGO || 'S/C';
-      const descripcion = item.DESCRIPCION || "-";
-      const um = item.UM || "-";
-      const inventario = item.INVENTARIO_ORIGEN || "-";
-      const cantidad = item.CANTIDAD_SALIDA || "-";
-      const fecha = formatShowValue(item.FECHA_SALIDA || item.fecha_salida || item.fecha);
-      const responsable = item.RESPONSABLE || "-";
-      const destinatario = item.DESTINATARIO || "";
-      const observ = item.OBSERVACIONES || "";
-
-      const color = invColorFor(inventario);
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(String(codigo))}</td>
-        <td>${escapeHtml(String(descripcion))}</td>
-        <td>${escapeHtml(String(um))}</td>
-        <td><span class="inv-dot" title="${escapeHtml(inventario)}" style="background:${color}"></span> ${escapeHtml(String(inventario))}</td>
-        <td>${escapeHtml(String(cantidad))}</td>
-        <td class="small-muted">${escapeHtml(String(fecha))}</td>
-        <td>${escapeHtml(String(responsable))}</td>
-        <td>${escapeHtml(String(destinatario))}</td>
-        <td>${escapeHtml(String(observ))}</td>
-      `;
-      tablaHistorialBody.appendChild(tr);
-    });
-    
-    console.log(`✅ Historial cargado: ${salidasFiltradas.length} registros de productos sin código`);
-    
-  } catch (err) {
-    console.error("❌ Error inesperado cargando historial:", err);
-    if (tablaHistorialBody) {
-      tablaHistorialBody.innerHTML = `
-        <tr>
-          <td colspan="9" style="text-align:center; color:#dc2626; padding:20px;">
-            Error cargando historial de salidas
-          </td>
-        </tr>
-      `;
-    }
-  }
-}
-// ------------------- Modal summary (UX) -------------------
-function showSummaryModal(successes, errors) {
-  const existing = document.getElementById("summaryModal");
-  if (existing) existing.remove();
-  const overlay = document.createElement("div");
-  overlay.id = "summaryModal";
-  overlay.className = "modal";
-  overlay.innerHTML = `
-    <div class="modal-content" style="text-align:center;max-width:420px">
-      <h3>Resumen de operación</h3>
-      <p style="font-size:18px;margin:10px 0">Procesadas: <strong>${successes}</strong></p>
-      <p style="font-size:18px;margin:10px 0">Fallidas: <strong>${errors}</strong></p>
-      <div style="display:flex;gap:10px;justify-content:center;margin-top:14px">
-        <button id="summaryCloseBtn" class="btn-salidas">Cerrar</button>
-        <button id="summaryViewBtn" class="btn-add">Ver historial</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlay.style.display = "flex";
-  document.getElementById("summaryCloseBtn").addEventListener("click", () => overlay.remove());
-  document.getElementById("summaryViewBtn").addEventListener("click", () => { overlay.remove(); window.scrollTo({top: document.body.scrollHeight, behavior:'smooth'}); });
-}
-
-// ------------------- Confirm pending items -------------------
-async function confirmAllPendings() {
-  const pendientes = getPendingSalidas();
-  if (!pendientes || pendientes.length === 0) {
-    showToast("No hay salidas pendientes", false);
-    return;
-  }
-
-  if (!confirm(`¿Confirmar ${pendientes.length} salidas pendientes y actualizar stock?`)) return;
-
-  if (btnConfirmAll) btnConfirmAll.disabled = true;
-  let successes = 0;
-  let errors = 0;
-
-  for (const item of pendientes.slice()) {
-    try {
-      console.log(`🔄 Procesando pendiente:`, item);
-      
-      // Extraer código del producto original con mejor diagnóstico
-      const { data: productoData, error: productoError } = await supabase
-        .from("productos_sin_codigo")
-        .select("*")
-        .eq("id", item.id)
-        .single();
-      
-      if (productoError) {
-        console.error("❌ Error al obtener producto:", productoError);
-        throw productoError;
-      }
-      
-      console.log("📦 Producto obtenido para extraer código:", productoData);
-      
-      const codigoSC = productoData ? extraerCodigoSC(productoData) : 'S/C';
-      console.log(`✅ Código extraído: ${codigoSC}`);
-
-      const responsableFinal = ((item.RESPONSABLE_NOMBRE ?? "").trim() || "").length > 0
-        ? `${(item.RESPONSABLE_NOMBRE ?? "").trim()} ${(item.RESPONSABLE_APELLIDO ?? "").trim()}`.trim()
-        : (item.RESPONSABLE && String(item.RESPONSABLE).trim()) || (CURRENT_USER_FULLNAME || "Usuario");
-
-      const observacionesFinal = item.OBSERVACIONES ?? "";
-      const destinatarioFinal = item.DESTINATARIO ?? "";
-
-      // Resto del código permanece igual...
-      const origenesToProcess = Array.isArray(item.ORIGENES) ? item.ORIGENES.map(o => ({
-        INVENTARIO_ORIGEN: o.INVENTARIO_ORIGEN,
-        CANTIDAD: parseInt(o.CANTIDAD, 10) || 0,
-        AVAILABLE: o.AVAILABLE ?? null
-      })) : [{
-        INVENTARIO_ORIGEN: item.INVENTARIO_ORIGEN,
-        CANTIDAD: parseInt(item.CANTIDAD, 10) || 0,
-        AVAILABLE: item.AVAILABLE ?? null
-      }];
-
-      // Validación de sumatoria
-      if (Array.isArray(item.ORIGENES) && item.CANTIDAD) {
-        const sum = origenesToProcess.reduce((s,o) => s + (o.CANTIDAD || 0), 0);
-        if (sum !== parseInt(item.CANTIDAD, 10)) {
-          throw new Error(`Suma de orígenes (${sum}) no coincide con total (${item.CANTIDAD})`);
-        }
-      }
-
-      // Procesar cada origen
-      for (const origin of origenesToProcess) {
-        const availableSnapshot = parseInt(origin.AVAILABLE || 0, 10);
-        if (availableSnapshot > 0 && origin.CANTIDAD > availableSnapshot) {
-          throw new Error(`Cantidad (${origin.CANTIDAD}) mayor que stock disponible (${availableSnapshot}) en ${origin.INVENTARIO_ORIGEN}`);
-        }
-
-        // Intentar RPC con código S/C
-        const rpcPayload = {
-          in_id: item.id,
-          in_codigo: codigoSC, // <- AGREGAR CÓDIGO
-          in_descripcion: item.DESCRIPCION,
-          in_cantidad: origin.CANTIDAD,
-          in_responsable: responsableFinal,
-          in_origen: origin.INVENTARIO_ORIGEN,
-          in_observaciones: observacionesFinal,
-          in_destinatario: destinatarioFinal
-        };
-
-        console.log("📤 Enviando RPC con payload:", rpcPayload);
-
-        const { data: rpcData, error: rpcError } = await supabase.rpc("crear_salida_sin_codigo", rpcPayload).catch(err => ({ data: null, error: err }));
-        
-        if (rpcError) {
-            console.warn("⚠️ RPC falló, usando método alternativo:", rpcError);
-          
-          // Fallback: insertar en tabla 'salidas_sin_codigo' con código
-           const salidaObj = {
-            CODIGO: codigoSC, // 
-             DESCRIPCION: item.DESCRIPCION,
-             CANTIDAD_SALIDA: origin.CANTIDAD,
-             FECHA_SALIDA: new Date().toISOString(),
-             RESPONSABLE: responsableFinal,
-              DESTINATARIO: destinatarioFinal,
-              INVENTARIO_ORIGEN: origin.INVENTARIO_ORIGEN,
-              OBSERVACIONES: observacionesFinal
-            };
-          
-            const { error: errorInsert } = await supabase.from("salidas").insert([salidaObj]);
-            if (errorInsert) throw errorInsert;
-
-          // Actualizar stock
-          await ensureProductosSinCodigoColumnMap();
-          const realKey = getRealColForInventoryLabel(origin.INVENTARIO_ORIGEN);
-          if (!realKey) throw new Error("No se pudo detectar columna de stock para actualizar: " + origin.INVENTARIO_ORIGEN);
-
-          const { data: prodRow, error: prodErr } = await supabase
-            .from("productos_sin_codigo")
-            .select(realKey)
-            .eq("id", item.id)
-            .maybeSingle();
-          if (prodErr) throw prodErr;
-          
-          const current = parseInt(prodRow ? (prodRow[realKey] ?? 0) : 0, 10) || 0;
-          const nuevo = Math.max(0, current - parseInt(origin.CANTIDAD, 10));
-          const upd = {}; upd[realKey] = nuevo;
-          const { error: eUpd } = await supabase.from("productos_sin_codigo").update(upd).eq("id", item.id);
-          if (eUpd) throw eUpd;
-        } else {
-          console.log("✅ RPC exitoso:", rpcData);
-        }
-      }
-
-      successes++;
-      
-      // Borrar del pending
-      const list = getPendingSalidas();
-      const idx = list.findIndex(
-        (s) =>
-          s.id === item.id &&
-          ((s.ADDED_AT && item.ADDED_AT && s.ADDED_AT === item.ADDED_AT) ||
-            (s.INVENTARIO_ORIGEN === item.INVENTARIO_ORIGEN && s.CANTIDAD === item.CANTIDAD))
-      );
-      if (idx >= 0) { list.splice(idx, 1); savePendingSalidas(list); }
-    } catch (err) {
-      console.error("❌ Error confirmando pendiente:", item, err);
-      errors++;
-    }
-  }
-
-  if (btnConfirmAll) btnConfirmAll.disabled = false;
-  await renderPendingList();
-  await cargarHistorialSalidas();
-  updatePendingCount();
-
-  if (successes > 0 || errors > 0) {
-    showSummaryModal(successes, errors);
+  // si tenemos physCol actualizamos con la suma calculada
+  if (physCol) {
+    updates[physCol] = roundFloat(totalComputed);
+    console.debug("Actualizando columna fisica:", physCol, "->", updates[physCol]);
   } else {
-    showToast("No se procesaron salidas", false);
+    console.debug("No se detectó columna 'fisico/almacen' para actualizar (se omitirá suma física).");
   }
-}
-// ------------------- Clear pending list -------------------
-function clearAllPendings() {
-  if (!confirm("¿Eliminar todas las salidas pendientes?")) return;
-  savePendingSalidas([]);
-  renderPendingList();
-  updatePendingCount();
-  showToast("Lista de salidas pendientes vaciada", true);
-}
 
-// ------------------- Asignar responsable desde tabla usuarios -------------------
-async function setResponsableFromAuth() {
+  // si hay updates, aplicarlas en una sola llamada
+  if (Object.keys(updates).length > 0) {
   try {
-    const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr) console.warn("setResponsableFromAuth - supabase.auth.getUser error:", authErr);
-
-    const user = authData?.user ?? null;
-
-    // 1) Si el auth trae email, úsalo directamente
-    if (user && user.email) {
-      if (typeof responsableField !== "undefined" && responsableField)
-        responsableField.value = user.email;
-      return user.email;
+    console.debug("Intentando actualizar stock para producto id", prodRow.id, "updates:", updates);
+    const { error: updErr } = await supabase.from("productos_sin_codigo").update(updates).eq("id", prodRow.id);
+    if (updErr) {
+      console.warn("Error actualizando stock:", updErr);
+      showActionToast("entrada", false, "Entrada guardada, pero fallo al actualizar stock (revisa consola)");
+    } else {
+      console.debug("Stock actualizado correctamente para id", prodRow.id);
+      showActionToast("entrada", true, `Entrada registrada y stock actualizado (+${total})`);
     }
-
-    // 2) Buscar en tabla usuarios
-    if (user && user.id) {
-      const { data: uData, error: uErr } = await supabase
-        .from("usuarios")
-        .select("email,nombre,apellido")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (!uErr && uData) {
-        const email = uData.email || null;
-        const nombreCompleto = `${(uData.nombre || "").trim()} ${(uData.apellido || "").trim()}`.trim();
-
-        if (email) {
-          if (typeof responsableField !== "undefined" && responsableField)
-            responsableField.value = email;
-          return email;
-        } else if (nombreCompleto) {
-          if (typeof responsableField !== "undefined" && responsableField)
-            responsableField.value = nombreCompleto;
-          return nombreCompleto;
-        }
-      }
-    }
-
-    // 3) Fallback
-    if (typeof responsableField !== "undefined" && responsableField)
-      responsableField.value = CURRENT_USER_FULLNAME || "";
-    return null;
-  } catch (ex) {
-    console.error("setResponsableFromAuth - excepción:", ex);
-    if (typeof responsableField !== "undefined" && responsableField)
-      responsableField.value = CURRENT_USER_FULLNAME || "";
-    return null;
-  }
-}
-
-// ------------------- Cargar inventario -------------------
-async function cargarInventario({ showErrors = false } = {}) {
-  try {
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("*");
-
-    if (error) throw error;
-
-    // Limpiar tabla
-    if (tableBody) {
-      tableBody.innerHTML = "";
-    }
-
-    if (!data || data.length === 0) {
-      if (tableBody) {
-        tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Sin productos registrados</td></tr>`;
-      }
-      return;
-    }
-
-    // Renderizar filas
-    data.forEach((p) => {
-      if (!tableBody) return;
-      
-      const tr = document.createElement("tr");
-
-      // Usar las funciones helper para obtener los valores correctamente
-      const i069 = getStockFromProduct(p, 'I069') ?? 0;
-      const i078 = getStockFromProduct(p, 'I078') ?? 0;
-      const i07f = getStockFromProduct(p, 'I07F') ?? 0;
-      const i312 = getStockFromProduct(p, 'I312') ?? 0;
-      const i073 = getStockFromProduct(p, 'I073') ?? 0;
-
-      const totalStock = i069 + i078 + i07f + i312 + i073;
-
-      let colorClass = "";
-      if (totalStock > 10) colorClass = "green";
-      else if (totalStock >= 2) colorClass = "yellow";
-      else colorClass = "red";
-
-      tr.innerHTML = `
-        <td>${p.CODIGO || p.codigo || ''}</td>
-        <td>${p.DESCRIPCION || p.descripcion || ''}</td>
-        <td>${p.UM || p.um || ''}</td>
-        <td>${i069}</td>
-        <td>${i078}</td>
-        <td>${i07f}</td>
-        <td>${i312}</td>
-        <td>${i073}</td>
-        <td class="${colorClass}">${totalStock}</td>
-        <td>
-          <button class="btn-edit" data-id="${p.id}">✏️</button>
-          <button class="btn-delete" data-id="${p.id}">🗑️</button>
-        </td>
-      `;
-
-      tableBody.appendChild(tr);
-    });
   } catch (err) {
-    console.error("Error al cargar inventario:", err);
-    if (showErrors) showToast("Error al cargar inventario", false);
+    console.error("Excepción al actualizar producto:", err);
+    showActionToast("entrada", false, "Entrada registrada pero error al actualizar stock (ver consola)");
   }
+} else {
+  showActionToast("entrada", true, "Entrada registrada; no se detectaron columnas de inventario para actualizar");
 }
 
-// ------------------- BOTÓN REFRESCAR -------------------
-if (refreshBtn) {
-  refreshBtn.addEventListener("click", () => {
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = "⏳ Recargando página...";
-    location.reload(); // recarga toda la página
-  });
+  // devolver registro insertado
+  return Array.isArray(insertData) ? insertData[0] : insertData;
 }
 
-// ------------------- FUNCIÓN PARA NOTIFICACIONES -------------------
-function showToast(msg, ok = true) {
-  const toast = document.getElementById("toast");
-  toast.textContent = msg;
-  toast.className = `toast show ${ok ? "ok" : "error"}`;
-  setTimeout(() => (toast.className = "toast"), 2500);
-}
-
-document.addEventListener("DOMContentLoaded", cargarInventario);
-
-// ------------------- Init -------------------
-document.addEventListener("DOMContentLoaded", async () => {
-  await setResponsableFromAuth();
-  await loadProducts();
-  await renderPendingList();
-  await cargarHistorialSalidas();
-  updatePendingCount();
-
-  if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
-  if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
-  if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
-});
-
-// ------------------- DIAGNOSTICOS-------------------
-// ------------------- DIAGNÓSTICO DE CREACIÓN DE PRODUCTO -------------------
-async function diagnosticarCreacionProducto() {
-  console.log("🔧 DIAGNÓSTICO CREACIÓN PRODUCTO");
+  // -------------------- FECHAS / FORMAT --------------------
+  function getCurrentLocalDate() {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
   
-  try {
-    // Verificar conexión a Supabase
-    console.log("🔗 Supabase inicializado:", !!supabase);
-    
-    // Verificar tabla existe
-    const { data, error } = await supabase
-      .from("productos_sin_codigo")
-      .select("id")
-      .limit(1);
-    
-    console.log("📊 Tabla accesible:", !error, error);
-    
-    // Verificar columnas requeridas
-    console.log("🔍 Verificando columnas requeridas...");
-    const columnMap = await ensureProductosSinCodigoColumnMap();
-    console.log("🗺️ Mapa de columnas:", columnMap);
-    
-  } catch (error) {
-    console.error("❌ Error en diagnóstico:", error);
-  }
-}
+  window.formatDate = function(dateInput) {
+    if (!dateInput) return "";
+    if (dateInput instanceof Date) {
+      if (isNaN(dateInput)) return "";
+      return dateInput.toLocaleDateString('es-MX');
+    }
+    const s = String(dateInput).trim();
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const m = s.match(ymd);
+    if (m) { const [, y, mm, dd] = m; return `${dd}/${mm}/${y}`; }
+    try {
+      if (s.includes('T') || s.includes(':')) {
+        const parsed = new Date(s);
+        if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
+      }
+      const tryIso = s.length === 10 ? `${s}T00:00:00` : s;
+      const parsed = new Date(tryIso);
+      if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
+    } catch(e){}
+    return s.length >= 10 ? s.slice(0,10) : s;
+  };
 
-// Ejecutar diagnóstico
-setTimeout(diagnosticarCreacionProducto, 2000);
+  // -------------------- HISTORIAL DE ENTRADAS --------------------
+  async function openEntradaHistoryModal(producto) {
+    const existing = document.getElementById("entradaHistoryOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "entradaHistoryOverlay";
+    Object.assign(overlay.style, {
+      position: "fixed",
+      inset: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "rgba(0,0,0,0.45)",
+      zIndex: 20000,
+      padding: "18px",
+      boxSizing: "border-box"
+    });
+
+    const modal = document.createElement("div");
+    modal.className = "entrada-history-modal";
+    Object.assign(modal.style, {
+      width: "920px",
+      maxWidth: "100%",
+      maxHeight: "84vh",
+      overflow: "auto",
+      background: "#fff",
+      borderRadius: "8px",
+      padding: "12px",
+      boxShadow: "0 16px 48px rgba(0,0,0,0.32)",
+      fontFamily: "'Quicksand', sans-serif",
+      color: "#111"
+    });
+
+    modal.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0;font-weight:600">Historial de entradas — ${escapeHtml(producto.DESCRIPCION || producto.CODIGO || '')}</h3>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="histFilterInput" placeholder="Filtrar por texto (responsable/obs)..." style="padding:8px;border-radius:6px;border:1px solid rgba(0,0,0,0.08);width:320px" />
+          <button id="histCloseBtn" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
+        </div>
+      </div>
+      <div id="histContent">Cargando historial...</div>
+    `;
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const histContent = modal.querySelector("#histContent");
+    const closeBtn = modal.querySelector("#histCloseBtn");
+    const filterInput = modal.querySelector("#histFilterInput");
+
+    function closeOverlay() { 
+      overlay.remove();
+      showActionToast("historial", true, "Historial cerrado");
+    }
+
+    closeBtn.addEventListener("click", closeOverlay);
+    overlay.addEventListener("click", (e) => { 
+      if (e.target === overlay) closeOverlay(); 
+    });
+    
+    window.addEventListener("keydown", function onEsc(ev){ 
+      if (ev.key === "Escape") { 
+        closeOverlay(); 
+        window.removeEventListener("keydown", onEsc); 
+      } 
+    });
+
+    try {
+      showActionToast("historial", true, "Cargando historial...");
+      
+      const cols = await detectColumnsOfEntradasSinCodigo();
+      let query;
+      
+      if (cols && cols.includes("PRODUCT_ID")) {
+        query = supabase.from("entradas_sin_codigo").select("*").eq("PRODUCT_ID", producto.id).order("fecha", { ascending: false }).limit(500);
+      } else if (cols && cols.includes("product_id")) {
+        query = supabase.from("entradas_sin_codigo").select("*").eq("product_id", producto.id).order("fecha", { ascending: false }).limit(500);
+      } else {
+        const q = (producto.DESCRIPCION || producto.descripcion || "").replace(/'/g, "''");
+        query = supabase.from("entradas_sin_codigo").select("*").ilike("descripcion", `%${q}%`).order("fecha", { ascending: false }).limit(500);
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        showActionToast("historial", false, error.message);
+        throw error;
+      }
+      
+      const rows = data || [];
+
+      if (!rows || rows.length === 0) {
+        histContent.innerHTML = `<div style="padding:18px">No se encontraron entradas para este producto.</div>`;
+        showActionToast("historial", false, "No hay entradas registradas");
+        return;
+      }
+
+      // Construir tabla con el diseño solicitado
+      const tableWrap = document.createElement("div");
+      tableWrap.style.overflow = "auto";
+
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.fontSize = "14px";
+      table.style.minWidth = "760px";
+
+      // estilos inline para encabezado y celdas (parecida a la imagen)
+      const thStyle = "text-align:left;padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.06);font-weight:600;color:#374151";
+      const tdStyle = "padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04);color:#111";
+      const smallTdStyle = "padding:12px 8px;border-bottom:1px solid rgba(0,0,0,0.04);color:#111;text-align:right;white-space:nowrap";
+
+      // header
+      const thead = document.createElement("thead");
+      thead.innerHTML = `
+        <tr style="background:#fff">
+          <th style="${thStyle}">Fecha</th>
+          <th style="${thStyle}">Cantidad</th>
+          <th style="${thStyle};text-align:right">I069</th>
+          <th style="${thStyle};text-align:right">I078</th>
+          <th style="${thStyle};text-align:right">I07F</th>
+          <th style="${thStyle};text-align:right">I312</th>
+          <th style="${thStyle};text-align:right">I073</th>
+          <th style="${thStyle}">Responsable</th>
+        </tr>
+      `;
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+
+      const renderRows = (list) => {
+        tbody.innerHTML = "";
+        list.forEach(r => {
+          const fechaRaw = r.fecha ?? r.FECHA ?? r.created_at ?? "";
+          const fecha = fechaRaw ? formatDate(fechaRaw) : "";
+          const total = r.cantidad ?? r.CANTIDAD ?? r.total ?? "";
+          const i069 = r.i069 ?? r.I069 ?? 0;
+          const i078 = r.i078 ?? r.I078 ?? 0;
+          const i07f = r.i07f ?? r.I07F ?? 0;
+          const i312 = r.i312 ?? r.I312 ?? 0;
+          const i073 = r.i073 ?? r.I073 ?? 0;
+          const responsable = r.responsable ?? r.RESPONSABLE ?? "";
+          const tr = document.createElement("tr");
+          tr.style.background = "transparent";
+          tr.style.transition = "background .12s ease";
+          tr.onmouseenter = () => tr.style.background = "rgba(15,23,42,0.03)";
+          tr.onmouseleave = () => tr.style.background = "transparent";
+
+          tr.innerHTML = `
+            <td style="${tdStyle};width:120px">${escapeHtml(String(fecha))}</td>
+            <td style="${tdStyle};text-align:right;width:90px">${escapeHtml(String(total))}</td>
+            <td style="${smallTdStyle}">${escapeHtml(String(i069))}</td>
+            <td style="${smallTdStyle}">${escapeHtml(String(i078))}</td>
+            <td style="${smallTdStyle}">${escapeHtml(String(i07f))}</td>
+            <td style="${smallTdStyle}">${escapeHtml(String(i312))}</td>
+            <td style="${smallTdStyle}">${escapeHtml(String(i073))}</td>
+            <td style="${tdStyle};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(String(responsable))}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      };
+
+      renderRows(rows);
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      histContent.innerHTML = "";
+      histContent.appendChild(tableWrap);
+
+      // filtro cliente
+      filterInput.addEventListener("input", debounce((ev) => {
+        const term = (ev.target.value || "").trim().toLowerCase();
+        if (!term) { 
+          renderRows(rows); 
+          return; 
+        }
+        const filtered = rows.filter(r => {
+          const txt = `${r.responsable||r.RESPONSABLE||""} ${r.observaciones||r.OBSERVACIONES||""} ${r.descripcion||r.DESCRIPCION||""}`.toLowerCase();
+          return txt.includes(term);
+        });
+        renderRows(filtered);
+        showActionToast("search", true, `${filtered.length} entradas filtradas`);
+      }, 150));
+
+      showActionToast("historial", true, `${rows.length} entradas cargadas`);
+
+    } catch (err) {
+      console.error("openEntradaHistoryModal err:", err);
+      histContent.innerHTML = `<div style="padding:18px;color:#7f1d1d">Error cargando historial.</div>`;
+      showActionToast("historial", false, err.message);
+    }
+  }
+
+  // -------------------- SETUP & BOOT --------------------
+  function setupButtonsAndEvents() {
+    try {
+      ensureTableScrollContainer();
+      
+      if (btnOpenModal) {
+        btnOpenModal.addEventListener("click", openProductModal);
+        showActionToast("general", true, "Botones configurados");
+      }
+      
+      if (btnCloseModal) btnCloseModal.addEventListener("click", closeProductModal);
+      if (btnCancelModal) btnCancelModal.addEventListener("click", (e)=> { e.preventDefault(); closeProductModal(); });
+      if (productForm) productForm.addEventListener("submit", saveProductFromForm);
+      
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => {
+          showActionToast("load", true, "Actualizando productos...");
+          loadAllProductsWithPagination();
+        });
+      }
+      
+      if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
+      
+      if (btnClearPending) {
+        btnClearPending.addEventListener("click", ()=> {
+          showConfirm("Eliminar todas las salidas pendientes?", ()=> { 
+            savePendingSalidas([]); 
+            renderPendingList(); 
+            showActionToast("clear", true, "Todos los pendientes eliminados");
+          },
+          () => {
+            showActionToast("clear", true, "Limpieza cancelada");
+          });
+        });
+      }
+
+      setupSearchWithPagination();
+      showActionToast("general", true, "Sistema inicializado correctamente");
+      
+    } catch (error) {
+      showActionToast("general", false, "Error en configuración inicial");
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    try {
+      showActionToast("general", true, "Iniciando aplicación...");
+      setupButtonsAndEvents();
+      await loadAllProductsWithPagination();
+      renderPendingList();
+      updatePendingCount();
+      
+      // exponer funciones globales por si usas onclick inline
+      window.editarProducto = editarProductoById;
+      window.eliminarProducto = eliminarProducto;
+      window.registrarSalida = registrarSalida;
+      window.openEntradaModalById = openEntradaModalById;
+      window.openEntradaHistoryModal = openEntradaHistoryModal;
+      window.reloadAllProducts = loadAllProductsWithPagination;
+      
+      showActionToast("general", true, "Aplicación lista para usar");
+      
+    } catch (err) {
+      console.error("init err:", err);
+      showActionToast("general", false, `Error iniciando módulo: ${err.message}`);
+    }
+  });
+})();
