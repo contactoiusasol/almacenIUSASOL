@@ -19,6 +19,7 @@
     'salidas.html',
     'reportes.html',
     'productos-sin-codigo.html',
+    'salidas-sin-codigo.html',
     'usuarios.html'
   ];
 
