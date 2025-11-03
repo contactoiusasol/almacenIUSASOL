@@ -59,25 +59,25 @@
     <div id="paginationControlsBottom" class="pagination-controls"></div>
   </div>
 
-  <!-- Seguridad / Auth (verifica ruta si usas otra) -->
   <script src="../js/seguridad.js"></script>
+
   <script>
     document.addEventListener('DOMContentLoaded', function() {
-      if (typeof checkAuth === 'function') checkAuth();
-      if (typeof displayUserInfo === 'function') displayUserInfo();
+        if (typeof checkAuth === 'function') {
+            checkAuth();
+        } else {  
+        }
+
+        if (typeof displayUserInfo === 'function') {
+            displayUserInfo();
+        }
     });
   </script>
-  <script src="../js/seguridad.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        protectPage('admin');
-    });
-</script>
 
   <!-- Supabase -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <!-- Tu script específico para "sin códigos" -->
-  <script src="../js/inventario-sin-coidgos-user.js"></script>
+  <!-- Tu script específico para "sin códigos" (nombre corregido) -->
+  <script src="../js/inventario-sin-codigos-user.js"></script>
 </body>
 </html>
