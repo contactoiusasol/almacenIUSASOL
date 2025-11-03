@@ -1,4 +1,3 @@
-
 // ------------------- CONFIG SUPABASE -------------------
 const SUPABASE_URL = "https://fkzlnqdzinjwpxzgwnqv.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZremxucWR6aW5qd3B4emd3bnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY5MTU3MTUsImV4cCI6MjA3MjQ5MTcxNX0.w-tyOR_J6MSF6O9JJHGHAnIGPRPfrIGrUkkbDv_B_9I";
@@ -6,10 +5,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let charts = {};
 let currentReportData = null;
+let useCodes = true;
+
 
 // ================== ALERTS (Toasts) & Confirm modal ==================
 (function() {
-  // ensure container exists
   const container = () => {
     let c = document.getElementById('toastContainer');
     if (!c) {
@@ -30,8 +30,6 @@ let currentReportData = null;
     }
   }
 
-  // showAlert(message, type = 'info', options = {})
-  // options: title, duration (ms), dismissible (bool)
   window.showAlert = function(message, type = 'info', options = {}) {
     const { title = '', duration = 4000, dismissible = true } = options;
     const c = container();
@@ -75,7 +73,6 @@ let currentReportData = null;
 
     c.prepend(t);
 
-    // auto dismiss
     if (duration && duration > 0) {
       t.timeout = setTimeout(() => {
         t.remove();
@@ -85,18 +82,15 @@ let currentReportData = null;
     return t;
   };
 
-  // clear all toasts
   window.clearAlerts = function() {
     const c = container();
     c.innerHTML = '';
   };
 
-  // ================== Confirm modal (returns Promise<boolean>) ==================
   window.showConfirm = function(title = 'Confirmar', message = '¿Estás seguro?') {
     return new Promise(resolve => {
       const modal = document.getElementById('confirmModal');
       if (!modal) {
-        // if missing HTML fallback to native confirm
         const ok = window.confirm(message);
         resolve(ok);
         return;
@@ -221,7 +215,6 @@ function parseNumber(value) {
 async function diagnosticarEstructuraCompleta() {
   console.log("🔍 DIAGNÓSTICO RÁPIDO");
   
-  // Productos
   try {
     const { data } = await supabase.from('productos').select('*').limit(1);
     if (data && data[0]) {
@@ -234,7 +227,6 @@ async function diagnosticarEstructuraCompleta() {
     }
   } catch (e) { console.error("❌ Productos:", e.message); }
 
-  // Entradas
   try {
     const { data } = await supabase.from('entradas').select('*').limit(1);
     if (data && data[0]) {
@@ -247,7 +239,6 @@ async function diagnosticarEstructuraCompleta() {
     }
   } catch (e) { console.error("❌ Entradas:", e.message); }
 
-  // Salidas
   try {
     const { data } = await supabase.from('salidas').select('*').limit(1);
     if (data && data[0]) {
@@ -285,7 +276,6 @@ function initializeYearSelect() {
     yearSelect.appendChild(opt);
   }
 
-  // Seleccionar el año por defecto: si el año actual está en el rango, seleccionarlo; si no, 2025
   const nowYear = new Date().getFullYear();
   yearSelect.value = (nowYear >= startYear && nowYear <= endYear) ? nowYear : startYear;
 
@@ -333,7 +323,6 @@ function setupEventListeners() {
 
   // Debounced generator — evitar llamadas demasiadas veces seguidas
   const debouncedGenerate = debounce(() => {
-    // Si el usuario cambiara el select varias veces, solo se llamará una vez
     generateReport().catch(err => {
       console.error('Error generando reporte automático:', err);
       showAlert('Error al actualizar el reporte automáticamente', 'error');
@@ -341,7 +330,6 @@ function setupEventListeners() {
   }, 600);
 
   if (monthSelect) {
-    // generar al cambiar (o al moverse con teclado)
     monthSelect.addEventListener('change', debouncedGenerate);
     monthSelect.addEventListener('input', debouncedGenerate);
   }
@@ -350,11 +338,50 @@ function setupEventListeners() {
     yearSelect.addEventListener('input', debouncedGenerate);
   }
 
+  // --- botones para modo (Todo / Con código / Sin código) ---
+  const bAll = document.getElementById('btnShowAll');
+  const bWith = document.getElementById('btnWithCode');
+  const bWithout = document.getElementById('btnWithoutCode');
+
+  if (bAll) {
+    bAll.addEventListener('click', () => {
+      useCodes = true; // "Todo" interpretamos igual que "con códigos" pero mostraremos todo (luego filtrado)
+      bAll.classList.add('active'); bWith.classList.remove('active'); bWithout.classList.remove('active');
+      generateReport();
+    });
+  }
+
+  if (bWith) {
+    bWith.addEventListener('click', () => {
+      useCodes = true;
+      bWith.classList.add('active'); bAll.classList.remove('active'); bWithout.classList.remove('active');
+      generateReport();
+    });
+  }
+
+  if (bWithout) {
+    bWithout.addEventListener('click', () => {
+      useCodes = false;
+      bWithout.classList.add('active'); bAll.classList.remove('active'); bWith.classList.remove('active');
+      generateReport();
+    });
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', function() { 
       switchTab(this.dataset.tab); 
     });
   });
+}
+// Helper: obtener modo actual seleccionado (all | with | without)
+function getActiveCodeMode() {
+  // si ya usas una variable global _reportFilterMode, úsala; si no toma el botón activo
+  if (typeof window._reportFilterMode !== 'undefined') return window._reportFilterMode;
+  const withBtn = document.getElementById('btnWithCode');
+  const withoutBtn = document.getElementById('btnWithoutCode');
+  if (withBtn && withBtn.classList.contains('active')) return 'with';
+  if (withoutBtn && withoutBtn.classList.contains('active')) return 'without';
+  return 'all';
 }
 
 
@@ -397,29 +424,37 @@ async function generateReport() {
   }
 }
 
-// ------------------- OBTENER DATOS CORREGIDO -------------------
 async function getMonthlyReport(month, year) {
   const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
   const endDate = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
   console.log("📅 Rango:", startDate, "a", endDate);
 
+  // decidir tablas según modo
+  const mode = getActiveCodeMode(); // 'all' | 'with' | 'without'
+  console.log("🔧 Modo actual useCodes=" + (mode === 'without' ? 'SIN CÓDIGOS' : mode === 'with' ? 'CON CÓDIGOS' : 'TODO'));
+
+  const prodTable = (mode === 'without') ? 'productos_sin_codigo' : 'productos';
+  const entradasTable = (mode === 'without') ? 'entradas_sin_codigo' : 'entradas';
+  const salidasTable = (mode === 'without') ? 'salidas_sin_codigo' : 'salidas';
+
   let products = [];
   let entradas = [];
   let salidas = [];
 
-  // 1. OBTENER PRODUCTOS - CORREGIDO para estructura real
+  // 1. OBTENER PRODUCTOS
   try {
     const { data, error } = await supabase
-      .from('productos')
+      .from(prodTable)
       .select('*')
-      .order('CODIGO');
+      .order('CODIGO', { ascending: true });
     
     if (!error && data) {
-      // Mapear a estructura consistente
+      // Mapear a estructura consistente; adaptarse a campos
       products = data.map(p => ({
-        codigo: p.CODIGO,
-        descripcion: p.DESCRIPCION,
-        inventario_fisico: p['INVENTARIO FISICO EN ALMACEN'] || 0
+        // los campos pueden variar: intentamos las variantes más comunes
+        codigo: p.CODIGO ?? p.codigo ?? p.code ?? null,
+        descripcion: p.DESCRIPCION ?? p.descripcion ?? p.nombre ?? '',
+        inventario_fisico: p['INVENTARIO FISICO EN ALMACEN'] ?? p['INVENTARIO'] ?? p['INVENTARIO I069'] ?? p.inventario ?? 0
       }));
       console.log(`📦 Productos mapeados: ${products.length}`);
     } else {
@@ -431,28 +466,20 @@ async function getMonthlyReport(month, year) {
     showAlert("Error obteniendo productos: " + (e.message || e), 'error');
   }
 
-  // 2. OBTENER ENTRADAS - CORREGIDO
+  // 2. OBTENER ENTRADAS
   try {
     const { data, error } = await supabase
-      .from('entradas')
+      .from(entradasTable)
       .select('*');
     
     if (!error && data) {
-      // Filtrar por fecha
       entradas = data.filter(registro => {
         const fechaRegistro = getRecordDate(registro);
-        const enRango = isDateInRange(fechaRegistro, startDate, endDate);
-        return enRango;
+        return isDateInRange(fechaRegistro, startDate, endDate);
       });
       console.log(`📥 Entradas obtenidas: ${entradas.length} (de ${data.length} totales)`);
-      
       if (entradas.length > 0) {
-        console.log("🔍 Ejemplo entrada:", {
-          codigo: entradas[0].codigo,
-          cantidad: entradas[0].cantidad,
-          fecha: entradas[0].fecha,
-          fechaParseada: getRecordDate(entradas[0])
-        });
+        console.log("🔍 Ejemplo entrada:", entradas[0]);
       }
     } else {
       console.error("Error entradas:", error);
@@ -463,14 +490,13 @@ async function getMonthlyReport(month, year) {
     showAlert("Error obteniendo entradas: " + (e.message || e), 'error');
   }
 
-  // 3. OBTENER SALIDAS - CORREGIDO
+  // 3. OBTENER SALIDAS
   try {
     const { data, error } = await supabase
-      .from('salidas')
+      .from(salidasTable)
       .select('*');
     
     if (!error && data) {
-      // Filtrar por fecha
       salidas = data.filter(registro => {
         const fechaRegistro = getRecordDate(registro);
         return isDateInRange(fechaRegistro, startDate, endDate);
@@ -485,41 +511,67 @@ async function getMonthlyReport(month, year) {
     showAlert("Error obteniendo salidas: " + (e.message || e), 'error');
   }
 
-  console.log(`📊 DATOS OBTENIDOS: ${products.length} productos, ${entradas.length} entradas, ${salidas.length} salidas`);
+  console.log(`📊 DATOS OBTENIDOS: productos=${products.length}, entradas=${entradas.length}, salidas=${salidas.length}`);
   
-  return processReportData(products, entradas, salidas, month, year);
+  // Pasar el modo para que processReportData pueda decidir cómo emparejar
+  return processReportData(products, entradas, salidas, month, year, mode);
 }
 
-// ------------------- PROCESAR DATOS CORREGIDO -------------------
-function processReportData(products, entradas, salidas, month, year) {
-  console.log("🔄 Procesando datos...");
-  
+
+function processReportData(products, entradas, salidas, month, year, mode = 'all') {
+  console.log("🔄 Procesando datos... (useCodes =", mode !== 'without', ")");
+
+  const useCodes = (mode !== 'without');
+
   const summary = { initialStock: 0, finalStock: 0, totalEntries: 0, totalExits: 0, stockDifference: 0 };
   const detailed = [];
   const movements = { entries: [], exits: [] };
 
-  // Procesar cada producto
+  // función para normalizar texto
+  const norm = txt => (txt === null || typeof txt === 'undefined') ? '' : String(txt).trim().toLowerCase();
+
+  // Para cada producto (si no hay códigos, intentamos emparejar por descripción)
   products.forEach(prod => {
     const codigo = prod.codigo;
+    const descripcion = prod.descripcion ?? '';
 
-    // Buscar entradas de este producto
-    const entradasProd = entradas.filter(e => e.codigo == codigo);
-    
-    // Buscar salidas de este producto
-    const salidasProd = salidas.filter(s => s.CODIGO == codigo);
+    let entradasProd = [];
+    let salidasProd = [];
 
-    // Calcular totales
-    const totalEntradas = entradasProd.reduce((sum, e) => sum + parseNumber(e.cantidad), 0);
-    const totalSalidas = salidasProd.reduce((sum, s) => sum + parseNumber(s.CANTIDAD_SALIDA), 0);
-    
+    if (useCodes && codigo !== null && codigo !== undefined && String(codigo).trim() !== '') {
+      // buscar por código (variantes)
+      entradasProd = entradas.filter(e => {
+        return ( (typeof e.codigo !== 'undefined' && String(e.codigo) == String(codigo)) ||
+                 (typeof e.CODIGO !== 'undefined' && String(e.CODIGO) == String(codigo)) );
+      });
+      salidasProd = salidas.filter(s => {
+        return ( (typeof s.CODIGO !== 'undefined' && String(s.CODIGO) == String(codigo)) ||
+                 (typeof s.codigo !== 'undefined' && String(s.codigo) == String(codigo)) );
+      });
+    } else {
+      // modo sin códigos: emparejar por descripción (contains)
+      const dnorm = norm(descripcion);
+      entradasProd = entradas.filter(e => {
+        const ed = norm(e.descripcion ?? e.producto ?? e.PRODUCTO ?? e.DESCRIPCION ?? e.descripcion_producto ?? '');
+        return ed && ed.indexOf(dnorm) !== -1;
+      });
+      salidasProd = salidas.filter(s => {
+        const sd = norm(s.DESCRIPCION ?? s.descripcion ?? s.producto ?? s.PRODUCTO ?? s.descripcion_producto ?? '');
+        return sd && sd.indexOf(dnorm) !== -1;
+      });
+    }
+
+    // totales
+    const totalEntradas = entradasProd.reduce((sum, e) => sum + parseNumber(e.cantidad ?? e.CANTIDAD ?? 0), 0);
+    const totalSalidas = salidasProd.reduce((sum, s) => sum + parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0), 0);
+
     const stockInicial = parseNumber(prod.inventario_fisico);
     const stockFinal = stockInicial + totalEntradas - totalSalidas;
     const diferencia = stockFinal - stockInicial;
 
-    // Agregar a detallado
     detailed.push({
       codigo,
-      descripcion: prod.descripcion,
+      descripcion,
       stockInicial,
       entradas: totalEntradas,
       salidas: totalSalidas,
@@ -528,47 +580,47 @@ function processReportData(products, entradas, salidas, month, year) {
       tendencia: diferencia > 0 ? 'up' : diferencia < 0 ? 'down' : 'neutral'
     });
 
-    // MOVIMIENTOS - ENTRADAS
+    // entradas movimiento - asegurar fecha y campos
     entradasProd.forEach(e => {
       movements.entries.push({
-        fecha: e.fecha,
-        codigo_producto: e.codigo,
-        descripcion_producto: prod.descripcion,
-        cantidad: parseNumber(e.cantidad),
-        responsable: e.responsable || 'No especificado',
-        observaciones: 'Entrada de inventario'
+        fecha: getRecordDate(e) || e.fecha || e.FECHA || '',
+        codigo_producto: e.codigo ?? e.CODIGO ?? null,
+        descripcion_producto: e.DESCRIPCION ?? e.descripcion ?? e.producto ?? prod.descripcion ?? '',
+        cantidad: parseNumber(e.cantidad ?? e.CANTIDAD ?? 0),
+        responsable: e.responsable ?? e.RESPONSABLE ?? 'No especificado',
+        observaciones: e.observaciones ?? e.OBSERVACIONES ?? ''
       });
     });
 
-    // MOVIMIENTOS - SALIDAS  
+    // salidas movimiento - asegurar fecha y destino (destinatario)
     salidasProd.forEach(s => {
       movements.exits.push({
-        fecha: s.FECHA_SALIDA,
-        codigo_producto: s.CODIGO,
-        descripcion_producto: s.DESCRIPCION,
-        cantidad: parseNumber(s.CANTIDAD_SALIDA),
-        responsable: s.RESPONSABLE || 'No especificado',
-        destino: s.DESTINATARIO || '-',
-        observaciones: s.OBSERVACIONES || ''
+        fecha: getRecordDate(s) || s.FECHA_SALIDA || s.fecha || '',
+        codigo_producto: s.CODIGO ?? s.codigo ?? null,
+        descripcion_producto: s.DESCRIPCION ?? s.descripcion ?? s.producto ?? prod.descripcion ?? '',
+        cantidad: parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0),
+        responsable: s.RESPONSABLE ?? s.responsable ?? 'No especificado',
+        destino: s.DESTINATARIO ?? s.destinatario ?? s.DESTINO ?? s.destino ?? '-',
+        observaciones: s.OBSERVACIONES ?? s.observaciones ?? ''
       });
     });
 
-    // Sumar al resumen
     summary.initialStock += stockInicial;
     summary.finalStock += stockFinal;
   });
 
-  // Calcular totales globales
-  summary.totalEntries = movements.entries.reduce((sum, e) => sum + e.cantidad, 0);
-  summary.totalExits = movements.exits.reduce((sum, e) => sum + e.cantidad, 0);
+  summary.totalEntries = movements.entries.reduce((sum, e) => sum + (e.cantidad || 0), 0);
+  summary.totalExits = movements.exits.reduce((sum, e) => sum + (e.cantidad || 0), 0);
   summary.stockDifference = summary.finalStock - summary.initialStock;
 
   console.log("📈 RESUMEN:", summary);
   console.log("📋 DETALLADO:", detailed.length, "productos");
   console.log("🔄 MOVIMIENTOS - Entradas:", movements.entries.length, "Salidas:", movements.exits.length);
 
-  return { summary, detailed, movements, month, year };
+  return { summary, detailed, movements, month, year, mode };
 }
+
+
 
 // ------------------- ACTUALIZAR UI -------------------
 function updateSummaryCards(summary) {
@@ -592,7 +644,6 @@ function updateSummaryCards(summary) {
     diff.className = `card-value ${summary.stockDifference > 0 ? 'trend-up' : summary.stockDifference < 0 ? 'trend-down' : ''}`;
   }
 }
-
 function updateDetailedTable(detailed) {
   const tbody = document.getElementById('reportTableBody');
   if (!tbody) {
@@ -607,46 +658,79 @@ function updateDetailedTable(detailed) {
     tbody.innerHTML = '<tr><td colspan="8" class="text-center">No hay datos disponibles</td></tr>';
     return;
   }
-  
+
+  // obtener modo actual del reporte si está disponible
+  const mode = (window.currentReportData && window.currentReportData.mode) ? window.currentReportData.mode : getActiveCodeMode?.() ?? 'all';
+  const showSCWhenMissing = (mode === 'without');
+
   detailed.forEach(item => {
+    // asegurarse que codigo es string para operaciones de texto
+    let codeStr = (item.codigo === null || item.codigo === undefined) ? '' : String(item.codigo).trim();
+
+    // si estamos en modo "sin códigos" y no hay código mostramos "S/C"
+    if (showSCWhenMissing && (!codeStr || codeStr.toLowerCase() === 'null' || codeStr.toLowerCase() === 'undefined')) {
+      codeStr = 'S/C';
+    }
+
+    const tendenciaClass = item.tendencia || 'neutral';
+    const diferenciaText = (item.diferencia > 0 ? '+' : '') + Math.round(item.diferencia || 0).toLocaleString();
+
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td>${item.codigo}</td>
-      <td>${item.descripcion}</td>
-      <td>${Math.round(item.stockInicial).toLocaleString()}</td>
-      <td>${Math.round(item.entradas).toLocaleString()}</td>
-      <td>${Math.round(item.salidas).toLocaleString()}</td>
-      <td>${Math.round(item.stockFinal).toLocaleString()}</td>
-      <td class="${item.tendencia}">${item.diferencia > 0 ? '+' : ''}${Math.round(item.diferencia).toLocaleString()}</td>
-      <td><span class="${item.tendencia}">${item.tendencia === 'up' ? '↗️' : item.tendencia === 'down' ? '↘️' : '➡️'}</span></td>
+      <td>${codeStr}</td>
+      <td>${item.descripcion ?? ''}</td>
+      <td>${Math.round(item.stockInicial || 0).toLocaleString()}</td>
+      <td>${Math.round(item.entradas || 0).toLocaleString()}</td>
+      <td>${Math.round(item.salidas || 0).toLocaleString()}</td>
+      <td>${Math.round(item.stockFinal || 0).toLocaleString()}</td>
+      <td class="${tendenciaClass}">${diferenciaText}</td>
+      <td><span class="${tendenciaClass}">${tendenciaClass === 'up' ? '↗️' : tendenciaClass === 'down' ? '↘️' : '➡️'}</span></td>
     `;
     tbody.appendChild(row);
   });
 }
 
+
+
+// helper simple para escapar HTML (por seguridad si los datos vienen con caracteres)
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 function updateMovementsTables(movements) {
   console.log("🔄 Actualizando tablas de movimientos:", {
     entradas: movements.entries.length,
     salidas: movements.exits.length
   });
 
+  // determinar modo para mostrar S/C cuando corresponda
+  const mode = (window.currentReportData && window.currentReportData.mode) ? window.currentReportData.mode : getActiveCodeMode?.() ?? 'all';
+  const showSCWhenMissing = (mode === 'without');
+
   // TABLA DE ENTRADAS
   const entriesBody = document.getElementById('entriesTableBody');
   if (entriesBody) {
     entriesBody.innerHTML = '';
-    
-    if (movements.entries.length === 0) {
+    if (!movements.entries || movements.entries.length === 0) {
       entriesBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay entradas registradas</td></tr>';
     } else {
       movements.entries.forEach(entry => {
+        let code = entry.codigo_producto ?? entry.codigo ?? entry.CODIGO ?? '';
+        code = (code === null || typeof code === 'undefined') ? '' : String(code).trim();
+        if (showSCWhenMissing && (!code || code.toLowerCase() === 'null' || code.toLowerCase() === 'undefined')) code = 'S/C';
+
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${formatDate(entry.fecha)}</td>
-          <td>${entry.codigo_producto}</td>
-          <td>${entry.descripcion_producto}</td>
-          <td>${Math.round(entry.cantidad).toLocaleString()}</td>
-          <td>${entry.responsable}</td>
-          <td>${entry.observaciones}</td>
+          <td>${code}</td>
+          <td>${entry.descripcion_producto ?? ''}</td>
+          <td>${Math.round(entry.cantidad || 0).toLocaleString()}</td>
+          <td>${entry.responsable ?? ''}</td>
+          <td>${entry.observaciones ?? ''}</td>
         `;
         entriesBody.appendChild(row);
       });
@@ -659,19 +743,24 @@ function updateMovementsTables(movements) {
   const exitsBody = document.getElementById('exitsTableBody');
   if (exitsBody) {
     exitsBody.innerHTML = '';
-    
-    if (movements.exits.length === 0) {
+    if (!movements.exits || movements.exits.length === 0) {
       exitsBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay salidas registradas</td></tr>';
     } else {
       movements.exits.forEach(exit => {
+        let code = exit.codigo_producto ?? exit.codigo ?? exit.CODIGO ?? '';
+        code = (code === null || typeof code === 'undefined') ? '' : String(code).trim();
+        if (showSCWhenMissing && (!code || code.toLowerCase() === 'null' || code.toLowerCase() === 'undefined')) code = 'S/C';
+
+        const destino = exit.destino ?? exit.DESTINATARIO ?? exit.destinatario ?? exit.DESTINO ?? exit.observaciones ?? '-';
+
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${formatDate(exit.fecha)}</td>
-          <td>${exit.codigo_producto}</td>
-          <td>${exit.descripcion_producto}</td>
-          <td>${Math.round(exit.cantidad).toLocaleString()}</td>
-          <td>${exit.responsable}</td>
-          <td>${exit.destino || exit.observaciones}</td>
+          <td>${code}</td>
+          <td>${exit.descripcion_producto ?? ''}</td>
+          <td>${Math.round(exit.cantidad || 0).toLocaleString()}</td>
+          <td>${exit.responsable ?? ''}</td>
+          <td>${destino}</td>
         `;
         exitsBody.appendChild(row);
       });
@@ -680,6 +769,7 @@ function updateMovementsTables(movements) {
     console.error("❌ No se encuentra exitsTableBody");
   }
 }
+
 
 function formatDate(dateString) {
   try {
@@ -759,7 +849,7 @@ function generateProductMovementChart(reportData) {
   charts.movement = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: topProducts.map(p => p.codigo),
+      labels: topProducts.map(p => p.codigo ? p.codigo : p.descripcion.substring(0, 10) + '...'),
       datasets: [
         { label: 'Entradas', data: topProducts.map(p => p.entradas), backgroundColor: '#10b981' },
         { label: 'Salidas', data: topProducts.map(p => p.salidas), backgroundColor: '#ef4444' }
@@ -829,7 +919,6 @@ async function exportToPDF() {
     const bottomMargin = 15;
     const usableWidth = pageWidth - margin * 2;
 
-    // Tipos y tamaños
     const titleSize = 16;
     const subtitleSize = 10;
     const summarySize = 10;
@@ -840,7 +929,6 @@ async function exportToPDF() {
 
     const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-    // Construir el array de productos con movimiento: entradas>0 o salidas>0
     const detailed = Array.isArray(currentReportData.detailed) ? currentReportData.detailed : [];
     const filtered = detailed.filter(it => {
       const entradas = Number(it.entradas ?? it.entrada ?? 0);
@@ -848,33 +936,28 @@ async function exportToPDF() {
       return entradas > 0 || salidas > 0;
     });
 
-    // Si no hay productos con movimiento, avisar y salir
     if (!filtered.length) {
       showAlert('No hay productos con movimientos (entradas o salidas) en este reporte.', 'info');
       showLoading(false);
       return;
     }
 
-    // Helper pie de página
     function addFooter(pageNumber) {
       doc.setFontSize(8);
       doc.setTextColor(120);
       doc.text(`Página ${pageNumber}`, pageWidth - margin, pageHeight - 8, { align: 'right' });
     }
 
-    // Título + subtítulo + resumen (igual formato que muestras)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(titleSize);
     doc.text('Reporte de Inventario', pageWidth / 2, topMargin, { align: 'center' });
 
-    // Período (manejar si month es string o number)
     const monthIndex = Number(currentReportData.month) ? Number(currentReportData.month) - 1 : (currentReportData.month ? (monthNames.indexOf(String(currentReportData.month))>=0?monthNames.indexOf(String(currentReportData.month)):0) : 0);
     const monthLabel = monthNames[monthIndex] ?? '';
     doc.setFontSize(subtitleSize);
     doc.setFont('helvetica', 'normal');
     doc.text(`Período: ${monthLabel} ${currentReportData.year ?? ''}`, pageWidth / 2, topMargin + 8, { align: 'center' });
 
-    // Resumen general (mantener exactamente estilo)
     let cursorY = topMargin + 18;
     doc.setFontSize(summarySize);
     doc.setFont('helvetica', 'bold');
@@ -882,11 +965,10 @@ async function exportToPDF() {
     cursorY += 6;
     doc.setFont('helvetica', 'normal');
     const s = currentReportData.summary || {};
-    // Mostrar en una línea dos columnas como en tu ejemplo
     const leftSummary = `Stock Inicial: ${Number(s.initialStock ?? s.stockInicial ?? 0).toLocaleString()}`;
     const rightSummary = `Stock Final: ${Number(s.finalStock ?? s.stockFinal ?? 0).toLocaleString()}`;
     doc.text(leftSummary, margin, cursorY);
-    doc.text(rightSummary, margin + 90, cursorY); // ajustar posición si quieres más espacio
+    doc.text(rightSummary, margin + 90, cursorY);
     cursorY += 6;
     const leftSummary2 = `Entradas: ${Number(s.totalEntries ?? s.entradas ?? 0).toLocaleString()}`;
     const rightSummary2 = `Salidas: ${Number(s.totalExits ?? s.salidas ?? 0).toLocaleString()}`;
@@ -894,7 +976,6 @@ async function exportToPDF() {
     doc.text(rightSummary2, margin + 90, cursorY);
     cursorY += 8;
 
-    // Definir columnas para "Detalle por Producto"
     const cols = [
       { key: 'codigo', title: 'Código', widthPct: 12 },
       { key: 'descripcion', title: 'Descripción', widthPct: 36 },
@@ -906,7 +987,6 @@ async function exportToPDF() {
     ];
     cols.forEach(c => c.width = Math.round((c.widthPct / 100) * usableWidth));
 
-    // Dibujar cabecera de tabla (se repite en páginas nuevas)
     function drawTableHeader(y) {
       const headerHeight = (headerFontSize * mmPerPt) * lineHeightMultiplier + 4;
       doc.setFillColor(41, 38, 96);
@@ -927,7 +1007,6 @@ async function exportToPDF() {
       return y + headerHeight + 1;
     }
 
-    // Empezar la tabla
     cursorY = drawTableHeader(cursorY + 4);
 
     doc.setFontSize(rowFontSize);
@@ -938,7 +1017,6 @@ async function exportToPDF() {
       doc.addPage();
       pageNumber++;
       cursorY = topMargin;
-      // título pequeño en páginas siguientes
       doc.setFontSize(subtitleSize);
       doc.setFont('helvetica', 'bold');
       doc.text('Reporte de Inventario', pageWidth / 2, cursorY, { align: 'center' });
@@ -950,7 +1028,6 @@ async function exportToPDF() {
     }
 
     const padding = 2;
-    // Iterar solo los productos filtrados
     for (let i = 0; i < filtered.length; i++) {
       const item = filtered[i];
 
@@ -964,7 +1041,6 @@ async function exportToPDF() {
         diferencia: String(item.diferencia ?? item.diff ?? ( (item.stockFinal ?? 0) - (item.stockInicial ?? 0) ) ?? 0)
       };
 
-      // calcular wrap por columna (descripcion genera wrap)
       const linesPerCol = {};
       cols.forEach(col => {
         const w = col.width - padding * 2;
@@ -976,13 +1052,11 @@ async function exportToPDF() {
       const maxLines = Math.max(...Object.values(linesPerCol).map(l => l.length || 1));
       const rowHeight = Math.max( (rowFontSize * mmPerPt) * lineHeightMultiplier * maxLines + 4, 6 );
 
-      // nueva página si no cabe
       if (cursorY + rowHeight > pageHeight - bottomMargin) {
         addFooter(pageNumber);
         addNewPageAndHeader();
       }
 
-      // dibujar fila
       let x = margin;
       const startY = cursorY + (rowFontSize * mmPerPt) * lineHeightMultiplier;
       cols.forEach(col => {
@@ -997,14 +1071,12 @@ async function exportToPDF() {
         x += col.width;
       });
 
-      // separador
       cursorY += rowHeight;
       doc.setDrawColor(220);
       doc.setLineWidth(0.1);
       doc.line(margin, cursorY - 1, margin + usableWidth, cursorY - 1);
     }
 
-    // pie final y guardar
     addFooter(pageNumber);
     const filename = `reporte_movimientos_productos_${currentReportData.month ?? 'mes'}_${currentReportData.year ?? 'anio'}.pdf`;
     doc.save(filename);
@@ -1027,7 +1099,7 @@ function showLoading(show) {
 let _refreshLock = false;
 
 async function refreshReport() {
-  if (_refreshLock) return; // evita pulsaciones repetidas
+  if (_refreshLock) return;
   _refreshLock = true;
 
   const btn = document.getElementById('refreshReport');
@@ -1062,10 +1134,9 @@ window.debugEntradas = async () => {
 window.debugReport = () => console.log("📊 Reporte actual:", currentReportData);
 window.diagnosticarEstructuraCompleta = diagnosticarEstructuraCompleta;
 
-// ------------------- PROTECCIÓN DE EXPORT (USAR seguridad si está implementada) -------------------
+// ------------------- PROTECCIÓN DE EXPORT -------------------
 async function exportToPDFIfAllowed() {
   try {
-    // si existe security module, verificar role
     if (window.security && typeof window.security.getCurrentUserAndRole === 'function') {
       const { user, role } = await window.security.getCurrentUserAndRole();
       if (!user) {
@@ -1077,7 +1148,6 @@ async function exportToPDFIfAllowed() {
         return;
       }
     }
-    // si no hay módulo security asumimos permisos (retrocompatibilidad)
     await exportToPDF();
   } catch (e) {
     console.error("Error exportToPDFIfAllowed:", e);

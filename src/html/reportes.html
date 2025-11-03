@@ -1,295 +1,214 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STOCK-VISION</title>
-    <link rel="stylesheet" href="../styles/reportes.css">
-    <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        /* ESTILOS PARA EL SCROLL DE LA TABLA DETALLE */
-        .table-scroll-container {
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: 8px;
-            margin-top: 10px;
-            background: white;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>STOCK-VISION</title>
+  <link rel="stylesheet" href="../styles/reportes.css">
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        .table-scroll-container table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 0;
-        }
+  <style>
+    /* --- ESTILOS PARA SCROLL Y BOTONES DE FILTRO --- */
+    .table-scroll-container {
+      max-height: 500px;
+      overflow-y: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-top: 10px;
+      background: white;
+    }
+    .table-scroll-container table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0;
+    }
+    .table-scroll-container thead th {
+      position: sticky;
+      top: 0;
+      background: #2d2978;
+      color: white;
+      z-index: 10;
+      padding: 12px 8px;
+      font-weight: 600;
+      border-bottom: 2px solid #3730a3;
+    }
+    .table-scroll-container td {
+      padding: 10px 8px;
+      border-bottom: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+    .table-scroll-container tbody tr:hover {
+      background-color: #f8fafc;
+    }
 
-        .table-scroll-container thead th {
-            position: sticky;
-            top: 0;
-            background: #2d2978;
-            color: white;
-            z-index: 10;
-            padding: 12px 8px;
-            font-weight: 600;
-            border-bottom: 2px solid #3730a3;
-        }
+    /* Scroll personalizado */
+    .table-scroll-container::-webkit-scrollbar { width: 12px; }
+    .table-scroll-container::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 6px;
+    }
+    .table-scroll-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 6px;
+      border: 2px solid #f1f5f9;
+    }
+    .table-scroll-container::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
 
-        .table-scroll-container td {
-            padding: 10px 8px;
-            border-bottom: 1px solid #e5e7eb;
-            white-space: nowrap;
-        }
+    /* Tendencias */
+    .up { color: #10b981; font-weight: 600; }
+    .down { color: #ef4444; font-weight: 600; }
+    .neutral { color: #6b7280; }
 
-        .table-scroll-container tbody tr:hover {
-            background-color: #f8fafc;
-        }
-
-        .table-scroll-container::-webkit-scrollbar {
-            width: 12px;
-        }
-
-        .table-scroll-container::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 6px;
-        }
-
-        .table-scroll-container::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 6px;
-            border: 2px solid #f1f5f9;
-        }
-
-        .table-scroll-container::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
-
-        /* Estilos para las tendencias */
-        .up { color: #10b981; font-weight: 600; }
-        .down { color: #ef4444; font-weight: 600; }
-        .neutral { color: #6b7280; }
-    </style>
+    /* --- BOTONES DE FILTRO --- */
+    .report-filters {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0 15px 0;
+    }
+    .report-filters .filter-btn {
+      background: transparent;
+      border: 1px solid #c7c7c7;
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color .12s, transform .06s;
+    }
+    .report-filters .filter-btn:hover { transform: translateY(-1px); }
+    .report-filters .filter-btn.active {
+      background: #667eea;
+      color: #fff;
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102,126,234,0.18);
+    }
+  </style>
 </head>
+
 <body>
-    <div class="container">
-        <a href="admin.html" class="back-btn">⬅ Volver al Panel Admin</a>
-        <h1>📊 Reportes de Inventario</h1>
-
-        <!-- Filtros -->
-        <div class="filters-container">
-            <div class="filter-group">
-                <label for="monthSelect">Mes:</label>
-                <select id="monthSelect" class="filter-select">
-                    <option value="1">Enero</option>
-                    <option value="2">Febrero</option>
-                    <option value="3">Marzo</option>
-                    <option value="4">Abril</option>
-                    <option value="5">Mayo</option>
-                    <option value="6">Junio</option>
-                    <option value="7">Julio</option>
-                    <option value="8">Agosto</option>
-                    <option value="9">Septiembre</option>
-                    <option value="10">Octubre</option>
-                    <option value="11">Noviembre</option>
-                    <option value="12">Diciembre</option>
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label for="yearSelect">Año:</label>
-                <select id="yearSelect" class="filter-select"></select>
-            </div>
-            <button id="refreshReport" class="generate-btn" title="Refrescar datos">🔄 Refrescar</button>
-            <button id="exportReport" class="export-btn">Exportar PDF</button>
-        </div>
-
-        <!-- Resumen General -->
-        <div class="summary-cards">
-            <div class="card">
-                <div class="card-icon">📈</div>
-                <div class="card-content">
-                    <h3>Stock Inicial</h3>
-                    <span id="initialStock" class="card-value">0</span>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-icon">📉</div>
-                <div class="card-content">
-                    <h3>Stock Final</h3>
-                    <span id="finalStock" class="card-value">0</span>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-icon">⬆️</div>
-                <div class="card-content">
-                    <h3>Entradas</h3>
-                    <span id="totalEntries" class="card-value">0</span>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-icon">⬇️</div>
-                <div class="card-content">
-                    <h3>Salidas</h3>
-                    <span id="totalExits" class="card-value">0</span>
-                </div>
-            </div>
-            
-            <div class="card">
-                <div class="card-icon">💰</div>
-                <div class="card-content">
-                    <h3>Diferencia</h3>
-                    <span id="stockDifference" class="card-value">0</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Gráficos -->
-        <div class="charts-container">
-            <div class="chart-card">
-                <h3>Comparativo Mensual - Stock</h3>
-                <canvas id="monthlyComparisonChart"></canvas>
-            </div>
-            
-            <div class="chart-card">
-                <h3>Movimiento por Producto</h3>
-                <canvas id="productMovementChart"></canvas>
-            </div>
-            
-            <div class="chart-card">
-                <h3>Top 10 Productos con Más Movimiento</h3>
-                <canvas id="topProductsChart"></canvas>
-            </div>
-            
-            <div class="chart-card">
-                <h3>Entradas vs Salidas</h3>
-                <canvas id="entriesExitsChart"></canvas>
-            </div>
-        </div>
-
-        <!-- Tabla Detallada CON SCROLL -->
-        <div class="table-section">
-            <h3>Detalle por Producto</h3>
-            <div class="table-scroll-container">
-                <table id="detailedReportTable">
-                    <thead>
-                        <tr>
-                            <th>Código</th>
-                            <th>Descripción</th>
-                            <th>Stock Inicial</th>
-                            <th>Entradas</th>
-                            <th>Salidas</th>
-                            <th>Stock Final</th>
-                            <th>Diferencia</th>
-                            <th>Tendencia</th>
-                        </tr>
-                    </thead>
-                    <tbody id="reportTableBody">
-                        <!-- Datos se cargan dinámicamente -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Reporte de Movimientos -->
-        <div class="movements-section">
-            <h3>Movimientos del Mes</h3>
-            <div class="tabs">
-                <button class="tab-btn active" data-tab="entries">Entradas</button>
-                <button class="tab-btn" data-tab="exits">Salidas</button>
-            </div>
-            
-            <div id="entriesTab" class="tab-content active">
-                <div class="table-scroll-container" style="max-height: 400px;">
-                    <table id="entriesTable">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Código</th>
-                                <th>Producto</th>
-                                <th>Cantidad</th>
-                                <th>Responsable</th>
-                                <th>Observaciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="entriesTableBody">
-                            <!-- Datos se cargan dinámicamente -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-            
-            <div id="exitsTab" class="tab-content">
-                <div class="table-scroll-container" style="max-height: 400px;">
-                    <table id="exitsTable">
-                        <thead>
-                            <tr>
-                                <th>Fecha</th>
-                                <th>Código</th>
-                                <th>Producto</th>
-                                <th>Cantidad</th>
-                                <th>Responsable</th>
-                                <th>Destino</th>
-                            </tr>
-                        </thead>
-                        <tbody id="exitsTableBody">
-                            <!-- Datos se cargan dinámicamente -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+  <div class="container">
+    <a href="admin.html" class="back-btn">⬅ Volver al Panel Admin</a>
+    <h1>📊 Reportes de Inventario</h1>
+       <!-- Filtros de código -->
+    <div id="reportCodeFilters" class="report-filters">
+      <span style="font-weight:600; margin-right:6px;">Mostrar:</span>
+      <button id="btnShowAll" class="filter-btn active">Todo</button>
+      <button id="btnWithCode" class="filter-btn">Inventario con código</button>
+      <button id="btnWithoutCode" class="filter-btn">Inventario sin código</button>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="loading-overlay">
-        <div class="loading-spinner"></div>
-        <p>Generando reporte...</p>
+    <!-- Filtros principales -->
+    <div class="filters-container">
+      <div class="filter-group">
+        <label for="monthSelect">Mes:</label>
+        <select id="monthSelect" class="filter-select">
+          <option value="1">Enero</option><option value="2">Febrero</option>
+          <option value="3">Marzo</option><option value="4">Abril</option>
+          <option value="5">Mayo</option><option value="6">Junio</option>
+          <option value="7">Julio</option><option value="8">Agosto</option>
+          <option value="9">Septiembre</option><option value="10">Octubre</option>
+          <option value="11">Noviembre</option><option value="12">Diciembre</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="yearSelect">Año:</label>
+        <select id="yearSelect" class="filter-select"></select>
+      </div>
+      <button id="refreshReport" class="generate-btn" title="Refrescar datos">🔄 Refrescar</button>
+      <button id="exportReport" class="export-btn">Exportar PDF</button>
     </div>
 
-<div id="toastContainer" aria-live="polite" aria-atomic="true" class="toast-container"></div>
+ 
 
-<div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
-  <div class="confirm-backdrop"></div>
-  <div class="confirm-box" role="document">
-    <header class="confirm-header"><h3 id="confirmTitle"></h3></header>
-    <div class="confirm-body" id="confirmMessage"></div>
-    <footer class="confirm-footer">
-      <button id="confirmCancel" class="btn btn-secondary">Cancelar</button>
-      <button id="confirmOk" class="btn btn-primary">Aceptar</button>
-    </footer>
+    <!-- Resumen -->
+    <div class="summary-cards">
+      <div class="card"><div class="card-icon">📈</div><div class="card-content"><h3>Stock Inicial</h3><span id="initialStock" class="card-value">0</span></div></div>
+      <div class="card"><div class="card-icon">📉</div><div class="card-content"><h3>Stock Final</h3><span id="finalStock" class="card-value">0</span></div></div>
+      <div class="card"><div class="card-icon">⬆️</div><div class="card-content"><h3>Entradas</h3><span id="totalEntries" class="card-value">0</span></div></div>
+      <div class="card"><div class="card-icon">⬇️</div><div class="card-content"><h3>Salidas</h3><span id="totalExits" class="card-value">0</span></div></div>
+      <div class="card"><div class="card-icon">💰</div><div class="card-content"><h3>Diferencia</h3><span id="stockDifference" class="card-value">0</span></div></div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="charts-container">
+      <div class="chart-card"><h3>Comparativo Mensual - Stock</h3><canvas id="monthlyComparisonChart"></canvas></div>
+      <div class="chart-card"><h3>Movimiento por Producto</h3><canvas id="productMovementChart"></canvas></div>
+      <div class="chart-card"><h3>Top 10 Productos con Más Movimiento</h3><canvas id="topProductsChart"></canvas></div>
+      <div class="chart-card"><h3>Entradas vs Salidas</h3><canvas id="entriesExitsChart"></canvas></div>
+    </div>
+
+    <!-- Tabla Detallada -->
+    <div class="table-section">
+      <h3>Detalle por Producto</h3>
+      <div class="table-scroll-container">
+        <table id="detailedReportTable">
+          <thead>
+            <tr>
+              <th>Código</th><th>Descripción</th><th>Stock Inicial</th><th>Entradas</th>
+              <th>Salidas</th><th>Stock Final</th><th>Diferencia</th><th>Tendencia</th>
+            </tr>
+          </thead>
+          <tbody id="reportTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Movimientos -->
+    <div class="movements-section">
+      <h3>Movimientos del Mes</h3>
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="entries">Entradas</button>
+        <button class="tab-btn" data-tab="exits">Salidas</button>
+      </div>
+      <div id="entriesTab" class="tab-content active">
+        <div class="table-scroll-container" style="max-height: 400px;">
+          <table id="entriesTable">
+            <thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Observaciones</th></tr></thead>
+            <tbody id="entriesTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div id="exitsTab" class="tab-content">
+        <div class="table-scroll-container" style="max-height: 400px;">
+          <table id="exitsTable">
+            <thead><tr><th>Fecha</th><th>Código</th><th>Producto</th><th>Cantidad</th><th>Responsable</th><th>Destino</th></tr></thead>
+            <tbody id="exitsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
-</div>
-<div id="toastContainer" aria-live="polite" aria-atomic="true" class="toast-container"></div>
 
-<div id="confirmModal" class="confirm-modal" role="dialog" aria-modal="true" aria-hidden="true" style="display:none;">
-  <div class="confirm-backdrop"></div>
-  <div class="confirm-box" role="document">
-    <header class="confirm-header"><h3 id="confirmTitle"></h3></header>
-    <div class="confirm-body" id="confirmMessage"></div>
-    <footer class="confirm-footer">
-      <button id="confirmCancel" class="btn btn-secondary">Cancelar</button>
-      <button id="confirmOk" class="btn btn-primary">Aceptar</button>
-    </footer>
+  <!-- Overlays -->
+  <div id="loadingOverlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <p>Generando reporte...</p>
   </div>
-</div>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="../js/reportes.js"></script>
 
-<script src="../js/seguridad.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        protectPage('admin');
-    });
-</script>
+  <div id="toastContainer" class="toast-container"></div>
+  <div id="confirmModal" class="confirm-modal" style="display:none;">
+    <div class="confirm-backdrop"></div>
+    <div class="confirm-box">
+      <header class="confirm-header"><h3 id="confirmTitle"></h3></header>
+      <div class="confirm-body" id="confirmMessage"></div>
+      <footer class="confirm-footer">
+        <button id="confirmCancel" class="btn btn-secondary">Cancelar</button>
+        <button id="confirmOk" class="btn btn-primary">Aceptar</button>
+      </footer>
+    </div>
+  </div>
 
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="../js/reportes.js"></script>
+  <!-- Scripts -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="../js/reportes.js"></script>
+  <script src="../js/seguridad.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => protectPage('admin'));
+  </script>
 </body>
 </html>
