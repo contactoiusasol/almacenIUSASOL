@@ -9,6 +9,8 @@
   --shadow: rgba(10,14,30,0.06);
   --container-padding: 24px;
 }
+
+/* Reset / base */
 *{ box-sizing: border-box; }
 html,body{ height:100%; }
 body{
@@ -53,6 +55,7 @@ body{
   box-shadow:0 6px 18px rgba(59,130,246,0.18);
 }
 
+/* Page title */
 h1{
   text-align:center;
   margin:10px 0 28px;
@@ -86,6 +89,8 @@ h1{
   background: #fafbfd;
   color:#213555;
 }
+
+/* Action buttons */
 .action-buttons{
   display:flex;
   gap:10px;
@@ -131,15 +136,19 @@ h1{
   border-radius:8px;
 }
 
-/* Table: use colgroup + fixed layout so widths are predictable */
+/* Tables: consistent behavior for pendientes + historial */
+.table-scroll-container table,
 table {
   width:100%;
   border-collapse:collapse;
-  table-layout: fixed;
-  min-width: 920px;
+  table-layout: fixed;      /* respeta <colgroup> widths */
+  min-width: 920px;         /* evita encogimiento; si la pantalla es menor, aparece scroll */
   background: transparent;
+  font-size:14px;
 }
 
+/* Thead: sticky header and style */
+.table-scroll-container thead th,
 thead th {
   background: var(--accent);
   color: #fff;
@@ -153,21 +162,43 @@ thead th {
   white-space:nowrap;
 }
 
+/* Slightly different darker header for historial table if present */
+#salidasTable thead th { background:#12325a; }
+
+/* Tbody cells */
+.table-scroll-container tbody td,
 tbody td {
-  padding: 18px 16px;
+  padding: 16px 14px;
   vertical-align: middle;
   border-bottom: 1px solid #f3f7fb;
-  font-size:14px;
   color:#223347;
-  word-break: normal;
-  overflow-wrap: break-word;
-  white-space: normal;
+  font-weight:600;
+  font-size:14px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap; /* default: compact */ 
+  box-sizing:border-box;
 }
 
-/* compact columns (no wrap) */
-.col-um, .col-cant, .col-acc { white-space: nowrap; }
+/* Allow certain columns to wrap and break long words */
+.col-desc,
+.col-obs,
+.col-resp,
+.col-dest,
+.descripcion,
+.obs,
+.email {
+  white-space: normal !important;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.4;
+  font-weight:500;
+}
 
-/* Inputs in table */
+/* Compact columns (no wrap) */
+.col-um, .col-cant, .col-acc, .col-inv { white-space: nowrap; }
+
+/* Inputs in table (pendiente cantidad editable) */
 input.pending-cantidad {
   width:110px;
   padding:8px 10px;
@@ -179,7 +210,28 @@ input.pending-cantidad {
   box-sizing:border-box;
 }
 
-/* Actions cell */
+/* Inventario label + dot */
+.inv-select-wrap { display:flex; align-items:center; gap:8px; white-space:nowrap; }
+.inv-dot {
+  display:inline-block;
+  width:12px;
+  height:12px;
+  min-width:12px;
+  border-radius:50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  border: 2px solid rgba(255,255,255,0.8);
+  vertical-align:middle;
+  background: var(--accent-2);
+}
+.inv-label {
+  font-weight:700;
+  color:#0b355a;
+  text-transform:uppercase;
+  font-size:12px;
+  letter-spacing:0.2px;
+}
+
+/* Actions cell layout */
 .acciones {
   display:flex;
   gap:8px;
@@ -194,24 +246,32 @@ input.pending-cantidad {
   font-weight:700;
   border:none;
 }
-.acciones .btn-delete {
+.acciones .btn-delete,
+.btn-delete {
   background: linear-gradient(90deg,#ef4444,#dc2626);
   color: #fff;
   padding:8px 12px;
   border-radius:8px;
   border:none;
   font-weight:700;
+  cursor:pointer;
+  box-shadow: 0 6px 18px rgba(239,68,68,0.12);
+}
+.btn-delete:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(239,68,68,0.18);
 }
 
+/* Empty note */
 .empty-note { padding:20px; color:var(--muted); text-align:center; }
 
+/* Small tweaks for specific tables */
 #salidasTable { min-width: 720px; }
-#salidasTable thead th { background:#12325a; }
 
 /* Scrollbar styling (WebKit) */
 .table-scroll-container::-webkit-scrollbar { height:12px; width:12px; }
 .table-scroll-container::-webkit-scrollbar-thumb {
-  background: #c8d2df; border-radius:10px; border:2px solid #f6f8fb;
+  background: #c8d2df; border-radius:10px; border:2px solid var(--bg);
 }
 .table-scroll-container::-webkit-scrollbar-track { background: transparent; }
 
@@ -223,11 +283,13 @@ input.pending-cantidad {
   tbody td { padding:12px 10px; font-size:13px; }
   .responsable-box { flex:1 1 200px; }
   #nombreResponsable { width:220px; }
+  .table-scroll-container { max-height: 50vh; }
 }
 @media (max-width:640px){
   .controls-row { flex-direction:column; align-items:flex-start; gap:10px; }
   #nombreResponsable{ width:100%; max-width:480px; }
   .btn { padding:10px 12px; }
+  .table-scroll-container { max-height: 45vh; }
 }
 
 /* Accessibility focus */
@@ -237,39 +299,9 @@ button:focus, a:focus, input:focus { outline: 3px solid rgba(6,182,212,0.18); ou
 .section-sep{
   border:0;height:1px;margin:26px 0;background:linear-gradient(90deg,transparent,#e9f2ff,transparent);border-radius:2px;
 }
-/* Botón eliminar dentro de la celda de acciones */
-.acciones {
-  display:flex;
-  gap:8px;
-  justify-content:flex-end;
-  align-items:center;
-}
 
-.btn-delete {
-  background: linear-gradient(90deg,#ef4444,#dc2626);
-  color: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
-  box-shadow: 0 6px 18px rgba(239,68,68,0.18);
-}
-
-.btn-delete:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(239,68,68,0.22);
-}
-
-/* Asegura que la acción no colapse en pantallas pequeñas */
-@media (max-width: 900px) {
-  .acciones { justify-content: flex-end; }
-  .btn-delete { padding: 7px 10px; font-size: 13px; }
-}
-.has-badge {
-  position: relative;
-}
-
+/* Badges */
+.has-badge { position: relative; }
 .ver-salidas-badge {
   position: absolute;
   top: -8px;
@@ -287,7 +319,6 @@ button:focus, a:focus, input:focus { outline: 3px solid rgba(6,182,212,0.18); ou
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   animation: pulse 2s infinite;
 }
-
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.1); }
@@ -311,25 +342,14 @@ button:focus, a:focus, input:focus { outline: 3px solid rgba(6,182,212,0.18); ou
   vertical-align: middle;
   pointer-events: none;
 }
-.has-badge { position: relative; }
 .button-badge.pulse { min-width:12px; width:12px; height:12px; padding:0; line-height:12px; font-size:0; }
-/* Badge-dot + label para inventarios (historial + pendientes) */
-.inv-select-wrap { display:flex; align-items:center; gap:8px; white-space:nowrap; }
-.inv-dot {
-  display:inline-block;
-  width:12px;
-  height:12px;
-  min-width:12px;
-  border-radius:50%;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-  border: 2px solid rgba(255,255,255,0.8);
-  vertical-align:middle;
+
+/* Helper classes */
+.text-center { text-align:center; }
+.small { font-size:13px; color:var(--muted); font-weight:500; }
+
+/* Ensure action buttons don't collapse on small screens */
+@media (max-width: 900px) {
+  .acciones { justify-content: flex-end; }
+  .btn-delete { padding: 7px 10px; font-size: 13px; }
 }
-.inv-label {
-  font-weight:700;
-  color:#0b355a;
-  text-transform:uppercase;
-  font-size:12px;
-  letter-spacing:0.2px;
-}
-.col-inv { white-space:nowrap; }

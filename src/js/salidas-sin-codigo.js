@@ -60,7 +60,6 @@ function normalizeKeyName(k){ return String(k||"").replace(/[^a-z0-9]/gi,"").toL
 
 // -------------------- MENSAJES / MODALES --------------------
 function showAlert(message, success=true, autoCloseMs=2500){
-  // simple overlay toast-like
   const id = "globalAlertOverlay";
   const existing = document.getElementById(id);
   if (existing) existing.remove();
@@ -84,8 +83,8 @@ function showAlert(message, success=true, autoCloseMs=2500){
 }
 function showToast(msg, ok=true){ showAlert(msg, ok); }
 
-function showConfirmModal({ title="Confirmar", message="", confirmText="Aceptar", cancelText="Cancelar", danger=false } = {}){
-  return new Promise((resolve)=>{
+function showConfirmModal({ title="Confirmar", message="", confirmText="Aceptar", cancelText="Cancelar", danger=false } = {}) {
+  return new Promise((resolve) => {
     if (document.querySelector(".custom-confirm-backdrop")) return resolve(false);
     const backdrop = document.createElement("div");
     backdrop.className = "custom-confirm-backdrop";
@@ -185,13 +184,14 @@ async function fetchStockForProduct(codigo, inventoryColLabel){
   }
 }
 
-// -------------------- RENDER PENDIENTES --------------------
+// -------------------- RENDER PENDIENTES / BADGE --------------------
 function updatePendingCountBadge(){
   const btn = document.getElementById("btnConfirmAll");
-  if (!btn) return;
   const count = getPendingSalidas().length;
+
+  // badge (crear si no existe)
   let badge = document.getElementById("pendingCountBadge");
-  if (!badge){
+  if (!badge && btn) {
     badge = document.createElement("span");
     badge.id = "pendingCountBadge";
     badge.style.background = "#ef4444";
@@ -203,13 +203,27 @@ function updatePendingCountBadge(){
     badge.style.verticalAlign = "middle";
     btn.appendChild(badge);
   }
-  badge.textContent = count;
-  badge.style.display = count>0 ? "inline-block" : "none";
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? "inline-block" : "none";
+  }
+
+  // Deshabilitar/activar botón Confirmar según exista al menos 1 pendiente
+  if (btn) {
+    btn.disabled = (count === 0);
+    if (count === 0) {
+      btn.title = "No hay salidas pendientes para procesar";
+      btn.classList && btn.classList.add('disabled');
+    } else {
+      btn.title = "";
+      btn.classList && btn.classList.remove('disabled');
+    }
+  }
 }
 
 async function renderPendingList(){
   if (!tablaPendientesBody) return;
-  // minimal inline styles
+  // minimal inline styles (solo una vez)
   if (!document.getElementById("salidas-sin-codigo-styles")){
     const s = document.createElement("style");
     s.id = "salidas-sin-codigo-styles";
@@ -217,27 +231,26 @@ async function renderPendingList(){
       #pendingTable td { vertical-align: middle; white-space: nowrap; }
       .btn-remove-pend { background:#ef4444;color:#fff;border:none;padding:6px 8px;border-radius:6px;cursor:pointer }
       .empty-note { text-align:center;color:#666;padding:8px; }
+      .col-desc, .col-obs, .col-resp, .col-dest { white-space: normal; overflow-wrap:anywhere; word-break:break-word; }
+      .acciones { display:flex; justify-content:flex-end; gap:8px; }
     `;
     document.head.appendChild(s);
   }
 
   const list = getPendingSalidas();
   tablaPendientesBody.innerHTML = "";
+
   if (!list || list.length === 0){
     tablaPendientesBody.innerHTML = `<tr><td colspan="9" class="empty-note">No hay salidas pendientes</td></tr>`;
     updatePendingCountBadge();
-    // actualizar badge a 0
     try { updateVerSalidasBadge(0); } catch(e){/* noop */ }
     return;
   }
 
   for (let i=0;i<list.length;i++){
     const it = list[i];
-    // mostrar S/C si no hay codigo
     const codigo = (it.CODIGO && String(it.CODIGO).trim() !== "") ? String(it.CODIGO) : "S/C";
     const cantidad = formatQty(it.CANTIDAD || 0);
-
-    // preparar label y color del inventario (igual que en historial)
     const inventarioRaw = it.INVENTARIO_ORIGEN ?? it.inventario_origen ?? "";
     const inventarioLabel = String(inventarioRaw || "").toUpperCase().replace(/^INVENTARIO\s*/i,'INVENTARIO ');
     const invColor = typeof invColorFor === 'function' ? invColorFor(inventarioRaw) : '#6b7280';
@@ -245,7 +258,7 @@ async function renderPendingList(){
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(codigo)}</td>
-      <td>${escapeHtml(it.DESCRIPCION || "")}</td>
+      <td class="col-desc">${escapeHtml(it.DESCRIPCION || "")}</td>
       <td>${escapeHtml(it.UM || "")}</td>
       <td class="col-inv">
         <span class="inv-select-wrap">
@@ -253,11 +266,11 @@ async function renderPendingList(){
           <span class="inv-label">${escapeHtml(inventarioLabel)}</span>
         </span>
       </td>
-      <td>${escapeHtml(cantidad)}</td>
-      <td>${escapeHtml(it.RESPONSABLE || "")}</td>
-      <td>${escapeHtml(it.DESTINATARIO || "")}</td>
-      <td>${escapeHtml(it.OBSERVACIONES || "")}</td>
-      <td><button class="btn-remove-pend" data-idx="${i}">Eliminar</button></td>
+      <td class="col-cant text-center">${escapeHtml(cantidad)}</td>
+      <td class="col-resp">${escapeHtml(it.RESPONSABLE || "")}</td>
+      <td class="col-dest">${escapeHtml(it.DESTINATARIO || "")}</td>
+      <td class="col-obs">${escapeHtml(it.OBSERVACIONES || "")}</td>
+      <td class="col-acc acciones"><button class="btn-remove-pend btn-delete" data-idx="${i}">Eliminar</button></td>
     `;
     tablaPendientesBody.appendChild(tr);
   }
@@ -276,18 +289,16 @@ async function renderPendingList(){
     });
   });
 
+  // actualizar badge y estado del botón Confirmar
   updatePendingCountBadge();
-  // actualizar badge con la longitud actual
   try { updateVerSalidasBadge(list.length); } catch(e){/* noop */ }
 }
-
 
 // -------------------- AGREGAR PENDIENTE (API pública que puedes invocar) --------------------
 function addPendingSalida(pendiente){
   // pendiente: { CODIGO?, DESCRIPCION, CANTIDAD, UM, INVENTARIO_ORIGEN, RESPONSABLE, DESTINATARIO, OBSERVACIONES, ORIGENES? }
   const list = getPendingSalidas();
   pendiente.id = pendiente.id || String(Date.now());
-  // normalizar cantidad numeric
   pendiente.CANTIDAD = roundFloat(Number(pendiente.CANTIDAD || 0) || 0);
   pendiente.ADDED_AT = pendiente.ADDED_AT || (new Date()).toISOString();
   list.push(pendiente);
@@ -296,7 +307,7 @@ function addPendingSalida(pendiente){
   renderPendingList();
 }
 
-// -------------------- processPendings ) --------------------
+// -------------------- processPendings --------------------
 async function processPendings(items) {
   if (!supabase) { showToast("Supabase no inicializado", false); return { successes:0, errors: items.length }; }
   await ensureProductosSinCodigoColumnMap();
@@ -305,7 +316,6 @@ async function processPendings(items) {
 
   for (const it of items) {
     try {
-      // insertar sólo las columnas que existen en salidas_sin_codigo
       const insertObj = {
         descripcion: it.DESCRIPCION || it.CODIGO || "",
         cantidad_salida: Number(it.CANTIDAD || it.CANTIDAD_SALIDA || 0),
@@ -323,26 +333,22 @@ async function processPendings(items) {
         throw insErr;
       }
 
-      // ajustar stock solo si hay cantidad > 0
       const qty = Number(it.CANTIDAD || it.CANTIDAD_SALIDA || 0);
       if (qty > 0) {
         let prodRow = null;
 
-        // 1) por PRODUCT_ID si viene
         if (it.PRODUCT_ID) {
           const sel = await supabase.from("productos_sin_codigo").select("*").eq("id", it.PRODUCT_ID).maybeSingle();
           if (!sel.error) prodRow = sel.data;
           else console.warn("Error buscando por PRODUCT_ID:", sel.error);
         }
 
-        // 2) por CODIGO si existe y no es S/C
         if (!prodRow && it.CODIGO && String(it.CODIGO).trim() !== "" && String(it.CODIGO).trim().toUpperCase() !== "S/C") {
           const sel = await supabase.from("productos_sin_codigo").select("*").ilike("CODIGO", String(it.CODIGO).trim()).limit(1).maybeSingle();
           if (!sel.error) prodRow = sel.data;
           else console.warn("Error buscando por CODIGO:", sel.error);
         }
 
-        // 3) fallback por DESCRIPCION (ilike)
         if (!prodRow && it.DESCRIPCION && String(it.DESCRIPCION).trim() !== "") {
           const q = String(it.DESCRIPCION).replace(/'/g, "''");
           const sel = await supabase.from("productos_sin_codigo").select("*").ilike("DESCRIPCION", `%${q}%`).limit(1).maybeSingle();
@@ -353,7 +359,6 @@ async function processPendings(items) {
         if (!prodRow) {
           console.warn("processPendings: No se encontró producto para decrementar stock. Pendiente:", it);
         } else {
-          // resolver columna de inventario
           const invLabelRaw = it.INVENTARIO_ORIGEN || it.inventario_origen || "ALMACEN";
           const invLabel = String(invLabelRaw || "").replace(/^INVENTARIO\s*/i,"").trim();
           let colName = getRealColForInventoryLabel(invLabel);
@@ -390,31 +395,67 @@ async function processPendings(items) {
   return { successes, errors, errorItems };
 }
 
+// -------------------- VACIAR PENDIENTES (función dedicada) --------------------
+async function clearAllPendings(){
+  const list = getPendingSalidas();
+  if (!list || list.length === 0) {
+    // Si no hay pendientes, avisar y salir (sin modal)
+    showToast("No hay salidas pendientes para eliminar.", false);
+    return;
+  }
+
+  // Si hay, pedir confirmación
+  const ok = await showConfirmModal({
+    title: "Limpiar pendientes",
+    message: `¿Eliminar las ${list.length} salidas pendientes? Esta acción no puede deshacerse.`,
+    confirmText: "Eliminar",
+    cancelText: "Cancelar",
+    danger: true
+  });
+
+  if (!ok) return;
+
+  // Limpiar, renderizar y notificar
+  savePendingSalidas([]);
+  await renderPendingList();
+  updatePendingCountBadge();
+  try { updateVerSalidasBadge(0); } catch(e){/* noop */ }
+  showToast("Pendientes eliminadas", true);
+}
 
 // -------------------- INTERFACE: Confirmar todas pendientes --------------------
 async function confirmAllPendings(){
   const list = getPendingSalidas();
-  if (!list || list.length === 0){ showToast("No hay pendientes", false); return; }
-  const ok = await showConfirmModal({ title: "Confirmar pendientes", message: `Procesar ${list.length} salidas pendientes?`, confirmText: "Procesar", cancelText: "Cancelar" });
+  if (!list || list.length === 0){
+    showToast("No se puede procesar: no hay salidas pendientes.", false);
+    return;
+  }
+
+  const ok = await showConfirmModal({
+    title: "Confirmar pendientes",
+    message: `Procesar ${list.length} salidas pendientes?`,
+    confirmText: "Procesar",
+    cancelText: "Cancelar"
+  });
   if (!ok) return;
+
   const res = await processPendings(list);
   if (res.errors === 0) {
-  savePendingSalidas([]);
-  renderPendingList();
-  // recarga el historial para que aparezcan las nuevas filas en la tabla
-  await cargarHistorialSalidas();
-  showToast(`Pendientes procesadas: ${res.successes}`, true);
-} else {
-  // en caso de errores, también recargamos el historial si hubo éxitos parciales
-  if (res.successes > 0) {
-    savePendingSalidas([]); // o logic para mantener fallidos
-    renderPendingList();
+    savePendingSalidas([]);
+    await renderPendingList();
     await cargarHistorialSalidas();
+    showToast(`Pendientes procesadas: ${res.successes}`, true);
+  } else {
+    if (res.successes > 0) {
+      savePendingSalidas([]); // opción: podrías guardar los fallidos en otro lugar
+      await renderPendingList();
+      await cargarHistorialSalidas();
+    }
+    showToast(`Procesadas: ${res.successes}, fallidas: ${res.errors}`, res.errors === 0);
   }
-  showToast(`Procesadas: ${res.successes}, fallidas: ${res.errors}`, res.errors === 0);
-}
 }
 
+// -------------------- CARGAR HISTORIAL --------------------
 async function cargarHistorialSalidas(){
   if (!tablaHistorialBody) return;
   try {
@@ -482,7 +523,6 @@ function updateVerSalidasBadge(count) {
       badge = document.createElement('span');
       badge.id = 'verSalidasBadge';
       badge.className = 'button-badge';
-      // insertamos como último hijo del botón (ajusta si prefieres otro contenedor)
       btn.appendChild(badge);
     }
 
@@ -501,12 +541,39 @@ function updateVerSalidasBadge(count) {
   }
 }
 
-// helper de diagnóstico rápido: muestra log + forzar badge visible con número de prueba
 function debugShowBadgeTest(n = 3) {
   console.log("debugShowBadgeTest: forcando badge con n =", n);
   updateVerSalidasBadge(n);
 }
 
+// -------------------- INVENTORY COLORS HELPER --------------------
+const INVENTORY_COLORS = {
+  "INVENTARIO I069": "#fff714", // amarillo
+  "INVENTARIO I078": "#0b78f5", // azul
+  "INVENTARIO I07F": "#f79125", // naranja
+  "INVENTARIO I312": "#ff1495", // magenta
+  "INVENTARIO I073": "#f1f65c", // amarillo claro
+  "I069": "#fff714",
+  "I078": "#0b78f5",
+  "I07F": "#f79125",
+  "I312": "#ff1495",
+  "I073": "#f1f65c",
+  "ALMACEN": "#6b7280"           // fallback
+};
+
+function normalizeInventoryKeyForColor(name) {
+  if (!name) return "";
+  let s = String(name).trim().toUpperCase();
+  if (s.startsWith("INVENTARIO ")) return s;
+  if (s === "ALMACEN") return "ALMACEN";
+  return `INVENTARIO ${s}`;
+}
+
+function invColorFor(name) {
+  if (!name) return INVENTORY_COLORS["ALMACEN"];
+  const long = normalizeInventoryKeyForColor(name);
+  return INVENTORY_COLORS[long] || INVENTORY_COLORS[name] || INVENTORY_COLORS["ALMACEN"];
+}
 
 // -------------------- INIT / EVENTOS --------------------
 async function init(){
@@ -516,7 +583,6 @@ async function init(){
       const { data } = await supabase.auth.getUser();
       const user = data?.user;
       if (user) {
-        // intentar leer tabla usuarios
         try {
           const { data: udata, error } = await supabase.from("usuarios").select("nombre, apellido").eq("email", user.email).maybeSingle();
           if (!error && udata){
@@ -540,60 +606,40 @@ async function init(){
 
   // eventos botones
   if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
-  if (btnClearPending) btnClearPending.addEventListener("click", async ()=>{
-    const ok = await showConfirmModal({ title: "Limpiar pendientes", message: "Eliminar todas las salidas pendientes?", confirmText: "Eliminar", cancelText: "Cancelar", danger:true });
-    if (!ok) return;
-    savePendingSalidas([]);
-    renderPendingList();
-    showToast("Pendientes eliminadas", true);
-  });
+
+  if (btnClearPending) {
+    btnClearPending.addEventListener("click", async (e) => {
+      // prevenir múltiples clicks
+      btnClearPending.disabled = true;
+      try {
+        await clearAllPendings();
+      } finally {
+        updatePendingCountBadge();
+        btnClearPending.disabled = false;
+      }
+    });
+  }
+
   if (btnRefresh) btnRefresh.addEventListener("click", async ()=>{
     await renderPendingList();
     await cargarHistorialSalidas();
     showToast("Refrescado", true);
   });
 
-  // render inicial
+  // render inicial -> await para estado consistente
   await ensureProductosSinCodigoColumnMap();
-  renderPendingList();
+  await renderPendingList();
   updatePendingCountBadge();
-  cargarHistorialSalidas();
-}
-// -------------------- INVENTORY COLORS HELPER --------------------
-const INVENTORY_COLORS = {
-  "INVENTARIO I069": "#fff714", // amarillo
-  "INVENTARIO I078": "#0b78f5", // azul
-  "INVENTARIO I07F": "#f79125", // naranja
-  "INVENTARIO I312": "#ff1495", // magenta
-  "INVENTARIO I073": "#f1f65c", // amarillo claro
-  "I069": "#fff714",
-  "I078": "#0b78f5",
-  "I07F": "#f79125",
-  "I312": "#ff1495",
-  "I073": "#f1f65c",
-  "ALMACEN": "#6b7280"           // fallback
-};
-
-function normalizeInventoryKeyForColor(name) {
-  if (!name) return "";
-  let s = String(name).trim().toUpperCase();
-  if (s.startsWith("INVENTARIO ")) return s;
-  if (s === "ALMACEN") return "ALMACEN";
-  // corto -> prefijo INVENTARIO
-  return `INVENTARIO ${s}`;
-}
-
-function invColorFor(name) {
-  if (!name) return INVENTORY_COLORS["ALMACEN"];
-  const long = normalizeInventoryKeyForColor(name);
-  return INVENTORY_COLORS[long] || INVENTORY_COLORS[name] || INVENTORY_COLORS["ALMACEN"];
+  await cargarHistorialSalidas();
 }
 
 // Auto-init
 init().catch(e => console.error("init error:", e));
 
-// -------------------- Exponer algunas funciones globales si quieres llamarlas desde consola/otros scripts -----
+// -------------------- Exponer funciones globales --------------------
 window.addPendingSalidaSinCodigo = addPendingSalida;
 window.confirmAllPendingsSinCodigo = confirmAllPendings;
 window.renderPendingListSinCodigo = renderPendingList;
 window.cargarHistorialSalidasSinCodigo = cargarHistorialSalidas;
+window.clearAllPendingsSinCodigo = clearAllPendings;
+window.debugShowBadgeTest = debugShowBadgeTest;
