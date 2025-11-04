@@ -260,22 +260,19 @@
     return null;
   }
 
-  function getStockFromProduct(productObj, inventoryLabel) {
-    if (!productObj) return 0;
-    const keys = Object.keys(productObj);
-    const normMap = new Map(keys.map(k => [normalizeKeyName(k), k]));
-    const variants = [`inventario ${inventoryLabel}`, `inventario_${inventoryLabel}`, `${inventoryLabel}`, `${inventoryLabel.toLowerCase()}`];
-    for (const v of variants) {
-      const nk = normalizeKeyName(v);
-      if (normMap.has(nk)) return toNumber(productObj[normMap.get(nk)]);
-    }
-    for (const k of keys) {
-      const nk = normalizeKeyName(k);
-      if (nk.includes("inventario") || nk.includes("almacen")) return toNumber(productObj[k]);
-    }
-    return 0;
+function getStockFromProduct(productObj, inventoryLabel) {
+  if (!productObj) return 0;
+  const keys = Object.keys(productObj);
+  const normMap = new Map(keys.map(k => [normalizeKeyName(k), k]));
+  const variants = [`inventario ${inventoryLabel}`, `inventario_${inventoryLabel}`, `${inventoryLabel}`, `${inventoryLabel.toLowerCase()}`];
+  
+  for (const v of variants) {
+    const nk = normalizeKeyName(v);
+    if (normMap.has(nk)) return toNumber(productObj[normMap.get(nk)]);
   }
-
+  
+  return 0;
+}
   // -------------------- TABLE SCROLL CONTAINER --------------------
   function ensureTableScrollContainer() {
     let wrapper = document.querySelector(".table-scroll-container");
@@ -484,78 +481,114 @@
       }, 100);
     });
   }
-
-  // -------------------- RENDER TABLA --------------------
-  function formatShowValue(v) { return v === null || v === undefined ? "0" : String(v); }
-
-  function renderTable(products) {
-    if (!tableBody) return;
+function renderTable(products) {
+  if (!tableBody) return;
+  
+  try {
+    tableBody.innerHTML = "";
     
-    try {
-      tableBody.innerHTML = "";
+    if (!products || products.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:#666;">No hay productos que coincidan con la búsqueda</td></tr>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    
+    products.forEach((p) => {
+      const i069 = getStockFromProduct(p, "I069");
+      const i078 = getStockFromProduct(p, "I078");
+      const i07f = getStockFromProduct(p, "I07F");
+      const i312 = getStockFromProduct(p, "I312");
+      const i073 = getStockFromProduct(p, "I073");
       
-      if (!products || products.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:#666;">No hay productos que coincidan con la búsqueda</td></tr>`;
-        return;
+      // Solo sumar los 5 inventarios principales
+      const stockReal = i069 + i078 + i07f + i312 + i073;
+
+      const tr = document.createElement("tr");
+      if (stockReal <= 1) tr.classList.add("stock-low");
+      else if (stockReal <= 10) tr.classList.add("stock-medium");
+      else tr.classList.add("stock-high");
+
+      tr.innerHTML = `
+        <td>${escapeHtml(nl(p.CODIGO) || "S/C")}</td>
+        <td>${escapeHtml(nl(p.DESCRIPCION))}</td>
+        <td>${escapeHtml(nl(p.UM))}</td>
+        <td>${String(i069)}</td>
+        <td>${String(i078)}</td>
+        <td>${String(i07f)}</td>
+        <td>${String(i312)}</td>
+        <td>${String(i073)}</td>
+        <td>${String(stockReal)}</td>
+        <td class="acciones">
+          <button class="btn-edit" title="Editar">✏️</button>
+          <button class="btn-delete" title="Eliminar">🗑️</button>
+          <button class="btn-salida" title="Registrar Salida">📦</button>
+          <button class="btn-entrada" title="Registrar Entrada">📥</button>
+          <button class="btn-historial" title="Historial de entradas">📜</button>
+        </td>
+      `;
+
+      // EVENT LISTENERS PARA LOS BOTONES - ESTO ES LO MÁS IMPORTANTE
+      const btnEdit = tr.querySelector(".btn-edit");
+      const btnDelete = tr.querySelector(".btn-delete");
+      const btnSalida = tr.querySelector(".btn-salida");
+      const btnEntrada = tr.querySelector(".btn-entrada");
+      const btnHist = tr.querySelector(".btn-historial");
+
+      if (btnEdit) {
+        btnEdit.addEventListener("click", () => editarProductoById(p.id));
+      }
+      if (btnDelete) {
+        btnDelete.addEventListener("click", () => eliminarProducto(String(p.id)));
+      }
+      if (btnSalida) {
+        btnSalida.addEventListener("click", () => registrarSalida(p));
+      }
+      if (btnEntrada) {
+        btnEntrada.addEventListener("click", () => openEntradaModalById(p));
+      }
+      if (btnHist) {
+        btnHist.addEventListener("click", () => openEntradaHistoryModal(p));
       }
 
-      const frag = document.createDocumentFragment();
-      
-      products.forEach((p) => {
-        const i069 = getStockFromProduct(p, "I069");
-        const i078 = getStockFromProduct(p, "I078");
-        const i07f = getStockFromProduct(p, "I07F");
-        const i312 = getStockFromProduct(p, "I312");
-        const i073 = getStockFromProduct(p, "I073");
-        const almacen = getStockFromProduct(p, "ALMACEN") || 0;
-        const stockReal = i069 + i078 + i07f + i312 + i073 + almacen;
+      frag.appendChild(tr);
+    });
 
-        const tr = document.createElement("tr");
-        if (stockReal <= 1) tr.classList.add("stock-low");
-        else if (stockReal <= 10) tr.classList.add("stock-medium");
-        else tr.classList.add("stock-high");
-
-        tr.innerHTML = `
-          <td>${escapeHtml(nl(p.CODIGO) || "S/C")}</td>
-          <td>${escapeHtml(nl(p.DESCRIPCION))}</td>
-          <td>${escapeHtml(nl(p.UM))}</td>
-          <td>${String(i069)}</td>
-          <td>${String(i078)}</td>
-          <td>${String(i07f)}</td>
-          <td>${String(i312)}</td>
-          <td>${String(i073)}</td>
-          <td>${String(stockReal)}</td>
-          <td class="acciones">
-            <button class="btn-edit" title="Editar">✏️</button>
-            <button class="btn-delete" title="Eliminar">🗑️</button>
-            <button class="btn-salida" title="Registrar Salida">📦</button>
-            <button class="btn-entrada" title="Registrar Entrada">📥</button>
-            <button class="btn-historial" title="Historial de entradas">📜</button>
-          </td>
-        `;
-
-        const btnEdit = tr.querySelector(".btn-edit");
-        const btnDelete = tr.querySelector(".btn-delete");
-        const btnSalida = tr.querySelector(".btn-salida");
-        const btnEntrada = tr.querySelector(".btn-entrada");
-        const btnHist = tr.querySelector(".btn-historial");
-
-        btnEdit.addEventListener("click", () => editarProductoById(p.id));
-        btnDelete.addEventListener("click", () => eliminarProducto(String(p.id)));
-        btnSalida.addEventListener("click", () => registrarSalida(p));
-        btnEntrada.addEventListener("click", () => openEntradaModalById(p));
-        btnHist.addEventListener("click", () => openEntradaHistoryModal(p));
-
-        frag.appendChild(tr);
-      });
-
-      tableBody.appendChild(frag);
-      
-    } catch (error) {
-      console.error("Error renderizando tabla:", error);
-    }
+    tableBody.appendChild(frag);
+    
+  } catch (error) {
+    console.error("Error renderizando tabla:", error);
   }
+}
+// AGREGA ESTAS FUNCIONES FALTANTES:
 
+function formatDate(dateString) {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (e) {
+    return dateString;
+  }
+}
+
+async function detectColumnsOfEntradasSinCodigo() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase.from("entradas_sin_codigo").select("*").limit(1);
+    if (error || !data || data.length === 0) return [];
+    return Object.keys(data[0]);
+  } catch (e) {
+    console.error("Error detectando columnas:", e);
+    return [];
+  }
+}
   // -------------------- PAGINACIÓN --------------------
   function ensurePaginationControlsExist() {
     let container = document.getElementById("paginationControls");
@@ -1920,137 +1953,6 @@ function updateVerSalidasBadge() {
   badge.style.display = 'flex';
   badge.textContent = count > 99 ? '99+' : String(count);
 }
-
-// ------------------- MODIFICAR LAS FUNCIONES QUE ACTUALIZAN PENDIENTES -------------------
-
-// En la función addPendingSalida, agregar al final:
-function addPendingSalida(pendiente) {
-  try {
-    const list = getPendingSalidas();
-    pendiente.id = pendiente.id || String(Date.now());
-    list.push(pendiente);
-    savePendingSalidas(list);
-    showToast("Salida agregada a pendientes", true);
-    renderPendingList();
-    updatePendingCount();
-    
-    // ACTUALIZAR BADGE - NUEVA LÍNEA
-    updateVerSalidasBadge();
-    
-  } catch (error) {
-    console.error("Error al agregar salida pendiente:", error);
-    showToast("Error al agregar salida pendiente", false);
-  }
-}
-
-// En la función removePendingSalida, agregar al final:
-function removePendingSalida(index) {
-  const list = getPendingSalidas();
-  list.splice(index, 1);
-  savePendingSalidas(list);
-  // ACTUALIZAR BADGE - NUEVA LÍNEA
-  updateVerSalidasBadge();
-}
-
-// En la función clearPendingSalidas, agregar al final:
-function clearPendingSalidas() {
-  localStorage.removeItem("salidas_pendientes");
-  // ACTUALIZAR BADGE - NUEVA LÍNEA
-  updateVerSalidasBadge();
-}
-
-// En la función confirmAllPendings, después de procesar:
-async function confirmAllPendings() {
-  const pendientes = getPendingSalidas();
-  if (!pendientes || pendientes.length === 0) {
-    showToast("No hay salidas pendientes", false);
-    return;
-  }
-
-  if (!confirm(`¿Confirmar ${pendientes.length} salidas pendientes y actualizar stock?`)) return;
-
-  if (btnConfirmAll) btnConfirmAll.disabled = true;
-  let successes = 0;
-  let errors = 0;
-
-  for (const item of pendientes.slice()) {
-    try {
-      // ... (código existente para procesar pendientes)
-      
-      successes++;
-      
-      // Borrar del pending
-      const list = getPendingSalidas();
-      const idx = list.findIndex(
-        (s) =>
-          s.CODIGO === item.CODIGO &&
-          ((s.ADDED_AT && item.ADDED_AT && s.ADDED_AT === item.ADDED_AT) ||
-            (s.INVENTARIO_ORIGEN === item.INVENTARIO_ORIGEN && s.CANTIDAD === item.CANTIDAD))
-      );
-      if (idx >= 0) { 
-        list.splice(idx, 1); 
-        savePendingSalidas(list); 
-      }
-    } catch (err) {
-      console.error("Error confirmando pendiente:", item, err);
-      errors++;
-    }
-  }
-
-  if (btnConfirmAll) btnConfirmAll.disabled = false;
-  await renderPendingList();
-  await cargarHistorialSalidas();
-  updatePendingCount();
-  
-  // ACTUALIZAR BADGE - NUEVAS LÍNEAS
-  updateVerSalidasBadge();
-
-  if (successes > 0 || errors > 0) {
-    showSummaryModal(successes, errors);
-  } else {
-    showToast("No se procesaron salidas", false);
-  }
-}
-
-// ------------------- ACTUALIZAR LA FUNCIÓN updatePendingCount -------------------
-function updatePendingCount() {
-  try {
-    const count = getPendingSalidas().length;
-    if (btnConfirmAll) btnConfirmAll.textContent = `Confirmar pendientes (${count})`;
-    
-    // ACTUALIZAR BADGE - NUEVA LÍNEA
-    updateVerSalidasBadge();
-    
-  } catch (error) {
-    console.error("Error actualizando contador:", error);
-  }
-}
-
-// ------------------- INICIALIZAR BADGE AL CARGAR LA PÁGINA -------------------
-document.addEventListener("DOMContentLoaded", async () => {
-  await setResponsableFromAuth();
-  await loadProducts();
-  await renderPendingList();
-  await cargarHistorialSalidas();
-  updatePendingCount();
-
-  // INICIALIZAR BADGE - NUEVA LÍNEA
-  updateVerSalidasBadge();
-
-  if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
-  if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
-  if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
-});
-
-// También agregar en la función renderPendingList:
-function renderPendingList() {
-  if (!tablaPendientesBody) return;
-
-  // ... (código existente)
-
-  // ACTUALIZAR BADGE AL FINAL - NUEVA LÍNEA
-  updateVerSalidasBadge();
-}
   // -------------------- SETUP & BOOT --------------------
   function setupButtonsAndEvents() {
     try {
@@ -2107,3 +2009,28 @@ function renderPendingList() {
     }
   });
 })();
+
+function renderTable(products) {
+  // ... código anterior ...
+  
+  products.forEach((p) => {
+    const i069 = getStockFromProduct(p, "I069");
+    const i078 = getStockFromProduct(p, "I078");
+    const i07f = getStockFromProduct(p, "I07F");
+    const i312 = getStockFromProduct(p, "I312");
+    const i073 = getStockFromProduct(p, "I073");
+    const stockReal = i069 + i078 + i07f + i312 + i073;
+
+    // DEBUG: Mostrar en consola para un producto específico
+    if (p.CODIGO === "TU_CODIGO_PROBLEMA" || p.DESCRIPCION.includes("TU_PRODUCTO_PROBLEMA")) {
+      console.log("DEBUG Stock:", {
+        producto: p.DESCRIPCION,
+        i069, i078, i07f, i312, i073,
+        total: stockReal,
+        objetoCompleto: p
+      });
+    }
+    
+    // ... resto del código
+  });
+}
