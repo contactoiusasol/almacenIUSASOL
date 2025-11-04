@@ -35,15 +35,13 @@
 
   // PENDINGS (salidas)
   const PENDINGS_KEY_SALIDAS = "salidas_sin_codigo_pendientes";
-// -------------------- PENDING KEY (consistente y fallback) --------------------
-const PENDING_KEY = "salidas_sin_codigo_pendientes"; // la key canonical que usamos
-// posibles keys antiguas (legacy) que otros módulos podrían haber usado
-const LEGACY_PENDING_KEYS = [
-  "PENDINGS_KEY_SALIDAS",
-  "pending_salidas",
-  "salidas_pending",
-  "salidas_sin_codigo_pendientes" // incluida por si acaso se guarda directamente
-];
+  const PENDING_KEY = "salidas_sin_codigo_pendientes";
+  const LEGACY_PENDING_KEYS = [
+    "PENDINGS_KEY_SALIDAS",
+    "pending_salidas",
+    "salidas_pending",
+    "salidas_sin_codigo_pendientes"
+  ];
 
   // -------------------- UTIL --------------------
   function nl(v){ return v === null || v === undefined ? "" : String(v); }
@@ -53,13 +51,13 @@ const LEGACY_PENDING_KEYS = [
     const n = Number(cleaned);
     return Number.isNaN(n) ? 0 : n;
   }
-  // redondeo seguro (usa en todo el módulo)
-function roundFloat(n, decimals = 6) {
-  const v = Number(n || 0);
-  if (!Number.isFinite(v)) return 0;
-  const f = Math.pow(10, decimals);
-  return Math.round(v * f) / f;
-}
+
+  function roundFloat(n, decimals = 6) {
+    const v = Number(n || 0);
+    if (!Number.isFinite(v)) return 0;
+    const f = Math.pow(10, decimals);
+    return Math.round(v * f) / f;
+  }
 
   function escapeHtml(text) {
     if (text === null || text === undefined) return "";
@@ -69,6 +67,7 @@ function roundFloat(n, decimals = 6) {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+
   function normalizeKeyName(s) {
     if (!s) return "";
     return String(s)
@@ -77,6 +76,7 @@ function roundFloat(n, decimals = 6) {
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]/g, "");
   }
+
   function debounce(fn, wait = 300) {
     let t;
     return (...args) => {
@@ -84,307 +84,95 @@ function roundFloat(n, decimals = 6) {
       t = setTimeout(() => fn(...args), wait);
     };
   }
-  
+
   // -------------------- Helpers similitud / normalización --------------------
-function normalizeTextForCompare(s){
-  if (!s) return "";
-  return String(s)
-    .trim()
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")   // quitar acentos
-    .replace(/[^a-z0-9\s]/g, "")                       // quitar símbolos
-    .replace(/\s+/g, " ")                              // colapsar espacios
-    .trim();
-}
-
-function levenshteinDistance(a, b){
-  const as = String(a || ""), bs = String(b || "");
-  if (as === bs) return 0;
-  const la = as.length, lb = bs.length;
-  if (la === 0) return lb;
-  if (lb === 0) return la;
-  let v0 = new Array(lb + 1), v1 = new Array(lb + 1);
-  for (let j = 0; j <= lb; j++) v0[j] = j;
-  for (let i = 0; i < la; i++) {
-    v1[0] = i + 1;
-    for (let j = 0; j < lb; j++) {
-      const cost = as[i] === bs[j] ? 0 : 1;
-      v1[j+1] = Math.min(v1[j] + 1, v0[j+1] + 1, v0[j] + cost);
-    }
-    // swap
-    const tmp = v0; v0 = v1; v1 = tmp;
-  }
-  return v0[lb];
-}
-
-function similarityRatio(a, b){
-  const na = normalizeTextForCompare(a);
-  const nb = normalizeTextForCompare(b);
-  if (!na && !nb) return 1;
-  if (!na || !nb) return 0;
-  const dist = levenshteinDistance(na, nb);
-  const maxLen = Math.max(na.length, nb.length);
-  if (maxLen === 0) return 1;
-  return 1 - (dist / maxLen);
-}
-
-
-function ensureToast() {
-  if (!document.getElementById("toast")) {
-    const t = document.createElement("div");
-    t.id = "toast";
-    t.className = "toast";
-    // estilos inline robustos para evitar que CSS externos lo oculten
-    Object.assign(t.style, {
-      position: "fixed",
-      top: "18px",
-      right: "18px",
-      padding: "10px 14px",
-      borderRadius: "10px",
-      color: "#fff",
-      zIndex: "99999",
-      display: "none",
-      fontFamily: "'Quicksand', sans-serif",
-      fontWeight: "600",
-      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
-      alignItems: "center",
-      justifyContent: "center"
-    });
-    document.body.appendChild(t);
-  }
-}
-
-function showToast(msg, ok = true, time = 3000) {
-  ensureToast();
-  const toast = document.getElementById("toast");
-  if (!toast) return;
-
-  // debug: log para confirmar invocación
-  console.debug("showToast llamado:", msg, "ok:", ok, "duration:", time);
-
-  // aplicar background según éxito/error
-  const bg = ok ? "linear-gradient(90deg,#16a34a,#059669)" : "linear-gradient(90deg,#ef4444,#dc2626)";
-  toast.style.background = bg;
-
-  // Forzar visibilidad con inline style y prioridad
-  toast.style.setProperty("display", "flex", "important");
-  toast.style.setProperty("opacity", "1", "important");
-  toast.style.setProperty("visibility", "visible", "important");
-
-  toast.textContent = msg;
-
-  // cancelar timeout previo si existe
-  if (toast._t) {
-    clearTimeout(toast._t);
+  function normalizeTextForCompare(s){
+    if (!s) return "";
+    return String(s)
+      .trim()
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
-  // auto-hide
-  toast._t = setTimeout(() => {
-    try {
-      toast.style.setProperty("opacity", "0", "important");
-      toast.style.setProperty("visibility", "hidden", "important");
-      // luego ocultar (no important, para que la próxima llamada lo muestre de nuevo)
-      setTimeout(()=> toast.style.display = "none", 200);
-    } catch(e){ console.warn("Error hiding toast", e); }
-  }, time);
-}
-// ----------------- TOAST FORZADO + DEPURACIÓN -----------------
-(function setupForcedToast() {
-  // inject strong CSS so external CSS can't hide it
-  try {
-    if (!document.getElementById("__forced_toast_styles")) {
-      const style = document.createElement("style");
-      style.id = "__forced_toast_styles";
-      style.textContent = `
-        /* regla fuerte para que el toast nunca quede oculto por CSS externo */
-        #toast, .toast {
-          display: -webkit-box !important;
-          display: -ms-flexbox !important;
-          display: flex !important;
-          -webkit-box-align: center !important;
-          -ms-flex-align: center !important;
-          align-items: center !important;
-          -webkit-box-pack: center !important;
-          -ms-flex-pack: center !important;
-          justify-content: center !important;
-          position: fixed !important;
-          top: 18px !important;
-          right: 18px !important;
-          z-index: 999999 !important;
-          padding: 10px 14px !important;
-          border-radius: 10px !important;
-          color: #fff !important;
-          font-weight: 600 !important;
-          box-shadow: 0 6px 20px rgba(2,6,23,0.18) !important;
-          transition: opacity 0.2s ease !important;
-          opacity: 1 !important;
-          visibility: visible !important;
-          pointer-events: auto !important;
-        }
-        /* small helper class for error/ok colors if needed */
-        #toast.ok { background: linear-gradient(90deg,#16a34a,#059669) !important; }
-        #toast.err { background: linear-gradient(90deg,#ef4444,#dc2626) !important; }
-      `;
-      document.head.appendChild(style);
-    }
-  } catch (e) {
-    console.warn("No se pudo inyectar estilos de toast:", e);
-  }
-
-  // create toast if not exists
-  if (!document.getElementById("toast")) {
-    const t = document.createElement("div");
-    t.id = "toast";
-    t.className = "toast";
-    // inline defaults (seguros)
-    Object.assign(t.style, {
-      display: "flex",
-      position: "fixed",
-      top: "18px",
-      right: "18px",
-      zIndex: "999999",
-      padding: "10px 14px",
-      borderRadius: "10px",
-      color: "#fff",
-      fontWeight: "600",
-      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "opacity 0.2s ease",
-      opacity: "1",
-      visibility: "visible"
-    });
-    document.body.appendChild(t);
-    console.debug("setupForcedToast: #toast creado");
-  } else {
-    console.debug("setupForcedToast: #toast ya existía");
-  }
-})();
-
-function ensureToast() {
-  // ya creado en setupForcedToast, pero por compatibilidad comprobamos
-  if (!document.getElementById("toast")) {
-    const t = document.createElement("div");
-    t.id = "toast";
-    t.className = "toast";
-    Object.assign(t.style, {
-      display: "flex",
-      position: "fixed",
-      top: "18px",
-      right: "18px",
-      zIndex: "999999",
-      padding: "10px 14px",
-      borderRadius: "10px",
-      color: "#fff",
-      fontWeight: "600",
-      boxShadow: "0 6px 20px rgba(2,6,23,0.18)",
-      alignItems: "center",
-      justifyContent: "center",
-      transition: "opacity 0.2s ease",
-      opacity: "1",
-      visibility: "visible"
-    });
-    document.body.appendChild(t);
-    console.debug("ensureToast: creado de emergencia");
-  }
-}
-
-function showToast(msg, ok = true, time = 3000) {
-  ensureToast();
-  const toast = document.getElementById("toast");
-  if (!toast) {
-    // última línea de defensa
-    try { alert(msg); } catch(e){ console.error("alert fallback failed", e); }
-    console.warn("showToast: no hay #toast, se usó alert como fallback");
-    return;
-  }
-
-  // debug: mostrar en consola cada llamada
-  console.debug("showToast llamado:", { msg, ok, time });
-
-  // aplicar clase de color
-  toast.classList.remove("ok", "err");
-  toast.classList.add(ok ? "ok" : "err");
-
-  // Mensaje y visibilidad forzados (inline style con setProperty "important")
-  toast.textContent = msg;
-  try {
-    toast.style.setProperty("display", "flex", "important");
-    toast.style.setProperty("opacity", "1", "important");
-    toast.style.setProperty("visibility", "visible", "important");
-  } catch (e) {
-    // algunos navegadores/entornos pueden no soportar third arg; aun así debe funcionar
-    toast.style.display = "flex";
-    toast.style.opacity = "1";
-    toast.style.visibility = "visible";
-  }
-
-  // limpiar timeout previo
-  if (toast._t) clearTimeout(toast._t);
-
-  // auto hide
-  toast._t = setTimeout(() => {
-    try {
-      toast.style.setProperty("opacity", "0", "important");
-      toast.style.setProperty("visibility", "hidden", "important");
-      // pequeña espera antes de ocultar del todo
-      setTimeout(()=> {
-        try { toast.style.display = "none"; } catch(e){}
-      }, 180);
-    } catch (e) {
-      // fallback directo
-      toast.style.opacity = "0";
-      toast.style.visibility = "hidden";
-      setTimeout(()=> { toast.style.display = "none"; }, 180);
-    }
-  }, time);
-
-  // comprobación post-show: si por alguna razón sigue oculto -> fallback alert
-  setTimeout(() => {
-    try {
-      const cs = getComputedStyle(toast);
-      console.debug("showToast computedStyle:", { display: cs.display, visibility: cs.visibility, opacity: cs.opacity });
-      if ((cs.display === "none" || cs.visibility === "hidden" || Number(cs.opacity) === 0) ) {
-        // fallback
-        console.warn("showToast: el toast sigue oculto — uso alert() como fallback");
-        try { alert(msg); } catch(e){ console.error("alert fallback failed", e); }
+  function levenshteinDistance(a, b){
+    const as = String(a || ""), bs = String(b || "");
+    if (as === bs) return 0;
+    const la = as.length, lb = bs.length;
+    if (la === 0) return lb;
+    if (lb === 0) return la;
+    let v0 = new Array(lb + 1), v1 = new Array(lb + 1);
+    for (let j = 0; j <= lb; j++) v0[j] = j;
+    for (let i = 0; i < la; i++) {
+      v1[0] = i + 1;
+      for (let j = 0; j < lb; j++) {
+        const cost = as[i] === bs[j] ? 0 : 1;
+        v1[j+1] = Math.min(v1[j] + 1, v0[j+1] + 1, v0[j] + cost);
       }
-    } catch (e) {
-      console.warn("showToast: error comprobando estilo computado", e);
+      const tmp = v0; v0 = v1; v1 = tmp;
     }
-  }, 60);
-}
-
-//  showToast y añadir logs
-function showActionToast(action, success = true, details = "") {
-  const actions = {
-    create: { success: "✅ Producto creado exitosamente", error: "❌ Error al crear el producto" },
-    update: { success: "✏️ Producto actualizado exitosamente", error: "❌ Error al actualizar el producto" },
-    delete: { success: "🗑️ Producto eliminado exitosamente", error: "❌ Error al eliminar el producto" },
-    load: { success: "📦 Productos cargados exitosamente", error: "❌ Error al cargar productos" },
-    search: { success: "🔍 Búsqueda completada", error: "❌ Error en la búsqueda" },
-    entrada: { success: "📥 Entrada registrada exitosamente", error: "❌ Error al registrar entrada" },
-    salida: { success: "📦 Salida agregada a pendientes", error: "❌ Error al registrar salida" },
-    pendiente: { success: "⏳ Acción en pendientes completada", error: "❌ Error en pendientes" },
-    clear: { success: "🧹 Pendientes eliminados", error: "❌ Error al eliminar pendientes" },
-    historial: { success: "📜 Historial cargado", error: "❌ Error al cargar historial" },
-    auth: { success: "🔐 Sesión verificada", error: "❌ Error de autenticación" },
-    general: { success: "✅ Acción completada", error: "❌ Error en la acción" }
-  };
-
-  const messageType = actions[action] || actions.general;
-  const message = success ? messageType.success : messageType.error;
-  const fullMessage = details ? `${message}: ${details}` : message;
-
-  try {
-    console.debug("showActionToast:", { action, success, details, fullMessage });
-    showToast(fullMessage, success, success ? 3000 : 4500);
-  } catch (e) {
-    console.error("showActionToast error:", e);
-    try { alert(fullMessage); } catch(e2){ console.error("alert fallback failed", e2); }
+    return v0[lb];
   }
-}
 
+  function similarityRatio(a, b){
+    const na = normalizeTextForCompare(a);
+    const nb = normalizeTextForCompare(b);
+    if (!na && !nb) return 1;
+    if (!na || !nb) return 0;
+    const dist = levenshteinDistance(na, nb);
+    const maxLen = Math.max(na.length, nb.length);
+    if (maxLen === 0) return 1;
+    return 1 - (dist / maxLen);
+  }
+
+  // -------------------- TOAST SIMPLIFICADO --------------------
+  function showToast(msg, ok = true, time = 3000) {
+    // Toast simple y discreto
+    try {
+      // Si no hay toast, crear uno mínimo
+      let toast = document.getElementById("simpleToast");
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "simpleToast";
+        Object.assign(toast.style, {
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          padding: "12px 16px",
+          borderRadius: "6px",
+          color: "#fff",
+          zIndex: "9999",
+          fontFamily: "'Quicksand', sans-serif",
+          fontWeight: "500",
+          fontSize: "14px",
+          background: ok ? "#10b981" : "#ef4444",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          transition: "all 0.3s ease",
+          opacity: "0",
+          transform: "translateY(-20px)"
+        });
+        document.body.appendChild(toast);
+      }
+
+      toast.textContent = msg;
+      toast.style.background = ok ? "#10b981" : "#ef4444";
+      toast.style.opacity = "1";
+      toast.style.transform = "translateY(0)";
+
+      // Limpiar timeout anterior
+      if (toast._timeout) clearTimeout(toast._timeout);
+      
+      toast._timeout = setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(-20px)";
+      }, time);
+
+    } catch (e) {
+      console.log("Toast:", msg); // Fallback a console
+    }
+  }
 
   function showConfirm(message, onConfirm, onCancel) {
     let modalC = document.getElementById("confirmModal");
@@ -426,29 +214,24 @@ function showActionToast(action, success = true, details = "") {
     no.addEventListener("click", n);
   }
 
-  // -------------------- MAPA DE COLUMNAS (productos_sin_codigo) --------------------
+  // -------------------- MAPA DE COLUMNAS --------------------
   async function ensureProductosSinCodigoColumnMap() {
     if (PRODUCTOS_SIN_CODIGO_COLUMN_MAP) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
     PRODUCTOS_SIN_CODIGO_COLUMN_MAP = {};
-    if (!supabase) {
-      showActionToast("auth", false, "Supabase no inicializado");
-      return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
-    }
+    if (!supabase) return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
+    
     try {
       const { data, error } = await supabase.from("productos_sin_codigo").select("*").limit(1);
       if (error) {
-        console.warn("ensureProductosSinCodigoColumnMap error:", error);
-        showActionToast("general", false, "Error al cargar mapa de columnas");
+        console.warn("Error al cargar mapa de columnas:", error);
         return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
       }
       if (data && data.length > 0) {
         const sample = data[0];
         Object.keys(sample).forEach(k => { PRODUCTOS_SIN_CODIGO_COLUMN_MAP[normalizeKeyName(k)] = k; });
-        showActionToast("general", true, "Mapa de columnas cargado");
       }
     } catch (e) { 
-      console.warn(e);
-      showActionToast("general", false, "Excepción en mapa de columnas");
+      console.warn("Excepción en mapa de columnas:", e);
     }
     return PRODUCTOS_SIN_CODIGO_COLUMN_MAP;
   }
@@ -514,10 +297,7 @@ function showActionToast(action, success = true, details = "") {
   let localSearchIndex = [];
 
   function prepareLocalSearchIndex() {
-    if (!allProductsFromServer || allProductsFromServer.length === 0) {
-      showActionToast("search", false, "No hay datos para indexar");
-      return;
-    }
+    if (!allProductsFromServer || allProductsFromServer.length === 0) return;
     
     try {
       localSearchIndex = allProductsFromServer.map(product => {
@@ -533,10 +313,8 @@ function showActionToast(action, success = true, details = "") {
           product: product
         };
       });
-      showActionToast("search", true, `Índice local creado con ${localSearchIndex.length} productos`);
     } catch (error) {
       console.error("Error creando índice local:", error);
-      showActionToast("search", false, "Error creando índice de búsqueda");
     }
   }
 
@@ -555,14 +333,14 @@ function showActionToast(action, success = true, details = "") {
     return results;
   }
 
-  // -------------------- LOAD / SEARCH (PAGINATED) MEJORADO --------------------
+  // -------------------- LOAD / SEARCH (PAGINATED) --------------------
   async function loadAllProductsWithPagination() {
     if (!supabase) { 
-      showActionToast("load", false, "Supabase no inicializado"); 
+      showToast("Error de conexión", false);
       return; 
     }
+    
     try {
-      showActionToast("load", true, "Cargando productos...");
       PRODUCTOS_SIN_CODIGO_COLUMN_MAP = null;
       await ensureProductosSinCodigoColumnMap();
 
@@ -573,7 +351,7 @@ function showActionToast(action, success = true, details = "") {
       while (true) {
         const { data, error } = await supabase.from("productos_sin_codigo").select("*").order("id", { ascending: true }).range(offset, offset + BATCH - 1);
         if (error) {
-          showActionToast("load", false, `Error en lote ${offset}: ${error.message}`);
+          showToast(`Error al cargar: ${error.message}`, false);
           throw error;
         }
         if (!data || data.length === 0) break;
@@ -590,29 +368,28 @@ function showActionToast(action, success = true, details = "") {
       renderCurrentPage();
       updatePaginationControls();
       
-      // Preparar índice de búsqueda local
       prepareLocalSearchIndex();
       
-      showActionToast("load", true, `${allProductsFromServer.length} productos cargados exitosamente`);
+      showToast(`${allProductsFromServer.length} productos cargados`, true);
+      
     } catch (err) {
-      console.error("loadAllProductsWithPagination err:", err);
-      showActionToast("load", false, `Error: ${err.message}`);
+      console.error("Error cargando productos:", err);
+      showToast(`Error: ${err.message}`, false);
     }
   }
 
   async function performServerSearchWithPagination(term) {
     if (!supabase) {
-      showActionToast("search", false, "Conexión no disponible");
+      showToast("Conexión no disponible", false);
       return;
     }
+    
     try {
-      showActionToast("search", true, "Buscando en servidor...");
-      
       const q = term.replace(/'/g, "''");
       const { data, error } = await supabase.from("productos_sin_codigo").select("*").or(`DESCRIPCION.ilike.%${q}%,CODIGO.ilike.%${q}%`).order("id", { ascending: true }).limit(5000);
       
       if (error) {
-        showActionToast("search", false, `Error del servidor: ${error.message}`);
+        showToast(`Error de búsqueda: ${error.message}`, false);
         throw error;
       }
       
@@ -623,13 +400,12 @@ function showActionToast(action, success = true, details = "") {
       
       const resultCount = paginatedProducts.length;
       if (resultCount > 0) {
-        showActionToast("search", true, `${resultCount} productos encontrados en servidor`);
+        showToast(`${resultCount} productos encontrados`, true);
       } else {
-        showActionToast("search", false, "No se encontraron productos en el servidor");
+        showToast("No se encontraron productos", false);
       }
     } catch (err) {
-      console.error("search err:", err);
-      showActionToast("search", false, `Error en búsqueda: ${err.message}`);
+      console.error("Error en búsqueda:", err);
       
       // Fallback a búsqueda local
       const localResults = performLocalSearch(term);
@@ -639,16 +415,13 @@ function showActionToast(action, success = true, details = "") {
       updatePaginationControls();
       
       if (localResults.length > 0) {
-        showActionToast("search", true, `${localResults.length} productos encontrados localmente`);
+        showToast(`${localResults.length} productos encontrados localmente`, true);
       }
     }
   }
 
   function setupSearchWithPagination() {
-    if (!searchInput) {
-      showActionToast("general", false, "Campo de búsqueda no encontrado");
-      return;
-    }
+    if (!searchInput) return;
     
     let lastSearchTerm = '';
     let searchMode = 'local';
@@ -662,24 +435,14 @@ function showActionToast(action, success = true, details = "") {
         currentPage = 1;
         renderCurrentPage();
         updatePaginationControls();
-        showActionToast("search", true, "Búsqueda limpiada");
         return;
       }
       
-      // Si el término es muy corto, usar búsqueda local
       if (term.length <= 2) {
         searchMode = 'local';
         const localResults = performLocalSearch(term);
         paginatedProducts = localResults;
-        
-        if (localResults.length > 0) {
-          showActionToast("search", true, `${localResults.length} productos encontrados localmente`);
-        } else {
-          showActionToast("search", false, "No se encontraron productos localmente");
-        }
-      } 
-      // Si el término es más largo, buscar en servidor
-      else {
+      } else {
         searchMode = 'server';
         performServerSearchWithPagination(term);
         return;
@@ -711,7 +474,6 @@ function showActionToast(action, success = true, details = "") {
       performSearch(term);
     });
 
-    // También buscar al pegar texto
     searchInput.addEventListener("paste", (e) => {
       setTimeout(() => {
         const term = searchInput.value.trim();
@@ -727,10 +489,7 @@ function showActionToast(action, success = true, details = "") {
   function formatShowValue(v) { return v === null || v === undefined ? "0" : String(v); }
 
   function renderTable(products) {
-    if (!tableBody) { 
-      showActionToast("general", false, "Tabla no encontrada en el DOM");
-      return; 
-    }
+    if (!tableBody) return;
     
     try {
       tableBody.innerHTML = "";
@@ -756,7 +515,6 @@ function showActionToast(action, success = true, details = "") {
         else if (stockReal <= 10) tr.classList.add("stock-medium");
         else tr.classList.add("stock-high");
 
-        // Crear celdas más eficientemente
         tr.innerHTML = `
           <td>${escapeHtml(nl(p.CODIGO) || "S/C")}</td>
           <td>${escapeHtml(nl(p.DESCRIPCION))}</td>
@@ -776,7 +534,6 @@ function showActionToast(action, success = true, details = "") {
           </td>
         `;
 
-        // Añadir event listeners
         const btnEdit = tr.querySelector(".btn-edit");
         const btnDelete = tr.querySelector(".btn-delete");
         const btnSalida = tr.querySelector(".btn-salida");
@@ -793,11 +550,9 @@ function showActionToast(action, success = true, details = "") {
       });
 
       tableBody.appendChild(frag);
-      showActionToast("general", true, `${products.length} productos renderizados`);
       
     } catch (error) {
       console.error("Error renderizando tabla:", error);
-      showActionToast("general", false, "Error al renderizar la tabla");
     }
   }
 
@@ -852,7 +607,6 @@ function showActionToast(action, success = true, details = "") {
       
     } catch (error) {
       console.error("Error actualizando controles de paginación:", error);
-      showActionToast("general", false, "Error en controles de paginación");
     }
   }
 
@@ -865,41 +619,9 @@ function showActionToast(action, success = true, details = "") {
     try {
       renderTable(getCurrentPageItems());
     } catch (error) {
-      showActionToast("general", false, "Error al renderizar página actual");
+      console.error("Error al renderizar página:", error);
     }
   }
-  // intenta encontrar el botón (por id o por texto) y crear/actualizar badge
-(function ensureVerSalidasBadgeOnProductsPage(){
-  try {
-    // buscar botón por id o por texto "ver salidas"
-    const btn = document.getElementById('btnVerSalidas') ||
-                Array.from(document.querySelectorAll('button,a')).find(el => el.textContent && /ver\s+salidas/i.test(el.textContent));
-    if (!btn) {
-      console.debug("ensureVerSalidasBadge: botón 'Ver Salidas' no encontrado en esta página");
-      return;
-    }
-    // añadir clase para posicionar badge
-    if (!btn.classList.contains('has-badge')) btn.classList.add('has-badge');
-
-    // crear badge si no existe
-    let badge = document.getElementById('verSalidasBadge');
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.id = 'verSalidasBadge';
-      badge.className = 'button-badge';
-      btn.appendChild(badge);
-    }
-
-    // actualizar con el número real
-    const count = (typeof getPendingSalidas === 'function') ? getPendingSalidas().length : 0;
-    if (!count) badge.style.display = 'none';
-    else { badge.style.display = 'inline-block'; badge.textContent = count > 99 ? '99+' : String(count); }
-    console.debug("ensureVerSalidasBadge: aplicado, count=", count);
-  } catch (err) {
-    console.error("ensureVerSalidasBadge error:", err);
-  }
-})();
-
 
   function goToPage(page) {
     try {
@@ -909,142 +631,96 @@ function showActionToast(action, success = true, details = "") {
       currentPage = page;
       renderCurrentPage();
       updatePaginationControls();
-      showActionToast("general", true, `Página ${page} de ${totPages}`);
     } catch (error) {
-      showActionToast("general", false, "Error al cambiar de página");
+      console.error("Error al cambiar de página:", error);
     }
   }
 
   // -------------------- CRUD PRODUCTOS --------------------
-// Reemplaza la función saveProductFromForm por esta versión
-async function saveProductFromForm(ev) {
-  ev && ev.preventDefault && ev.preventDefault();
-  if (!productForm) {
-    showActionToast("general", false, "Formulario no disponible");
-    return;
-  }
+  async function saveProductFromForm(ev) {
+    ev && ev.preventDefault && ev.preventDefault();
+    if (!productForm) return;
 
-  const btnSave = productForm.querySelector(".btn-save");
-  const prevText = btnSave ? btnSave.textContent : null;
+    const btnSave = productForm.querySelector(".btn-save");
+    const prevText = btnSave ? btnSave.textContent : null;
 
-  // --- Helpers de similitud (se definen si no existen) ---
-  if (typeof normalizeTextForCompare === "undefined") {
-    window.normalizeTextForCompare = function(s){
-      if (!s) return "";
-      return String(s)
-        .trim()
-        .toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^a-z0-9\s]/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-    };
-  }
-  if (typeof levenshteinDistance === "undefined") {
-    window.levenshteinDistance = function(a,b){
-      const as = String(a||""), bs = String(b||"");
-      if (as === bs) return 0;
-      const la = as.length, lb = bs.length;
-      if (la === 0) return lb;
-      if (lb === 0) return la;
-      let v0 = new Array(lb+1), v1 = new Array(lb+1);
-      for (let j=0;j<=lb;j++) v0[j]=j;
-      for (let i=0;i<la;i++){
-        v1[0]=i+1;
-        for (let j=0;j<lb;j++){
-          const cost = as[i] === bs[j] ? 0 : 1;
-          v1[j+1] = Math.min(v1[j] + 1, v0[j+1] + 1, v0[j] + cost);
+    try {
+      if (!supabase) { 
+        showToast("Conexión no disponible", false); 
+        return; 
+      }
+
+      if (btnSave) { 
+        btnSave.disabled = true; 
+        btnSave.textContent = editMode ? "Guardando..." : "Creando..."; 
+      }
+
+      const descripcion = (productForm.querySelector('[name="descripcion"]')?.value || "").trim();
+      const um = (productForm.querySelector('[name="um"]')?.value || "").trim();
+
+      if (!descripcion) {
+        showToast("La descripción es obligatoria", false);
+        if (btnSave) { 
+          btnSave.disabled = false; 
+          if (prevText) btnSave.textContent = prevText; 
         }
-        const tmp = v0; v0 = v1; v1 = tmp;
+        return;
       }
-      return v0[lb];
-    };
-  }
-  if (typeof similarityRatio === "undefined") {
-    window.similarityRatio = function(a,b){
-      const na = normalizeTextForCompare(a);
-      const nb = normalizeTextForCompare(b);
-      if (!na && !nb) return 1;
-      if (!na || !nb) return 0;
-      const dist = levenshteinDistance(na, nb);
-      const maxLen = Math.max(na.length, nb.length);
-      return maxLen === 0 ? 1 : (1 - (dist / maxLen));
-    };
-  }
 
-  try {
-    if (!supabase) { showActionToast("create", false, "Conexión a BD no disponible"); return; }
+      // Comprobar similitud (solo en creación)
+      if (!editMode) {
+        try {
+          const q = descripcion.replace(/'/g, "''");
+          const { data: candidates, error: candErr } = await supabase
+            .from("productos_sin_codigo")
+            .select("id, DESCRIPCION")
+            .ilike("DESCRIPCION", `%${q}%`)
+            .limit(30);
 
-    if (btnSave) { btnSave.disabled = true; btnSave.textContent = editMode ? "Guardando..." : "Creando..."; }
-
-    const descripcion = (productForm.querySelector('[name="descripcion"]')?.value || "").trim();
-    const um = (productForm.querySelector('[name="um"]')?.value || "").trim();
-
-    if (!descripcion) {
-      showActionToast("create", false, "La descripción es obligatoria");
-      if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
-      return;
-    }
-
-    // --- comprobar similitud con productos existentes (solo en creación) ---
-    if (!editMode) {
-      try {
-        // buscar candidatos por texto parecido (ilike) para limitar resultados
-        const q = descripcion.replace(/'/g, "''");
-        const { data: candidates, error: candErr } = await supabase
-          .from("productos_sin_codigo")
-          .select("id, DESCRIPCION")
-          .ilike("DESCRIPCION", `%${q}%`)
-          .limit(30);
-
-        if (candErr) {
-          console.warn("saveProductFromForm: error buscando candidatos:", candErr);
-          // no bloqueamos si falla la búsqueda; procedemos a inserción
-        } else if (Array.isArray(candidates) && candidates.length > 0) {
-          const THRESHOLD = 0.70; // ajustar si quieres más o menos estricto
-          const similars = [];
-          for (const c of candidates) {
-            const candDesc = c.DESCRIPCION || "";
-            const sim = similarityRatio(descripcion, candDesc);
-            if (sim >= THRESHOLD) similars.push({ id: c.id, descripcion: candDesc, score: sim });
+          if (!candErr && Array.isArray(candidates) && candidates.length > 0) {
+            const THRESHOLD = 0.70;
+            const similars = [];
+            for (const c of candidates) {
+              const candDesc = c.DESCRIPCION || "";
+              const sim = similarityRatio(descripcion, candDesc);
+              if (sim >= THRESHOLD) similars.push({ id: c.id, descripcion: candDesc, score: sim });
+            }
+            if (similars.length > 0) {
+              similars.sort((a,b) => b.score - a.score);
+              const top = similars.slice(0,3).map(s => `• "${s.descripcion}" (${Math.round(s.score*100)}%)`).join("\n");
+              showToast(`Productos similares:\n${top}`, false, 5000);
+              if (btnSave) { 
+                btnSave.disabled = false; 
+                if (prevText) btnSave.textContent = prevText; 
+              }
+              return;
+            }
           }
-          if (similars.length > 0) {
-            similars.sort((a,b) => b.score - a.score);
-            const top = similars.slice(0,3).map(s => `• "${s.descripcion}" (${Math.round(s.score*100)}%)`).join("\n");
-            showActionToast("create", false, `Existe(n) producto(s) muy similar(es):\n${top}`);
-            if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
-            return;
-          }
+        } catch (err) {
+          console.warn("Error buscando similares:", err);
         }
-      } catch (err) {
-        console.warn("saveProductFromForm: excepción al buscar similares:", err);
-        // no bloqueamos; continuamos
-      }
-    }
-
-    // --- insertar o actualizar ---
-    if (editMode && editingId) {
-      const upd = { DESCRIPCION: descripcion, UM: um };
-      const { error } = await supabase.from("productos_sin_codigo").update(upd).eq("id", editingId);
-
-      if (error) {
-        showActionToast("update", false, error.message || "Error al actualizar");
-        throw error;
       }
 
-      showActionToast("update", true, `"${descripcion}" actualizado`);
-        } else {
-        // --- NUEVO: comprobación de duplicados por DESCRIPCION (similar) ---
-        // normalizamos la descripcion para la búsqueda
+      // Insertar o actualizar
+      if (editMode && editingId) {
+        const upd = { DESCRIPCION: descripcion, UM: um };
+        const { error } = await supabase.from("productos_sin_codigo").update(upd).eq("id", editingId);
+
+        if (error) {
+          showToast(`Error al actualizar: ${error.message}`, false);
+          throw error;
+        }
+
+        showToast("Producto actualizado", true);
+      } else {
+        // Comprobación de duplicados
         const descripcionNorm = descripcion.replace(/'/g, "''").trim();
         if (!descripcionNorm) {
-          showActionToast("create", false, "Descripción vacía");
+          showToast("Descripción vacía", false);
           return;
         }
 
         try {
-          // Buscar coincidencias aproximadas en servidor: usamos ilike con la frase completa
-          // y una sub-frase (primeros 10 caracteres) para aumentar chances de detectar "similares".
           const short = descripcionNorm.substring(0, Math.min(10, descripcionNorm.length));
           const orQuery = `DESCRIPCION.ilike.%${descripcionNorm}%,DESCRIPCION.ilike.%${short}%`;
           const { data: dup, error: dupErr } = await supabase
@@ -1055,59 +731,57 @@ async function saveProductFromForm(ev) {
 
           if (dupErr) {
             console.warn("Error buscando duplicados:", dupErr);
-            // no bloqueamos por fallo de búsqueda, pero avisamos
-            showActionToast("create", false, "Error comprobando duplicados (revisa consola)");
+            showToast("Error comprobando duplicados", false);
             return;
           }
           if (dup && dup.length > 0) {
-            // Si hay una coincidencia devolvemos un mensaje y no insertamos
-            showActionToast("create", false, `Ya existe un producto con descripción parecida: "${dup[0].DESCRIPCION}"`);
+            showToast(`Ya existe producto similar: "${dup[0].DESCRIPCION}"`, false);
             return;
           }
         } catch (err) {
           console.error("Error en check duplicados:", err);
-          showActionToast("create", false, "Error comprobando duplicados");
+          showToast("Error comprobando duplicados", false);
           return;
         }
 
-        // --- Preparar objeto a insertar ---
+        // Preparar objeto a insertar
         await ensureProductosSinCodigoColumnMap();
         const insertObj = {
-          CODIGO: "S/C",               // <-- importante: no puede ser null; usamos "S/C"
+          CODIGO: "S/C",
           DESCRIPCION: descripcion,
           UM: um || null
         };
 
-        // inicializar las columnas de inventario (si existen) a 0
         ["I069","I078","I07F","I312","I073","ALMACEN"].forEach(lbl => {
           const col = getRealColForInventoryLabel(lbl);
           if (col) insertObj[col] = 0;
         });
 
-        // finalmente insertar
         const { error } = await supabase.from("productos_sin_codigo").insert([insertObj]);
 
         if (error) {
-          console.error("Error al insertar producto:", error);
-          showActionToast("create", false, error.message || "Error al crear producto");
+          showToast(`Error al crear: ${error.message}`, false);
           throw error;
         }
 
-        showActionToast("create", true, `"${descripcion}" creado`);
+        showToast("Producto creado", true);
       }
 
+      closeProductModal();
+      await loadAllProductsWithPagination();
 
-    closeProductModal();
-    await loadAllProductsWithPagination();
-
-  } catch (err) {
-    console.error("saveProductFromForm err:", err);
-    showActionToast(editMode ? "update" : "create", false, (err && err.message) ? err.message : "Error inesperado");
-  } finally {
-    if (btnSave) { btnSave.disabled = false; if (prevText) btnSave.textContent = prevText; }
-    editMode = false; editingId = null;
+    } catch (err) {
+      console.error("Error guardando producto:", err);
+      showToast(`Error: ${err.message}`, false);
+    } finally {
+      if (btnSave) { 
+        btnSave.disabled = false; 
+        if (prevText) btnSave.textContent = prevText; 
+      }
+      editMode = false; 
+      editingId = null;
+    }
   }
-}
 
   function clearProductFormFields() {
     if (!productForm) return;
@@ -1117,10 +791,7 @@ async function saveProductFromForm(ev) {
   }
 
   function openProductModal() {
-    if (!modal) {
-      showActionToast("general", false, "Modal no disponible");
-      return;
-    }
+    if (!modal) return;
     
     try {
       modal.style.display = "flex";
@@ -1128,9 +799,8 @@ async function saveProductFromForm(ev) {
       if (title) title.textContent = "Agregar Producto";
       const saveBtn = productForm?.querySelector(".btn-save");
       if (saveBtn) saveBtn.textContent = "💾 Guardar";
-      showActionToast("general", true, "Modal de producto abierto");
     } catch (error) {
-      showActionToast("general", false, "Error al abrir modal");
+      console.error("Error al abrir modal:", error);
     }
   }
 
@@ -1140,9 +810,8 @@ async function saveProductFromForm(ev) {
     try {
       modal.style.display = "none";
       clearProductFormFields();
-      showActionToast("general", true, "Modal cerrado");
     } catch (error) {
-      showActionToast("general", false, "Error al cerrar modal");
+      console.error("Error al cerrar modal:", error);
     }
   }
 
@@ -1150,12 +819,12 @@ async function saveProductFromForm(ev) {
     try {
       const prod = allProductsFromServer.find(x => String(x.id) === String(id));
       if (!prod) { 
-        showActionToast("update", false, "Producto no encontrado"); 
+        showToast("Producto no encontrado", false); 
         return; 
       }
       
       if (!modal || !productForm) { 
-        showActionToast("update", false, "Formulario no disponible"); 
+        showToast("Formulario no disponible", false); 
         return; 
       }
       
@@ -1176,16 +845,15 @@ async function saveProductFromForm(ev) {
       const saveBtn = productForm.querySelector(".btn-save"); 
       if (saveBtn) saveBtn.textContent = "Guardar Cambios";
       
-      showActionToast("update", true, `Editando: ${prod.DESCRIPCION}`);
-      
     } catch (error) {
-      showActionToast("update", false, "Error al preparar edición");
+      console.error("Error al preparar edición:", error);
+      showToast("Error al preparar edición", false);
     }
   }
 
   async function eliminarProducto(id) {
     if (!id) {
-      showActionToast("delete", false, "ID no válido");
+      showToast("ID no válido", false);
       return;
     }
     
@@ -1193,7 +861,7 @@ async function saveProductFromForm(ev) {
       const { data: producto, error: fetchErr } = await supabase.from("productos_sin_codigo").select("DESCRIPCION").eq("id", id).maybeSingle();
       
       if (fetchErr) {
-        showActionToast("delete", false, fetchErr.message);
+        showToast(`Error: ${fetchErr.message}`, false);
         throw fetchErr;
       }
       
@@ -1205,196 +873,47 @@ async function saveProductFromForm(ev) {
             const { error } = await supabase.from("productos_sin_codigo").delete().eq("id", id);
             
             if (error) { 
-              showActionToast("delete", false, error.message); 
+              showToast(`Error al eliminar: ${error.message}`, false); 
               throw error; 
             }
             
-            showActionToast("delete", true, `"${nombre}" eliminado`);
+            showToast("Producto eliminado", true);
             await loadAllProductsWithPagination();
             
           } catch (err) {
-            console.error("eliminarProducto err:", err);
-            showActionToast("delete", false, err.message);
+            console.error("Error eliminando producto:", err);
+            showToast(`Error: ${err.message}`, false);
           }
         }, 
         ()=>{
-          showActionToast("delete", true, "Eliminación cancelada");
+          // Cancelado - sin mensaje
         }
       );
       
     } catch (err) {
-      console.error("eliminarProducto err:", err);
-      showActionToast("delete", false, err.message);
+      console.error("Error eliminando producto:", err);
+      showToast(`Error: ${err.message}`, false);
     }
   }
-// -------------------- BADGE PARA VER SALIDAS --------------------
-function updateVerSalidasBadge(count) {
-  const btn = document.getElementById('btnVerSalidas');
-  if (!btn) return;
-  
-  // Asegurar que el botón tenga posición relativa para el badge
-  if (!btn.classList.contains('has-badge')) {
-    btn.classList.add('has-badge');
-    btn.style.position = 'relative';
-  }
 
-  let badge = document.getElementById('verSalidasBadge');
-  if (!badge) {
-    badge = document.createElement('span');
-    badge.id = 'verSalidasBadge';
-    badge.className = 'ver-salidas-badge';
-    badge.style.cssText = `
-      position: absolute;
-      top: -8px;
-      right: -8px;
-      background: #ef4444;
-      color: white;
-      border-radius: 50%;
-      width: 20px;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    `;
-    btn.appendChild(badge);
-  }
-
-  if (!count || count === 0) {
-    badge.style.display = 'none';
-    return;
-  }
-
-  badge.style.display = 'flex';
-  badge.textContent = count > 99 ? '99+' : String(count);
-}
-
-// Modificar la función addPendingSalida para actualizar el badge
-// Lee pendientes intentando múltiples keys y normalizando
-function getPendingSalidas(){
-  try {
-    // primero la key canonical
-    let raw = localStorage.getItem(PENDING_KEY);
-    // si no hay nada, buscar en legacy keys
-    if (!raw) {
-      for (const k of LEGACY_PENDING_KEYS) {
-        const v = localStorage.getItem(k);
-        if (v) { raw = v; break; }
-      }
-    }
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (err) {
-    console.error("getPendingSalidas error:", err);
-    return [];
-  }
-}
-
-// Guarda pendientes usando la key canonical y actualiza el badge
-function savePendingSalidas(list){
-  try {
-    if (!Array.isArray(list)) {
-      console.warn("savePendingSalidas recibió no-array, convirtiendo a []");
-      list = [];
-    }
-    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
-    // opcional: también mantener legacy keys sincronizadas (descomenta si lo deseas)
-    // for (const k of LEGACY_PENDING_KEYS) localStorage.setItem(k, JSON.stringify(list));
-
-    // actualizar badge si existe la función
-    try { if (typeof updateVerSalidasBadge === 'function') updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ console.warn("badge update failed", e); }
-
-    return true;
-  } catch (err) {
-    console.error("savePendingSalidas error:", err);
-    showToast("Error al guardar pendientes", false);
-    return false;
-  }
-}
-
-
-// Modificar renderPendingList para actualizar el badge
-function renderPendingList() {
-  if (!tablaPendientesBody) {
-    showActionToast("pendiente", false, "Tabla de pendientes no encontrada");
-    return;
-  }
-  
-  try {
-    const list = getPendingSalidas();
-    tablaPendientesBody.innerHTML = "";
-    
-    if (!list || list.length === 0) {
-      tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
-      updatePendingCount();
-      updateVerSalidasBadge(0); // ← Actualizar badge a 0
-      showActionToast("pendiente", true, "No hay pendientes");
-      return;
-    }
-    
-    // ... resto del código de renderizado ...
-    
-    updatePendingCount();
-    updateVerSalidasBadge(list.length); // ← Actualizar badge con el conteo actual
-    showActionToast("pendiente", true, `${list.length} pendientes cargados`);
-    
-  } catch (error) {
-    console.error("Error renderizando pendientes:", error);
-    showActionToast("pendiente", false, "Error al cargar pendientes");
-  }
-}
-
-// Modificar confirmAllPendings para actualizar el badge
-async function confirmAllPendings() {
-  const list = getPendingSalidas();
-  if (!list || list.length === 0) { 
-    showActionToast("confirm", false, "No hay pendientes para confirmar"); 
-    return; 
-  }
-  
-  showConfirm(`Confirmar todas las pendientes (${list.length})?`, 
-    async () => {
-      try {
-        await processPendings(list, "salidas");
-        savePendingSalidas([]);
-        renderPendingList();  
-        updateVerSalidasBadge(0); // ← Actualizar badge a 0 después de confirmar
-        await loadAllProductsWithPagination();
-        showActionToast("confirm", true, `${list.length} pendientes confirmados`);
-      } catch (error) {
-        showActionToast("confirm", false, "Error al confirmar pendientes");
-      }
-    },
-    () => {
-      showActionToast("confirm", true, "Confirmación cancelada");
-    }
-  );
-}
   // -------------------- PENDIENTES SALIDAS --------------------
   function getPendingSalidas() { 
     try {
       return JSON.parse(localStorage.getItem(PENDINGS_KEY_SALIDAS) || "[]");
     } catch (error) {
-      showActionToast("pendiente", false, "Error al leer pendientes");
+      console.error("Error al leer pendientes:", error);
       return [];
     }
   }
   
-function savePendingSalidas(list){ 
-  try {
-    localStorage.setItem(PENDING_KEY, JSON.stringify(list));
-    // actualizar badge cuando cambian los pendientes (longitud real)
-    try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ /* noop */ }
-  } catch (err) {
-    console.error("savePendingSalidas error:", err);
-    showToast("Error al guardar pendientes", false);
+  function savePendingSalidas(list){ 
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(list));
+    } catch (err) {
+      console.error("Error al guardar pendientes:", err);
+      showToast("Error al guardar pendientes", false);
+    }
   }
-}
-
-
 
   function addPendingSalida(pendiente) {
     try {
@@ -1402,143 +921,124 @@ function savePendingSalidas(list){
       pendiente.id = pendiente.id || String(Date.now());
       list.push(pendiente);
       savePendingSalidas(list);
-      showActionToast("salida", true, "Salida agregada a pendientes");
+      showToast("Salida agregada a pendientes", true);
       renderPendingList();
       updatePendingCount();
     
     } catch (error) {
-      showActionToast("salida", false, "Error al agregar salida pendiente");
+      console.error("Error al agregar salida pendiente:", error);
+      showToast("Error al agregar salida pendiente", false);
     }
   }
 
   function renderPendingList() {
-  if (!tablaPendientesBody) {
-    showActionToast("pendiente", false, "Tabla de pendientes no encontrada");
-    return;
-  }
-  updatePendingCount();
-// actualizar badge basado en la longitud actual
-try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
-
-  
-  try {
-    const list = getPendingSalidas();
-    tablaPendientesBody.innerHTML = "";
+    if (!tablaPendientesBody) return;
     
-    if (!list || list.length === 0) {
-      tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
-      updatePendingCount();
-      // actualizar badge
-      try { updateVerSalidasBadge(0); } catch(e){/* noop */ }
-      showActionToast("pendiente", true, "No hay pendientes");
-      return;
-    }
-    
-    list.forEach((it, idx) => {
-      const codigo = (it.CODIGO && String(it.CODIGO).trim() !== "") ? String(it.CODIGO) : "S/C";
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${escapeHtml(codigo)}</td>
-        <td>${escapeHtml(it.DESCRIPCION || "")}</td>
-        <td>${escapeHtml(it.UM || "")}</td>
-        <td>${escapeHtml(it.INVENTARIO_ORIGEN || "")}</td>
-        <td><input type="number" min="1" value="${escapeHtml(String(it.CANTIDAD || 0))}" data-idx="${idx}" class="pending-cantidad" style="width:90px" /></td>
-        <td>${escapeHtml(it.RESPONSABLE || "")}</td>
-        <td>${escapeHtml(it.DESTINATARIO || "")}</td>
-        <td>${escapeHtml(it.OBSERVACIONES || "")}</td>
-        <td>
-          <button class="confirm-single" data-idx="${idx}">Confirmar</button>
-          <button class="remove-pend" data-idx="${idx}">Eliminar</button>
-        </td>
-      `;
-      tablaPendientesBody.appendChild(tr);
-    });
-
-    // events
-    tablaPendientesBody.querySelectorAll(".confirm-single").forEach(b => {
-      b.addEventListener("click", async (e) => {
-        const idx = Number(e.currentTarget.dataset.idx);
-        const listNow = getPendingSalidas();
-        if (!listNow[idx]) {
-          showActionToast("pendiente", false, "Pendiente no encontrado");
-          return;
-        }
-        
-        try {
-          // procesar solo ese item
-          await processPendings([listNow[idx]], "salidas");
-          // reconstruir la lista actualizada a partir de localStorage (por si processPendings la modificó)
-          const newList = getPendingSalidas().filter((_,i) => i !== idx);
-          savePendingSalidas(newList);
-          renderPendingList();
-          // actualizar badge con la longitud real
-          updateVerSalidasBadge(newList.length);
-          await loadAllProductsWithPagination();
-          showActionToast("confirm", true, "Pendiente confirmado individualmente");
-        } catch (error) {
-          console.error("Error confirm-single:", error);
-          showActionToast("confirm", false, "Error al confirmar pendiente individual");
-        }
-      });
-    });
-    
-    tablaPendientesBody.querySelectorAll(".remove-pend").forEach(b => {
-      b.addEventListener("click", (e) => {
-        const idx = Number(e.currentTarget.dataset.idx);
-        const listNow = getPendingSalidas();
-        if (!listNow[idx]) {
-          showActionToast("pendiente", false, "Pendiente no encontrado");
-          return;
-        }
-        
-        listNow.splice(idx, 1);
-        savePendingSalidas(listNow);
-        renderPendingList();
-        updateVerSalidasBadge(listNow.length);
-
-        showActionToast("pendiente", true, "Pendiente eliminado");
-      });
-    });
-    
-    tablaPendientesBody.querySelectorAll(".pending-cantidad").forEach(inp => {
-      inp.addEventListener("change", (e) => {
-        const idx = Number(e.target.dataset.idx);
-        const v = Number(e.target.value || 0);
-        const listNow = getPendingSalidas();
-        if (!listNow[idx]) return;
-        listNow[idx].CANTIDAD = v;
-        listNow[idx].ADDED_AT = new Date().toISOString();
-        savePendingSalidas(listNow);
-        showActionToast("pendiente", true, "Cantidad actualizada");
-        // badge no cambia al actualizar cantidad
-      });
-    });
-
     updatePendingCount();
-    // actualizar badge (longitud actual)
-    updateVerSalidasBadge(list.length);
-    showActionToast("pendiente", true, `${list.length} pendientes cargados`);
-    
-  } catch (error) {
-    console.error("Error renderizando pendientes:", error);
-    showActionToast("pendiente", false, "Error al cargar pendientes");
-  }
-}
+  
+    try {
+      const list = getPendingSalidas();
+      tablaPendientesBody.innerHTML = "";
+      
+      if (!list || list.length === 0) {
+        tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
+        updatePendingCount();
+        return;
+      }
+      
+      list.forEach((it, idx) => {
+        const codigo = (it.CODIGO && String(it.CODIGO).trim() !== "") ? String(it.CODIGO) : "S/C";
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${escapeHtml(codigo)}</td>
+          <td>${escapeHtml(it.DESCRIPCION || "")}</td>
+          <td>${escapeHtml(it.UM || "")}</td>
+          <td>${escapeHtml(it.INVENTARIO_ORIGEN || "")}</td>
+          <td><input type="number" min="1" value="${escapeHtml(String(it.CANTIDAD || 0))}" data-idx="${idx}" class="pending-cantidad" style="width:90px" /></td>
+          <td>${escapeHtml(it.RESPONSABLE || "")}</td>
+          <td>${escapeHtml(it.DESTINATARIO || "")}</td>
+          <td>${escapeHtml(it.OBSERVACIONES || "")}</td>
+          <td>
+            <button class="confirm-single" data-idx="${idx}">Confirmar</button>
+            <button class="remove-pend" data-idx="${idx}">Eliminar</button>
+          </td>
+        `;
+        tablaPendientesBody.appendChild(tr);
+      });
 
+      // Event listeners
+      tablaPendientesBody.querySelectorAll(".confirm-single").forEach(b => {
+        b.addEventListener("click", async (e) => {
+          const idx = Number(e.currentTarget.dataset.idx);
+          const listNow = getPendingSalidas();
+          if (!listNow[idx]) {
+            showToast("Pendiente no encontrado", false);
+            return;
+          }
+          
+          try {
+            await processPendings([listNow[idx]], "salidas");
+            const newList = getPendingSalidas().filter((_,i) => i !== idx);
+            savePendingSalidas(newList);
+            renderPendingList();
+            await loadAllProductsWithPagination();
+            showToast("Pendiente confirmado", true);
+          } catch (error) {
+            console.error("Error confirmando pendiente:", error);
+            showToast("Error al confirmar pendiente", false);
+          }
+        });
+      });
+      
+      tablaPendientesBody.querySelectorAll(".remove-pend").forEach(b => {
+        b.addEventListener("click", (e) => {
+          const idx = Number(e.currentTarget.dataset.idx);
+          const listNow = getPendingSalidas();
+          if (!listNow[idx]) {
+            showToast("Pendiente no encontrado", false);
+            return;
+          }
+          
+          listNow.splice(idx, 1);
+          savePendingSalidas(listNow);
+          renderPendingList();
+          showToast("Pendiente eliminado", true);
+        });
+      });
+      
+      tablaPendientesBody.querySelectorAll(".pending-cantidad").forEach(inp => {
+        inp.addEventListener("change", (e) => {
+          const idx = Number(e.target.dataset.idx);
+          const v = Number(e.target.value || 0);
+          const listNow = getPendingSalidas();
+          if (!listNow[idx]) return;
+          listNow[idx].CANTIDAD = v;
+          listNow[idx].ADDED_AT = new Date().toISOString();
+          savePendingSalidas(listNow);
+        });
+      });
+
+      updatePendingCount();
+      
+    } catch (error) {
+      console.error("Error renderizando pendientes:", error);
+      showToast("Error al cargar pendientes", false);
+    }
+  }
 
   function updatePendingCount() {
     try {
       const count = getPendingSalidas().length;
       if (btnConfirmAll) btnConfirmAll.textContent = `Confirmar pendientes (${count})`;
     } catch (error) {
-      showActionToast("pendiente", false, "Error actualizando contador");
+      console.error("Error actualizando contador:", error);
     }
   }
 
   async function confirmAllPendings() {
     const list = getPendingSalidas();
     if (!list || list.length === 0) { 
-      showActionToast("confirm", false, "No hay pendientes para confirmar"); 
+      showToast("No hay pendientes para confirmar", false); 
       return; 
     }
     
@@ -1547,24 +1047,23 @@ try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
         try {
           await processPendings(list, "salidas");
           savePendingSalidas([]);
-          renderPendingList();  
-        try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){ /* noop */ }
-        await loadAllProductsWithPagination();
-          showActionToast("confirm", true, `${list.length} pendientes confirmados`);
+          renderPendingList();
+          await loadAllProductsWithPagination();
+          showToast(`${list.length} pendientes confirmados`, true);
         } catch (error) {
-          showActionToast("confirm", false, "Error al confirmar pendientes");
+          console.error("Error confirmando pendientes:", error);
+          showToast("Error al confirmar pendientes", false);
         }
       },
       () => {
-        showActionToast("confirm", true, "Confirmación cancelada");
+        // Cancelado - sin mensaje
       }
     );
   }
 
-  // processPendings: salidas o entradas (entradas no se usan aquí pero soportado)
   async function processPendings(items, mode = "salidas") {
     if (!supabase) { 
-      showActionToast("pendiente", false, "Conexión no disponible"); 
+      showToast("Conexión no disponible", false); 
       return; 
     }
     
@@ -1573,7 +1072,6 @@ try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
     for (const it of items) {
       try {
         if (mode === "salidas" || (it.INVENTARIO_ORIGEN && mode !== "entradas")) {
-          // insertar en salidas_sin_codigo
           const salidaObj = {
             PRODUCT_ID: it.PRODUCT_ID ?? null,
             CODIGO: it.CODIGO ?? null,
@@ -1588,7 +1086,6 @@ try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
           const { error: insErr } = await supabase.from("salidas_sin_codigo").insert([salidaObj]);
           if (insErr) throw insErr;
 
-          // restar stock en productos_sin_codigo
           await ensureProductosSinCodigoColumnMap();
           const realCol = getRealColForInventoryLabel(it.INVENTARIO_ORIGEN);
           if (realCol && it.PRODUCT_ID) {
@@ -1634,349 +1131,271 @@ try { updateVerSalidasBadge(getPendingSalidas().length); } catch(e){/* noop */ }
     }
     
     if (errors === 0) {
-      showActionToast("confirm", true, `${successes} pendientes procesados exitosamente`);
+      showToast(`${successes} pendientes procesados`, true);
     } else {
-      showActionToast("confirm", false, `${successes} exitos, ${errors} errores`);
+      showToast(`${successes} éxitos, ${errors} errores`, false);
     }
     
     return { successes, errors };
   }
-  
-// --- Fallbacks ligeros para toasts (si no existen) ---
-if (!window.MessageSystem) {
-  class _MS {
-    static createContainer() {
-      if (document.getElementById("message-system-container")) return;
-      const c = document.createElement("div");
-      c.id = "message-system-container";
-      c.style.cssText = "position:fixed;top:18px;right:18px;z-index:20000;display:flex;flex-direction:column;gap:8px;max-width:420px";
-      document.body.appendChild(c);
-    }
-    static show(msg, type='info', timeout=4000) {
-      try {
-        this.createContainer();
-        const cont = document.getElementById("message-system-container");
-        const el = document.createElement("div");
-        el.style.cssText = "padding:10px;border-radius:8px;background:#fff;border:1px solid #e6e6e6;box-shadow:0 6px 20px rgba(0,0,0,0.06);font-family:Inter,system-ui;max-width:360px";
-        el.textContent = String(msg);
-        cont.prepend(el);
-        if (timeout>0) setTimeout(()=>el.remove(), timeout);
-      } catch(e){ console.log(msg); }
-    }
-  }
-  window.MessageSystem = _MS;
-}
-
-// compat wrappers (no-op pero útiles)
-window.showAlertToast = window.showAlertToast || function(message, type="info", time=4000) {
-  try { return window.MessageSystem.show(message, type, time); } catch(e){ console.log(message); };
-};
-window.showDetailedToast = window.showDetailedToast || function(title, lines = [], options = {}) {
-  const parts = [title].concat(lines.map(l => typeof l==='string'?l:(l.label?`${l.label}: ${l.value}`:JSON.stringify(l))));
-  return window.MessageSystem.show(parts.join("\n"), 'info', options.timeoutMs ?? 5000);
-};
 
   // -------------------- SALIDAS: modal dinámico --------------------
   async function registrarSalida(producto) {
     try {
       await openSalidaModal(producto);
-      showActionToast("salida", true, `Preparando salida para: ${producto.DESCRIPCION}`);
     } catch (error) {
-      showActionToast("salida", false, "Error al abrir modal de salida");
+      console.error("Error al abrir modal de salida:", error);
+      showToast("Error al abrir modal de salida", false);
     }
   }
 
- // ---------- openSalidaModal (reemplaza la versión anterior) ----------
-async function openSalidaModal(producto) {
-  // eliminar modal previo si existe
-  const existing = document.getElementById("salidaModalOverlay");
-  if (existing) existing.remove();
+  async function openSalidaModal(producto) {
+    const existing = document.getElementById("salidaModalOverlay");
+    if (existing) existing.remove();
 
-  // overlay
-  const overlay = document.createElement("div");
-  overlay.id = "salidaModalOverlay";
-  overlay.className = "salida-overlay";
+    const overlay = document.createElement("div");
+    overlay.id = "salidaModalOverlay";
+    overlay.className = "salida-overlay";
 
-  // modal (con scroll y max-height)
-  const modal = document.createElement("div");
-  modal.className = "salida-modal";
-  modal.style.overflow = "auto";
-  modal.style.maxHeight = "86vh";
+    const modal = document.createElement("div");
+    modal.className = "salida-modal";
+    modal.style.overflow = "auto";
+    modal.style.maxHeight = "86vh";
 
-  modal.innerHTML = `
-    <div class="header">
-      <h3>Salida — ${escapeHtml(producto.CODIGO || "")} ${producto.DESCRIPCION ? "— " + escapeHtml(producto.DESCRIPCION) : ""}</h3>
-      <button id="salidaCloseX" aria-label="Cerrar" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
-    </div>
-
-    <div class="salida-grid">
-      <div>
-        <label style="font-size:13px;color:#334155">Cantidad total requerida</label>
-        <input id="salidaCantidadInputModal" class="input-text" type="number" min="0" step="any" placeholder="Ej. 5" />
+    modal.innerHTML = `
+      <div class="header">
+        <h3>Salida — ${escapeHtml(producto.CODIGO || "")} ${producto.DESCRIPCION ? "— " + escapeHtml(producto.DESCRIPCION) : ""}</h3>
+        <button id="salidaCloseX" aria-label="Cerrar" style="background:transparent;border:none;font-size:18px;cursor:pointer">✕</button>
       </div>
-      <div>
-        <label style="font-size:13px;color:#334155">UM</label>
-        <input id="salidaUM" class="input-text" type="text" value="${escapeHtml(producto.UM || '')}" readonly />
+
+      <div class="salida-grid">
+        <div>
+          <label style="font-size:13px;color:#334155">Cantidad total requerida</label>
+          <input id="salidaCantidadInputModal" class="input-text" type="number" min="0" step="any" placeholder="Ej. 5" />
+        </div>
+        <div>
+          <label style="font-size:13px;color:#334155">UM</label>
+          <input id="salidaUM" class="input-text" type="text" value="${escapeHtml(producto.UM || '')}" readonly />
+        </div>
       </div>
-    </div>
 
-    <div style="margin-top:6px;font-weight:600;color:#0b2545">Repartir entre inventarios</div>
-    <div class="distrib-list" id="salidaDistribContainer" style="margin-bottom:8px;"></div>
+      <div style="margin-top:6px;font-weight:600;color:#0b2545">Repartir entre inventarios</div>
+      <div class="distrib-list" id="salidaDistribContainer" style="margin-bottom:8px;"></div>
 
-    <div style="display:flex;justify-content:flex-end;margin-top:6px">
-      <button id="btnLimpiarDistrib" class="btn btn-clear" style="margin-right:10px">Limpiar</button>
-    </div>
+      <div style="display:flex;justify-content:flex-end;margin-top:6px">
+        <button id="btnLimpiarDistrib" class="btn btn-clear" style="margin-right:10px">Limpiar</button>
+      </div>
 
-    <div class="form-row" style="margin-top:10px">
-      <label>Responsable (autocompletado)</label>
-      <input id="salida_responsable" class="input-text readonly" readonly />
-      <label>Destinatario</label>
-      <input id="salida_destinatario" class="input-text" placeholder="Ej. Cliente XYZ" />
-      <label>Observaciones (opcional)</label>
-      <textarea id="salida_obs" class="input-text" rows="3" style="resize:vertical"></textarea>
-    </div>
+      <div class="form-row" style="margin-top:10px">
+        <label>Responsable (autocompletado)</label>
+        <input id="salida_responsable" class="input-text readonly" readonly />
+        <label>Destinatario</label>
+        <input id="salida_destinatario" class="input-text" placeholder="Ej. Cliente XYZ" />
+        <label>Observaciones (opcional)</label>
+        <textarea id="salida_obs" class="input-text" rows="3" style="resize:vertical"></textarea>
+      </div>
 
-    <div class="salida-actions">
-      <button id="salidaCancelBtn" class="btn btn-cancel">Cancelar</button>
-      <button id="salidaConfirmBtn" class="btn btn-primary" style="min-width:160px" disabled>Agregar a pendientes</button>
-    </div>
-  `;
+      <div class="salida-actions">
+        <button id="salidaCancelBtn" class="btn btn-cancel">Cancelar</button>
+        <button id="salidaConfirmBtn" class="btn btn-primary" style="min-width:160px" disabled>Agregar a pendientes</button>
+      </div>
+    `;
 
-  overlay.appendChild(modal);
-  document.body.appendChild(overlay);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
 
-  // elementos
-  const cantidadInput = modal.querySelector("#salidaCantidadInputModal");
-  const distribContainer = modal.querySelector("#salidaDistribContainer");
-  const btnCancel = modal.querySelector("#salidaCancelBtn");
-  const btnConfirm = modal.querySelector("#salidaConfirmBtn");
-  const btnLimpiar = modal.querySelector("#btnLimpiarDistrib");
-  const responsableField = modal.querySelector("#salida_responsable");
-  const destinatarioField = modal.querySelector("#salida_destinatario");
-  const obsField = modal.querySelector("#salida_obs");
-  const closeX = modal.querySelector("#salidaCloseX");
+    // elementos
+    const cantidadInput = modal.querySelector("#salidaCantidadInputModal");
+    const distribContainer = modal.querySelector("#salidaDistribContainer");
+    const btnCancel = modal.querySelector("#salidaCancelBtn");
+    const btnConfirm = modal.querySelector("#salidaConfirmBtn");
+    const btnLimpiar = modal.querySelector("#btnLimpiarDistrib");
+    const responsableField = modal.querySelector("#salida_responsable");
+    const destinatarioField = modal.querySelector("#salida_destinatario");
+    const obsField = modal.querySelector("#salida_obs");
+    const closeX = modal.querySelector("#salidaCloseX");
 
-  // precargar responsable desde sesión (si existe)
-  (async () => {
-    try {
-      if (supabase && supabase.auth) {
-        const { data: authData } = await supabase.auth.getUser();
-        const user = authData?.user ?? null;
-        if (user && user.email) {
-          responsableField.value = user.email;
-        } else {
-          responsableField.value = "";
-          responsableField.placeholder = "No autenticado";
+    // precargar responsable desde sesión
+    (async () => {
+      try {
+        if (supabase && supabase.auth) {
+          const { data: authData } = await supabase.auth.getUser();
+          const user = authData?.user ?? null;
+          if (user && user.email) {
+            responsableField.value = user.email;
+          }
         }
+      } catch (e) {
+        // Silencioso
       }
-    } catch (e) {
-      responsableField.placeholder = "No disponible";
-    }
-  })();
+    })();
 
-  // helper stock
-  function safeStock(prod, inv) {
-    try { const s = getStockFromProduct(prod, inv); return Number.isFinite(Number(s)) ? Number(s) : 0; } catch(e){ return 0; }
-  }
-
-  const invs = ["I069","I078","I07F","I312","I073"];
-
-  // render filas inventarios (con data-inv)
-  function renderDistribRows() {
-    distribContainer.innerHTML = "";
-    for (const inv of invs) {
-      const avail = safeStock(producto, inv);
-      const row = document.createElement("div");
-      row.className = "distrib-row";
-
-      const left = document.createElement("div");
-      left.className = "distrib-left";
-      const small = avail > 0 ? `<span class="small">Disponible: ${String(avail)}</span>` : `<span class="small" style="color:#9ca3af">No disponible</span>`;
-      left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — ${small}`;
-
-      const right = document.createElement("div");
-      right.className = "distrib-right";
-      const input = document.createElement("input");
-      input.type = "number";
-      input.step = "any";
-      input.min = "0";
-      input.value = "0";
-      input.setAttribute("data-inv", inv);
-      input.className = "input-num";
-      if (avail <= 0) {
-        input.disabled = true;
-        input.title = "Sin stock";
+    function safeStock(prod, inv) {
+      try { 
+        const s = getStockFromProduct(prod, inv); 
+        return Number.isFinite(Number(s)) ? Number(s) : 0; 
+      } catch(e){ 
+        return 0; 
       }
-      // permitir pegar / escribir decimales
-      input.addEventListener("input", () => {
-        // normalizar valor (evitar NaN)
-        if (input.value === "" || input.value === null) input.value = "0";
-        // actualizar estado del botón confirmar
-        updateConfirmState();
-      });
-
-      right.appendChild(input);
-
-      row.appendChild(left);
-      row.appendChild(right);
-      distribContainer.appendChild(row);
     }
-  }
 
-  renderDistribRows();
+    const invs = ["I069","I078","I07F","I312","I073"];
 
-  // obtener distribución actual
-  function getDistrib() {
-    const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
-    return inputs.map(i => ({ inv: i.getAttribute('data-inv'), qty: Number(i.value || 0), el: i }));
-  }
+    function renderDistribRows() {
+      distribContainer.innerHTML = "";
+      for (const inv of invs) {
+        const avail = safeStock(producto, inv);
+        const row = document.createElement("div");
+        row.className = "distrib-row";
 
-  // habilitar/inhabilitar confirmar según reglas
-  function updateConfirmState() {
-    const totalNeeded = Number(cantidadInput.value || 0);
-    if (!totalNeeded || totalNeeded <= 0) { btnConfirm.disabled = true; return; }
-    const distrib = getDistrib();
-    const sum = distrib.reduce((s,d) => s + Number(d.qty || 0), 0);
-    const availTotal = distrib.reduce((s,d) => s + safeStock(producto, d.inv), 0);
-    if (!Number.isFinite(sum)) { btnConfirm.disabled = true; return; }
-    if (Math.abs(sum - totalNeeded) > 1e-6 || totalNeeded > availTotal) { btnConfirm.disabled = true; return; }
-    btnConfirm.disabled = false;
-  }
+        const left = document.createElement("div");
+        left.className = "distrib-left";
+        const small = avail > 0 ? `<span class="small">Disponible: ${String(avail)}</span>` : `<span class="small" style="color:#9ca3af">No disponible</span>`;
+        left.innerHTML = `<strong>${escapeHtml(inv)}</strong> — ${small}`;
 
-  // listeners
-  cantidadInput.addEventListener("input", updateConfirmState);
-  // si se quiere, escuchar cambios de todos los inputs delegadamente:
-  distribContainer.addEventListener("input", updateConfirmState);
+        const right = document.createElement("div");
+        right.className = "distrib-right";
+        const input = document.createElement("input");
+        input.type = "number";
+        input.step = "any";
+        input.min = "0";
+        input.value = "0";
+        input.setAttribute("data-inv", inv);
+        input.className = "input-num";
+        if (avail <= 0) {
+          input.disabled = true;
+          input.title = "Sin stock";
+        }
+        input.addEventListener("input", () => {
+          if (input.value === "" || input.value === null) input.value = "0";
+          updateConfirmState();
+        });
 
-  btnLimpiar.addEventListener("click", () => {
-    distribContainer.querySelectorAll('input[data-inv]').forEach(i => { if (!i.disabled) i.value = "0"; });
-    cantidadInput.value = "";
-    updateConfirmState();
-  });
+        right.appendChild(input);
+        row.appendChild(left);
+        row.appendChild(right);
+        distribContainer.appendChild(row);
+      }
+    }
 
-  const closeOverlay = () => overlay.remove();
-  btnCancel.addEventListener("click", closeOverlay);
-  closeX.addEventListener("click", closeOverlay);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) closeOverlay(); });
-  window.addEventListener("keydown", function onEsc(ev){ if (ev.key === "Escape") { closeOverlay(); window.removeEventListener("keydown", onEsc); } });
+    renderDistribRows();
 
-  // asegurar evaluación inicial (por si ya había valores)
-  setTimeout(updateConfirmState, 50);
+    function getDistrib() {
+      const inputs = Array.from(distribContainer.querySelectorAll('input[data-inv]'));
+      return inputs.map(i => ({ inv: i.getAttribute('data-inv'), qty: Number(i.value || 0), el: i }));
+    }
 
-  // Confirm — agrega uno o varios pendientes usando addPendingSalida
-  btnConfirm.addEventListener("click", () => {
-    try {
+    function updateConfirmState() {
       const totalNeeded = Number(cantidadInput.value || 0);
-      if (!totalNeeded || totalNeeded <= 0) { showAlertToast("Cantidad inválida", "warning"); return; }
-
-      const distrib = getDistrib().filter(d => Number(d.qty) > 0);
-      if (distrib.length === 0) { showAlertToast("Distribución inválida", "warning"); return; }
-      if (Math.abs(distrib.reduce((s,d) => s + Number(d.qty || 0), 0) - totalNeeded) > 1e-6) { showAlertToast("La suma por inventario debe coincidir con el total", "warning"); return; }
-
-      const responsableVal = responsableField.value || "";
-      const destinatarioVal = destinatarioField.value || "";
-      const obsVal = obsField.value || "";
-
-      // construir y añadir pendiente(s)
-      if (distrib.length === 1) {
-        const d = distrib[0];
-        const pend = {
-          PRODUCT_ID: producto.id,
-          CODIGO: producto.CODIGO,
-          DESCRIPCION: producto.DESCRIPCION,
-          UM: producto.UM,
-          INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`,
-          CANTIDAD: Number(d.qty),
-          RESPONSABLE: responsableVal,
-          DESTINATARIO: destinatarioVal,
-          OBSERVACIONES: obsVal,
-          ADDED_AT: new Date().toISOString()
-        };
-        addPendingSalida(pend);
-      } else {
-        const pend = {
-          PRODUCT_ID: producto.id,
-          CODIGO: producto.CODIGO,
-          DESCRIPCION: producto.DESCRIPCION,
-          UM: producto.UM,
-          ORIGENES: distrib.map(d => ({ INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`, CANTIDAD: Number(d.qty) })),
-          CANTIDAD: totalNeeded,
-          RESPONSABLE: responsableVal,
-          DESTINATARIO: destinatarioVal,
-          OBSERVACIONES: obsVal,
-          ADDED_AT: new Date().toISOString()
-        };
-        addPendingSalida(pend);
+      if (!totalNeeded || totalNeeded <= 0) { 
+        btnConfirm.disabled = true; 
+        return; 
       }
-
-      // mostrar toast detallado y simple
-      const lines = [
-        { label: "Producto", value: producto.DESCRIPCION || producto.CODIGO || "(sin descripción)" },
-        { label: "Total", value: totalNeeded },
-        ...getDistrib().filter(d=>d.qty>0).map(d => ({ label: d.inv, value: d.qty }))
-      ];
-      showDetailedToast("✅ Salida agregada a pendientes", lines, { timeoutMs: 5000 });
-      showToast("Salida agregada a pendientes", true, 3000);
-
-      // refrescar vista de pendientes
-      renderPendingList();
-
-      // cerrar modal
-      closeOverlay();
-    } catch (err) {
-      console.error("Error al agregar pendiente desde modal salida:", err);
-      showAlertToast("Error al agregar pendiente", "error");
+      const distrib = getDistrib();
+      const sum = distrib.reduce((s,d) => s + Number(d.qty || 0), 0);
+      const availTotal = distrib.reduce((s,d) => s + safeStock(producto, d.inv), 0);
+      if (!Number.isFinite(sum)) { 
+        btnConfirm.disabled = true; 
+        return; 
+      }
+      if (Math.abs(sum - totalNeeded) > 1e-6 || totalNeeded > availTotal) { 
+        btnConfirm.disabled = true; 
+        return; 
+      }
+      btnConfirm.disabled = false;
     }
-  });
-}
-  // -------------------- Helper cleanObjectForInsert --------------------
-  function cleanObjectForInsert(obj) {
-    const out = {};
-    for (const k in obj) {
-      if (obj[k] === undefined) continue;
-      out[k] = obj[k];
-    }
-    return out;
+
+    cantidadInput.addEventListener("input", updateConfirmState);
+    distribContainer.addEventListener("input", updateConfirmState);
+
+    btnLimpiar.addEventListener("click", () => {
+      distribContainer.querySelectorAll('input[data-inv]').forEach(i => { 
+        if (!i.disabled) i.value = "0"; 
+      });
+      cantidadInput.value = "";
+      updateConfirmState();
+    });
+
+    const closeOverlay = () => overlay.remove();
+    btnCancel.addEventListener("click", closeOverlay);
+    closeX.addEventListener("click", closeOverlay);
+    overlay.addEventListener("click", (e) => { 
+      if (e.target === overlay) closeOverlay(); 
+    });
+    window.addEventListener("keydown", function onEsc(ev){ 
+      if (ev.key === "Escape") { 
+        closeOverlay(); 
+        window.removeEventListener("keydown", onEsc); 
+      } 
+    });
+
+    setTimeout(updateConfirmState, 50);
+
+    btnConfirm.addEventListener("click", () => {
+      try {
+        const totalNeeded = Number(cantidadInput.value || 0);
+        if (!totalNeeded || totalNeeded <= 0) { 
+          showToast("Cantidad inválida", false); 
+          return; 
+        }
+
+        const distrib = getDistrib().filter(d => Number(d.qty) > 0);
+        if (distrib.length === 0) { 
+          showToast("Distribución inválida", false); 
+          return; 
+        }
+        if (Math.abs(distrib.reduce((s,d) => s + Number(d.qty || 0), 0) - totalNeeded) > 1e-6) { 
+          showToast("La suma por inventario debe coincidir con el total", false); 
+          return; 
+        }
+
+        const responsableVal = responsableField.value || "";
+        const destinatarioVal = destinatarioField.value || "";
+        const obsVal = obsField.value || "";
+
+        if (distrib.length === 1) {
+          const d = distrib[0];
+          const pend = {
+            PRODUCT_ID: producto.id,
+            CODIGO: producto.CODIGO,
+            DESCRIPCION: producto.DESCRIPCION,
+            UM: producto.UM,
+            INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`,
+            CANTIDAD: Number(d.qty),
+            RESPONSABLE: responsableVal,
+            DESTINATARIO: destinatarioVal,
+            OBSERVACIONES: obsVal,
+            ADDED_AT: new Date().toISOString()
+          };
+          addPendingSalida(pend);
+        } else {
+          const pend = {
+            PRODUCT_ID: producto.id,
+            CODIGO: producto.CODIGO,
+            DESCRIPCION: producto.DESCRIPCION,
+            UM: producto.UM,
+            ORIGENES: distrib.map(d => ({ INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`, CANTIDAD: Number(d.qty) })),
+            CANTIDAD: totalNeeded,
+            RESPONSABLE: responsableVal,
+            DESTINATARIO: destinatarioVal,
+            OBSERVACIONES: obsVal,
+            ADDED_AT: new Date().toISOString()
+          };
+          addPendingSalida(pend);
+        }
+
+        showToast("Salida agregada a pendientes", true);
+        renderPendingList();
+        closeOverlay();
+        
+      } catch (err) {
+        console.error("Error al agregar pendiente:", err);
+        showToast("Error al agregar pendiente", false);
+      }
+    });
   }
 
-  // -------------------- UTIL DETECT COLUMNS --------------------
-  async function detectColumnsOfEntradasSinCodigo() {
-    if (!supabase) {
-      showActionToast("general", false, "Conexión no disponible para detectar columnas");
-      return null;
-    }
-    
-    try {
-      const { data, error } = await supabase.from("entradas_sin_codigo").select("*").limit(1);
-      if (error) {
-        console.warn("detectColumnsOfEntradasSinCodigo warning:", error);
-        showActionToast("general", false, "Error al detectar columnas");
-        return null;
-      }
-      if (!data || data.length === 0) {
-        showActionToast("general", true, "Tabla de entradas vacía");
-        return null;
-      }
-      
-      showActionToast("general", true, "Columnas de entradas detectadas");
-      return Object.keys(data[0]);
-    } catch (e) {
-      console.error("detectColumnsOfEntradasSinCodigo ex:", e);
-      showActionToast("general", false, "Excepción al detectar columnas");
-      return null;
-    }
-  }
-
-  function pickAllowed(obj, allowed) {
-    const out = {};
-    for (const k of Object.keys(obj)) {
-      // allowed names are case-sensitive (returned by supabase)
-      if (allowed.includes(k)) out[k] = obj[k];
-    }
-    return out;
-  }
-
-  // -------------------- ENTRADAS _entradas_sin_codigo (modal registrar) --------------------
+  // -------------------- ENTRADAS --------------------
   function openEntradaModalById(producto) {
     const existing = document.getElementById("entradaModalOverlay");
     if (existing) existing.remove();
@@ -2049,18 +1468,14 @@ async function openSalidaModal(producto) {
     const cancelBtn = modal.querySelector("#ent_cancel");
     const closeX = modal.querySelector("#entradaCloseBtn");
 
-    // make responsable autocompleted and read-only (not editable)
     responsableField.readOnly = true;
     responsableField.tabIndex = -1;
-    responsableField.title = "Autocompletado desde sesión (no editable)";
-    // style visually as non-editable
     Object.assign(responsableField.style, {
       backgroundColor: "#f3f4f6",
       cursor: "not-allowed",
       borderColor: "rgba(0,0,0,0.08)"
     });
 
-    // Prellenar responsable si hay sesión activa
     (async () => {
       try {
         if (supabase) {
@@ -2068,19 +1483,10 @@ async function openSalidaModal(producto) {
           const user = authData?.user ?? null;
           if (user && user.email) {
             responsableField.value = user.email;
-            showActionToast("auth", true, "Sesión autenticada");
-          } else {
-            // si no hay sesión, dejar vacío pero no editable; mostrar placeholder
-            responsableField.placeholder = "No autenticado";
-            responsableField.value = "";
-            showActionToast("auth", false, "No hay sesión activa");
           }
         }
       } catch (e) {
-        // fallback: dejar placeholder
-        responsableField.placeholder = "No disponible";
-        responsableField.value = "";
-        showActionToast("auth", false, "Error al verificar sesión");
+        // Silencioso
       }
     })();
 
@@ -2092,7 +1498,6 @@ async function openSalidaModal(producto) {
 
     const computeTotal = () => {
       const t = parseQ(i069) + parseQ(i078) + parseQ(i07f) + parseQ(i312) + parseQ(i073);
-      // mostrar con hasta 3 decimales (como en tu UI)
       totalField.value = Number.isFinite(t) ? t.toFixed(3) : "0.000";
       return t;
     };
@@ -2100,10 +1505,7 @@ async function openSalidaModal(producto) {
     [i069, i078, i07f, i312, i073].forEach(inp => inp.addEventListener("input", computeTotal));
     computeTotal();
 
-    const closeOverlay = () => {
-      overlay.remove();
-      showActionToast("entrada", true, "Entrada cancelada");
-    };
+    const closeOverlay = () => overlay.remove();
     
     cancelBtn.addEventListener("click", closeOverlay);
     closeX.addEventListener("click", closeOverlay);
@@ -2128,235 +1530,173 @@ async function openSalidaModal(producto) {
         const responsable = (responsableField.value || "").trim();
 
         if (total <= 0) {
-          showActionToast("entrada", false, "Ingresa al menos una cantidad mayor a 0");
+          showToast("Ingresa al menos una cantidad mayor a 0", false);
           registerBtn.disabled = false; 
           registerBtn.textContent = "Registrar entrada"; 
           return;
         }
         
         if (!responsable) {
-          showActionToast("entrada", false, "Responsable requerido (no autenticado)");
+          showToast("Responsable requerido", false);
           registerBtn.disabled = false; 
           registerBtn.textContent = "Registrar entrada"; 
           return;
         }
 
-        // --- INSERCIÓN ENTRADAS_SIN_CODIGO (forzado) ---
-        const inserted = await registerEntradaImmediate(producto, {
+        await registerEntradaImmediate(producto, {
           q069: q069v, q078: q078v, q07f: q07fv, q312: q312v, q073: q073v, total, responsable, nota: ""
         });
 
-        // Mostrar toast detallado
-        showActionToast("entrada", true, `Entrada registrada - Total: ${total}`);
+        showToast("Entrada registrada", true);
 
-        // refrescar productos
         try { 
           await loadAllProductsWithPagination(); 
         } catch (e) {
-          showActionToast("load", false, "Error al actualizar productos después de entrada");
+          console.error("Error actualizando productos:", e);
         }
 
-        // cerrar modal un poco después para que se vea el toast
         setTimeout(closeOverlay, 700);
       } catch (err) {
-        console.error("Error registrar entrada inmediata (UI):", err);
-        showActionToast("entrada", false, `Error: ${err.message}`);
+        console.error("Error registrando entrada:", err);
+        showToast(`Error: ${err.message}`, false);
       } finally {
         registerBtn.disabled = false;
         registerBtn.textContent = "Registrar entrada";
       }
     });
-    
-    showActionToast("entrada", true, `Modal de entrada abierto para: ${producto.DESCRIPCION}`);
   }
 
-// Reemplazar la función existente registerEntradaImmediate por esta versión mejorada
-async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312=0, q073=0, total=0, responsable="", nota="" } = {}) {
-  if (!supabase) throw new Error("Supabase no inicializado");
+  async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312=0, q073=0, total=0, responsable="", nota="" } = {}) {
+    if (!supabase) throw new Error("Supabase no inicializado");
 
-  // fecha fallback
-  function _getNowISO() {
-    try { return (new Date()).toISOString(); } catch(e){ return null; }
-  }
-  const fechaNow = (typeof getCurrentLocalDate === 'function') ? getCurrentLocalDate() : _getNowISO();
+    function _getNowISO() {
+      try { return (new Date()).toISOString(); } catch(e){ return null; }
+    }
+    const fechaNow = (typeof getCurrentLocalDate === 'function') ? getCurrentLocalDate() : _getNowISO();
 
-  // insertar entrada (mantener la tabla entradas_sin_codigo)
-  const entradaToInsert = {
-    descripcion: producto?.DESCRIPCION ?? producto?.descripcion ?? producto?.CODIGO ?? "",
-    cantidad: Number(total || 0),
-    i069: Number(q069 || 0),
-    i078: Number(q078 || 0),
-    i07f: Number(q07f || 0),
-    i312: Number(q312 || 0),
-    i073: Number(q073 || 0),
-    responsable: responsable || null,
-    fecha: fechaNow
-  };
+    const entradaToInsert = {
+      descripcion: producto?.DESCRIPCION ?? producto?.descripcion ?? producto?.CODIGO ?? "",
+      cantidad: Number(total || 0),
+      i069: Number(q069 || 0),
+      i078: Number(q078 || 0),
+      i07f: Number(q07f || 0),
+      i312: Number(q312 || 0),
+      i073: Number(q073 || 0),
+      responsable: responsable || null,
+      fecha: fechaNow
+    };
 
-  const { data: insertData, error: insertErr } = await supabase
-    .from("entradas_sin_codigo")
-    .insert([entradaToInsert])
-    .select();
+    const { data: insertData, error: insertErr } = await supabase
+      .from("entradas_sin_codigo")
+      .insert([entradaToInsert])
+      .select();
 
-  if (insertErr) {
-    showActionToast("entrada", false, `Error BD (insert entrada): ${insertErr.message}`);
-    throw insertErr;
-  }
+    if (insertErr) {
+      showToast(`Error BD: ${insertErr.message}`, false);
+      throw insertErr;
+    }
 
-  // cargar mapa columnas (intentar)
-  try { await ensureProductosSinCodigoColumnMap(); } catch(e) { console.warn("Mapa columnas no cargado:", e); }
+    try { 
+      await ensureProductosSinCodigoColumnMap(); 
+    } catch(e) { 
+      console.warn("Mapa columnas no cargado:", e); 
+    }
 
-  // buscar producto objetivo (primero por id, sino por CODIGO)
-  let prodRow = null;
-  try {
-    if (producto && (producto.id || producto.ID || producto.Id)) {
-      const idVal = producto.id ?? producto.ID ?? producto.Id;
-      const { data: pData, error: pErr } = await supabase.from("productos_sin_codigo").select("*").eq("id", idVal).maybeSingle();
-      if (pErr) console.warn("Error buscando producto por id:", pErr);
-      prodRow = (pErr ? null : pData) || null;
+    let prodRow = null;
+    try {
+      if (producto && (producto.id || producto.ID || producto.Id)) {
+        const idVal = producto.id ?? producto.ID ?? producto.Id;
+        const { data: pData, error: pErr } = await supabase.from("productos_sin_codigo").select("*").eq("id", idVal).maybeSingle();
+        if (!pErr) prodRow = pData;
+      }
+
+      if (!prodRow) {
+        const codigoVal = (producto?.CODIGO ?? producto?.codigo ?? "").toString().trim();
+        if (codigoVal) {
+          const { data: pData2, error: pErr2 } = await supabase.from("productos_sin_codigo").select("*").ilike("CODIGO", codigoVal).limit(1).maybeSingle();
+          if (!pErr2) prodRow = pData2;
+        }
+      }
+    } catch (err) {
+      console.warn("Error buscando producto:", err);
     }
 
     if (!prodRow) {
-      const codigoVal = (producto?.CODIGO ?? producto?.codigo ?? "").toString().trim();
-      if (codigoVal) {
-        const { data: pData2, error: pErr2 } = await supabase.from("productos_sin_codigo").select("*").ilike("CODIGO", codigoVal).limit(1).maybeSingle();
-        if (pErr2) console.warn("Error buscando producto por codigo:", pErr2);
-        prodRow = (pErr2 ? null : pData2) || null;
+      showToast("Entrada registrada; producto no encontrado para stock", false);
+      return Array.isArray(insertData) ? insertData[0] : insertData;
+    }
+
+    const additions = {
+      "I069": Number(q069 || 0),
+      "I078": Number(q078 || 0),
+      "I07F": Number(q07f || 0),
+      "I312": Number(q312 || 0),
+      "I073": Number(q073 || 0)
+    };
+
+    const updates = {};
+    const prodKeys = Object.keys(prodRow || {});
+
+    for (const shortInv of Object.keys(additions)) {
+      const qty = Number(additions[shortInv] || 0);
+      if (!qty) continue;
+
+      let colName = null;
+      try { colName = getRealColForInventoryLabel(shortInv); } catch(e) { colName = null; }
+
+      if (!colName) {
+        const nkShort = normalizeKeyName(shortInv);
+        colName = prodKeys.find(k => normalizeKeyName(k).includes(nkShort) && normalizeKeyName(k).includes("inventario")) || null;
+      }
+
+      if (!colName) {
+        colName = prodKeys.find(k => normalizeKeyName(k).includes("inventario") && /\d{2,}/.test(k)) || null;
+      }
+
+      if (colName) {
+        const current = toNumber(prodRow[colName]);
+        updates[colName] = roundFloat(current + qty);
       }
     }
-  } catch (err) {
-    console.warn("Excepción buscando producto:", err);
-  }
 
-  // Si no encontramos producto, devolvemos la inserción pero avisamos
-  if (!prodRow) {
-    showActionToast("entrada", true, "Entrada registrada; no se encontró producto para actualizar stock");
+    const physCol = prodKeys.find(k => {
+      const nk = normalizeKeyName(k);
+      return nk.includes("fisico") || nk.includes("fisinco") || nk.includes("inventariofisico") || nk.includes("inventariofisicoenalmacen") || nk.includes("fisic") || (nk.includes("almacen") && !nk.includes("inventario"));
+    }) || prodKeys.find(k => normalizeKeyName(k).includes("inventario") && normalizeKeyName(k).includes("fisico")) || null;
+
+    let totalComputed = 0;
+    prodKeys.forEach(k => {
+      const nk = normalizeKeyName(k);
+      if (k === physCol) return;
+      if (nk.includes("inventario") || nk.includes("almacen") || /\bi0?69\b/.test(nk) || /\bi0?78\b/.test(nk) || /\bi0?7f\b/.test(nk) || /\bi312\b/.test(nk) || /\bi073\b/.test(nk)) {
+        const val = updates.hasOwnProperty(k) ? toNumber(updates[k]) : toNumber(prodRow[k]);
+        totalComputed += Number(val || 0);
+      }
+    });
+
+    if (physCol) {
+      updates[physCol] = roundFloat(totalComputed);
+    }
+
+    if (Object.keys(updates).length > 0) {
+      try {
+        const { error: updErr } = await supabase.from("productos_sin_codigo").update(updates).eq("id", prodRow.id);
+        if (updErr) {
+          console.warn("Error actualizando stock:", updErr);
+          showToast("Entrada guardada, error en stock", false);
+        } else {
+          showToast("Entrada registrada y stock actualizado", true);
+        }
+      } catch (err) {
+        console.error("Error actualizando producto:", err);
+        showToast("Entrada registrada, error en stock", false);
+      }
+    } else {
+      showToast("Entrada registrada", true);
+    }
+
     return Array.isArray(insertData) ? insertData[0] : insertData;
   }
-
-  // preparar cantidades por inventario
-  const additions = {
-    "I069": Number(q069 || 0),
-    "I078": Number(q078 || 0),
-    "I07F": Number(q07f || 0),
-    "I312": Number(q312 || 0),
-    "I073": Number(q073 || 0)
-  };
-
-  // construir objeto updates sumando a las columnas reales
-  const updates = {};
-  const prodKeys = Object.keys(prodRow || {});
-
-  for (const shortInv of Object.keys(additions)) {
-    const qty = Number(additions[shortInv] || 0);
-    if (!qty) continue;
-
-    // intentar obtener la columna real con tu helper
-    let colName = null;
-    try { colName = getRealColForInventoryLabel(shortInv); } catch(e) { colName = null; }
-
-    // fallback: buscar en prodRow keys alguna que contenga el shortInv normalizado
-    if (!colName) {
-      const nkShort = normalizeKeyName(shortInv);
-      colName = prodKeys.find(k => normalizeKeyName(k).includes(nkShort) && normalizeKeyName(k).includes("inventario")) || null;
-    }
-
-    // si aún no hay columna, buscar la primer columna que contenga 'inventario' + dígitos (fallback amplio)
-    if (!colName) {
-      colName = prodKeys.find(k => normalizeKeyName(k).includes("inventario") && /\d{2,}/.test(k)) || null;
-    }
-
-    if (colName) {
-      const current = toNumber(prodRow[colName]);
-      updates[colName] = roundFloat(current + qty);
-      console.debug("Preparando update:", { colName, current, add: qty, newVal: updates[colName] });
-    } else {
-      console.warn("No se encontró columna para", shortInv, "producto id:", prodRow.id);
-    }
-  }
-
-  // ahora recalcular "inventario físico" / "almacen físico" si existe alguna columna que lo represente
-  // buscamos la columna física en prodRow: preferimos nombres que contengan 'fisico' o 'físico' o 'inventariofisico' o 'almacen'
-  const physCol = prodKeys.find(k => {
-    const nk = normalizeKeyName(k);
-    return nk.includes("fisico") || nk.includes("fisinco") || nk.includes("inventariofisico") || nk.includes("inventariofisicoenalmacen") || nk.includes("fisic") || (nk.includes("almacen") && !nk.includes("inventario"));
-  }) || prodKeys.find(k => normalizeKeyName(k).includes("inventario") && normalizeKeyName(k).includes("fisico")) || null;
-
-  // calcular suma de todos los inventarios detectables (usamos prodKeys que incluyan 'inventario' o 'almacen' excepto physCol)
-  let totalComputed = 0;
-  prodKeys.forEach(k => {
-    const nk = normalizeKeyName(k);
-    if (k === physCol) return;
-    // contar keys que representen inventarios (ej: inventarioi069, inventario i069, almacen)
-    if (nk.includes("inventario") || nk.includes("almacen") || /\bi0?69\b/.test(nk) || /\bi0?78\b/.test(nk) || /\bi0?7f\b/.test(nk) || /\bi312\b/.test(nk) || /\bi073\b/.test(nk)) {
-      // si en updates ya calculamos el nuevo valor, usarlo; si no, tomar valor actual prodRow[k]
-      const val = updates.hasOwnProperty(k) ? toNumber(updates[k]) : toNumber(prodRow[k]);
-      totalComputed += Number(val || 0);
-    }
-  });
-
-  // si tenemos physCol actualizamos con la suma calculada
-  if (physCol) {
-    updates[physCol] = roundFloat(totalComputed);
-    console.debug("Actualizando columna fisica:", physCol, "->", updates[physCol]);
-  } else {
-    console.debug("No se detectó columna 'fisico/almacen' para actualizar (se omitirá suma física).");
-  }
-
-  // si hay updates, aplicarlas en una sola llamada
-  if (Object.keys(updates).length > 0) {
-  try {
-    console.debug("Intentando actualizar stock para producto id", prodRow.id, "updates:", updates);
-    const { error: updErr } = await supabase.from("productos_sin_codigo").update(updates).eq("id", prodRow.id);
-    if (updErr) {
-      console.warn("Error actualizando stock:", updErr);
-      showActionToast("entrada", false, "Entrada guardada, pero fallo al actualizar stock (revisa consola)");
-    } else {
-      console.debug("Stock actualizado correctamente para id", prodRow.id);
-      showActionToast("entrada", true, `Entrada registrada y stock actualizado (+${total})`);
-    }
-  } catch (err) {
-    console.error("Excepción al actualizar producto:", err);
-    showActionToast("entrada", false, "Entrada registrada pero error al actualizar stock (ver consola)");
-  }
-} else {
-  showActionToast("entrada", true, "Entrada registrada; no se detectaron columnas de inventario para actualizar");
-}
-
-  // devolver registro insertado
-  return Array.isArray(insertData) ? insertData[0] : insertData;
-}
-
-  // -------------------- FECHAS / FORMAT --------------------
-  function getCurrentLocalDate() {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-  
-  window.formatDate = function(dateInput) {
-    if (!dateInput) return "";
-    if (dateInput instanceof Date) {
-      if (isNaN(dateInput)) return "";
-      return dateInput.toLocaleDateString('es-MX');
-    }
-    const s = String(dateInput).trim();
-    const ymd = /^(\d{4})-(\d{2})-(\d{2})$/;
-    const m = s.match(ymd);
-    if (m) { const [, y, mm, dd] = m; return `${dd}/${mm}/${y}`; }
-    try {
-      if (s.includes('T') || s.includes(':')) {
-        const parsed = new Date(s);
-        if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
-      }
-      const tryIso = s.length === 10 ? `${s}T00:00:00` : s;
-      const parsed = new Date(tryIso);
-      if (!isNaN(parsed)) return parsed.toLocaleDateString('es-MX');
-    } catch(e){}
-    return s.length >= 10 ? s.slice(0,10) : s;
-  };
 
   // -------------------- HISTORIAL DE ENTRADAS --------------------
   async function openEntradaHistoryModal(producto) {
@@ -2409,11 +1749,7 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
     const closeBtn = modal.querySelector("#histCloseBtn");
     const filterInput = modal.querySelector("#histFilterInput");
 
-    function closeOverlay() { 
-      overlay.remove();
-      showActionToast("historial", true, "Historial cerrado");
-    }
-
+    function closeOverlay() { overlay.remove(); }
     closeBtn.addEventListener("click", closeOverlay);
     overlay.addEventListener("click", (e) => { 
       if (e.target === overlay) closeOverlay(); 
@@ -2427,8 +1763,6 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
     });
 
     try {
-      showActionToast("historial", true, "Cargando historial...");
-      
       const cols = await detectColumnsOfEntradasSinCodigo();
       let query;
       
@@ -2444,7 +1778,7 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
       const { data, error } = await query;
       
       if (error) {
-        showActionToast("historial", false, error.message);
+        showToast(`Error: ${error.message}`, false);
         throw error;
       }
       
@@ -2452,11 +1786,9 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
 
       if (!rows || rows.length === 0) {
         histContent.innerHTML = `<div style="padding:18px">No se encontraron entradas para este producto.</div>`;
-        showActionToast("historial", false, "No hay entradas registradas");
         return;
       }
 
-      // Construir tabla con el diseño solicitado
       const tableWrap = document.createElement("div");
       tableWrap.style.overflow = "auto";
 
@@ -2466,12 +1798,10 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
       table.style.fontSize = "14px";
       table.style.minWidth = "760px";
 
-      // estilos inline para encabezado y celdas (parecida a la imagen)
       const thStyle = "text-align:left;padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.06);font-weight:600;color:#374151";
       const tdStyle = "padding:12px 16px;border-bottom:1px solid rgba(0,0,0,0.04);color:#111";
       const smallTdStyle = "padding:12px 8px;border-bottom:1px solid rgba(0,0,0,0.04);color:#111;text-align:right;white-space:nowrap";
 
-      // header
       const thead = document.createElement("thead");
       thead.innerHTML = `
         <tr style="background:#fff">
@@ -2527,7 +1857,6 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
       histContent.innerHTML = "";
       histContent.appendChild(tableWrap);
 
-      // filtro cliente
       filterInput.addEventListener("input", debounce((ev) => {
         const term = (ev.target.value || "").trim().toLowerCase();
         if (!term) { 
@@ -2539,35 +1868,201 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
           return txt.includes(term);
         });
         renderRows(filtered);
-        showActionToast("search", true, `${filtered.length} entradas filtradas`);
       }, 150));
 
-      showActionToast("historial", true, `${rows.length} entradas cargadas`);
-
     } catch (err) {
-      console.error("openEntradaHistoryModal err:", err);
+      console.error("Error cargando historial:", err);
       histContent.innerHTML = `<div style="padding:18px;color:#7f1d1d">Error cargando historial.</div>`;
-      showActionToast("historial", false, err.message);
+      showToast(`Error: ${err.message}`, false);
+    }
+  }
+// ------------------- FUNCIÓN PARA ACTUALIZAR BADGE EN BOTÓN VER SALIDAS -------------------
+function updateVerSalidasBadge() {
+  const btn = document.getElementById('btnVerSalidas');
+  if (!btn) return;
+  
+  // Asegurar que el botón tenga posición relativa para el badge
+  if (!btn.classList.contains('has-badge')) {
+    btn.classList.add('has-badge');
+    btn.style.position = 'relative';
+  }
+
+  let badge = document.getElementById('verSalidasBadge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = 'verSalidasBadge';
+    badge.className = 'ver-salidas-badge';
+    badge.style.cssText = `
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    `;
+    btn.appendChild(badge);
+  }
+
+  const count = getPendingSalidas().length;
+  if (!count || count === 0) {
+    badge.style.display = 'none';
+    return;
+  }
+
+  badge.style.display = 'flex';
+  badge.textContent = count > 99 ? '99+' : String(count);
+}
+
+// ------------------- MODIFICAR LAS FUNCIONES QUE ACTUALIZAN PENDIENTES -------------------
+
+// En la función addPendingSalida, agregar al final:
+function addPendingSalida(pendiente) {
+  try {
+    const list = getPendingSalidas();
+    pendiente.id = pendiente.id || String(Date.now());
+    list.push(pendiente);
+    savePendingSalidas(list);
+    showToast("Salida agregada a pendientes", true);
+    renderPendingList();
+    updatePendingCount();
+    
+    // ACTUALIZAR BADGE - NUEVA LÍNEA
+    updateVerSalidasBadge();
+    
+  } catch (error) {
+    console.error("Error al agregar salida pendiente:", error);
+    showToast("Error al agregar salida pendiente", false);
+  }
+}
+
+// En la función removePendingSalida, agregar al final:
+function removePendingSalida(index) {
+  const list = getPendingSalidas();
+  list.splice(index, 1);
+  savePendingSalidas(list);
+  // ACTUALIZAR BADGE - NUEVA LÍNEA
+  updateVerSalidasBadge();
+}
+
+// En la función clearPendingSalidas, agregar al final:
+function clearPendingSalidas() {
+  localStorage.removeItem("salidas_pendientes");
+  // ACTUALIZAR BADGE - NUEVA LÍNEA
+  updateVerSalidasBadge();
+}
+
+// En la función confirmAllPendings, después de procesar:
+async function confirmAllPendings() {
+  const pendientes = getPendingSalidas();
+  if (!pendientes || pendientes.length === 0) {
+    showToast("No hay salidas pendientes", false);
+    return;
+  }
+
+  if (!confirm(`¿Confirmar ${pendientes.length} salidas pendientes y actualizar stock?`)) return;
+
+  if (btnConfirmAll) btnConfirmAll.disabled = true;
+  let successes = 0;
+  let errors = 0;
+
+  for (const item of pendientes.slice()) {
+    try {
+      // ... (código existente para procesar pendientes)
+      
+      successes++;
+      
+      // Borrar del pending
+      const list = getPendingSalidas();
+      const idx = list.findIndex(
+        (s) =>
+          s.CODIGO === item.CODIGO &&
+          ((s.ADDED_AT && item.ADDED_AT && s.ADDED_AT === item.ADDED_AT) ||
+            (s.INVENTARIO_ORIGEN === item.INVENTARIO_ORIGEN && s.CANTIDAD === item.CANTIDAD))
+      );
+      if (idx >= 0) { 
+        list.splice(idx, 1); 
+        savePendingSalidas(list); 
+      }
+    } catch (err) {
+      console.error("Error confirmando pendiente:", item, err);
+      errors++;
     }
   }
 
+  if (btnConfirmAll) btnConfirmAll.disabled = false;
+  await renderPendingList();
+  await cargarHistorialSalidas();
+  updatePendingCount();
+  
+  // ACTUALIZAR BADGE - NUEVAS LÍNEAS
+  updateVerSalidasBadge();
+
+  if (successes > 0 || errors > 0) {
+    showSummaryModal(successes, errors);
+  } else {
+    showToast("No se procesaron salidas", false);
+  }
+}
+
+// ------------------- ACTUALIZAR LA FUNCIÓN updatePendingCount -------------------
+function updatePendingCount() {
+  try {
+    const count = getPendingSalidas().length;
+    if (btnConfirmAll) btnConfirmAll.textContent = `Confirmar pendientes (${count})`;
+    
+    // ACTUALIZAR BADGE - NUEVA LÍNEA
+    updateVerSalidasBadge();
+    
+  } catch (error) {
+    console.error("Error actualizando contador:", error);
+  }
+}
+
+// ------------------- INICIALIZAR BADGE AL CARGAR LA PÁGINA -------------------
+document.addEventListener("DOMContentLoaded", async () => {
+  await setResponsableFromAuth();
+  await loadProducts();
+  await renderPendingList();
+  await cargarHistorialSalidas();
+  updatePendingCount();
+
+  // INICIALIZAR BADGE - NUEVA LÍNEA
+  updateVerSalidasBadge();
+
+  if (btnConfirmAll) btnConfirmAll.addEventListener("click", confirmAllPendings);
+  if (btnClearPending) btnClearPending.addEventListener("click", clearAllPendings);
+  if (btnRefresh) btnRefresh.addEventListener("click", cargarHistorialSalidas);
+});
+
+// También agregar en la función renderPendingList:
+function renderPendingList() {
+  if (!tablaPendientesBody) return;
+
+  // ... (código existente)
+
+  // ACTUALIZAR BADGE AL FINAL - NUEVA LÍNEA
+  updateVerSalidasBadge();
+}
   // -------------------- SETUP & BOOT --------------------
   function setupButtonsAndEvents() {
     try {
       ensureTableScrollContainer();
       
-      if (btnOpenModal) {
-        btnOpenModal.addEventListener("click", openProductModal);
-        showActionToast("general", true, "Botones configurados");
-      }
-      
+      if (btnOpenModal) btnOpenModal.addEventListener("click", openProductModal);
       if (btnCloseModal) btnCloseModal.addEventListener("click", closeProductModal);
       if (btnCancelModal) btnCancelModal.addEventListener("click", (e)=> { e.preventDefault(); closeProductModal(); });
       if (productForm) productForm.addEventListener("submit", saveProductFromForm);
       
       if (refreshBtn) {
         refreshBtn.addEventListener("click", () => {
-          showActionToast("load", true, "Actualizando productos...");
           loadAllProductsWithPagination();
         });
       }
@@ -2579,31 +2074,26 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
           showConfirm("Eliminar todas las salidas pendientes?", ()=> { 
             savePendingSalidas([]); 
             renderPendingList(); 
-            showActionToast("clear", true, "Todos los pendientes eliminados");
-          },
-          () => {
-            showActionToast("clear", true, "Limpieza cancelada");
+            showToast("Pendientes eliminados", true);
           });
         });
       }
 
       setupSearchWithPagination();
-      showActionToast("general", true, "Sistema inicializado correctamente");
       
     } catch (error) {
-      showActionToast("general", false, "Error en configuración inicial");
+      console.error("Error en configuración inicial:", error);
     }
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
     try {
-      showActionToast("general", true, "Iniciando aplicación...");
       setupButtonsAndEvents();
       await loadAllProductsWithPagination();
       renderPendingList();
       updatePendingCount();
       
-      // exponer funciones globales por si usas onclick inline
+      // exponer funciones globales
       window.editarProducto = editarProductoById;
       window.eliminarProducto = eliminarProducto;
       window.registrarSalida = registrarSalida;
@@ -2611,11 +2101,9 @@ async function registerEntradaImmediate(producto, { q069=0, q078=0, q07f=0, q312
       window.openEntradaHistoryModal = openEntradaHistoryModal;
       window.reloadAllProducts = loadAllProductsWithPagination;
       
-      showActionToast("general", true, "Aplicación lista para usar");
-      
     } catch (err) {
-      console.error("init err:", err);
-      showActionToast("general", false, `Error iniciando módulo: ${err.message}`);
+      console.error("Error iniciando módulo:", err);
+      showToast(`Error iniciando: ${err.message}`, false);
     }
   });
 })();
