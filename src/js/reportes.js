@@ -490,7 +490,7 @@ async function getMonthlyReport(month, year) {
     showAlert("Error obteniendo entradas: " + (e.message || e), 'error');
   }
 
-  // 3. OBTENER SALIDAS
+  // 3. OBTENER SALIDAS - CORREGIDO PARA SALIDAS SIN CÓDIGO
   try {
     const { data, error } = await supabase
       .from(salidasTable)
@@ -502,6 +502,12 @@ async function getMonthlyReport(month, year) {
         return isDateInRange(fechaRegistro, startDate, endDate);
       });
       console.log(`📤 Salidas obtenidas: ${salidas.length} (de ${data.length} totales)`);
+      
+      // DEBUG: Mostrar estructura de las salidas sin código
+      if (mode === 'without' && salidas.length > 0) {
+        console.log("🔍 ESTRUCTURA SALIDAS SIN CÓDIGO:", salidas[0]);
+        console.log("🔍 CAMPOS DISPONIBLES:", Object.keys(salidas[0]));
+      }
     } else {
       console.error("Error salidas:", error);
       showAlert("Error obteniendo salidas: " + (error?.message || error), 'error');
@@ -517,9 +523,10 @@ async function getMonthlyReport(month, year) {
   return processReportData(products, entradas, salidas, month, year, mode);
 }
 
-
+// ------------------- PROCESS REPORT DATA CORREGIDO -------------------
 function processReportData(products, entradas, salidas, month, year, mode = 'all') {
   console.log("🔄 Procesando datos... (useCodes =", mode !== 'without', ")");
+  console.log("🔍 Datos recibidos - Productos:", products.length, "Entradas:", entradas.length, "Salidas:", salidas.length);
 
   const useCodes = (mode !== 'without');
 
@@ -551,57 +558,89 @@ function processReportData(products, entradas, salidas, month, year, mode = 'all
     } else {
       // modo sin códigos: emparejar por descripción (contains)
       const dnorm = norm(descripcion);
+      
       entradasProd = entradas.filter(e => {
         const ed = norm(e.descripcion ?? e.producto ?? e.PRODUCTO ?? e.DESCRIPCION ?? e.descripcion_producto ?? '');
         return ed && ed.indexOf(dnorm) !== -1;
       });
+      
       salidasProd = salidas.filter(s => {
-        const sd = norm(s.DESCRIPCION ?? s.descripcion ?? s.producto ?? s.PRODUCTO ?? s.descripcion_producto ?? '');
+        const sd = norm(s.descripcion ?? s.DESCRIPCION ?? s.producto ?? s.PRODUCTO ?? s.descripcion_producto ?? '');
         return sd && sd.indexOf(dnorm) !== -1;
       });
     }
 
-    // totales
-    const totalEntradas = entradasProd.reduce((sum, e) => sum + parseNumber(e.cantidad ?? e.CANTIDAD ?? 0), 0);
-    const totalSalidas = salidasProd.reduce((sum, s) => sum + parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0), 0);
+    // DEBUG: Mostrar matching
+    if (mode === 'without' && descripcion) {
+      console.log(`🔍 Producto: "${descripcion}" - Entradas: ${entradasProd.length}, Salidas: ${salidasProd.length}`);
+    }
+
+    // CORRECCIÓN PRINCIPAL: Extraer correctamente las cantidades de salidas sin código
+    const totalEntradas = entradasProd.reduce((sum, e) => {
+      // Para entradas sin código
+      if (mode === 'without') {
+        return sum + parseNumber(e.cantidad_entrada ?? e.cantidad ?? e.CANTIDAD ?? 0);
+      } else {
+        return sum + parseNumber(e.cantidad ?? e.CANTIDAD ?? 0);
+      }
+    }, 0);
+
+    const totalSalidas = salidasProd.reduce((sum, s) => {
+      // CORRECCIÓN CRÍTICA: Para salidas sin código, usar cantidad_salida
+      if (mode === 'without') {
+        const cantidad = parseNumber(s.cantidad_salida ?? s.cantidad ?? s.CANTIDAD_SALIDA ?? s.CANTIDAD ?? 0);
+        console.log(`📤 Salida sin código: "${s.descripcion}" - Cantidad: ${cantidad}`, s);
+        return sum + cantidad;
+      } else {
+        return sum + parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0);
+      }
+    }, 0);
 
     const stockInicial = parseNumber(prod.inventario_fisico);
     const stockFinal = stockInicial + totalEntradas - totalSalidas;
     const diferencia = stockFinal - stockInicial;
 
-    detailed.push({
-      codigo,
-      descripcion,
-      stockInicial,
-      entradas: totalEntradas,
-      salidas: totalSalidas,
-      stockFinal,
-      diferencia,
-      tendencia: diferencia > 0 ? 'up' : diferencia < 0 ? 'down' : 'neutral'
-    });
+    // Solo incluir productos que tengan movimientos o stock
+    if (stockInicial > 0 || totalEntradas > 0 || totalSalidas > 0) {
+      detailed.push({
+        codigo,
+        descripcion,
+        stockInicial,
+        entradas: totalEntradas,
+        salidas: totalSalidas,
+        stockFinal,
+        diferencia,
+        tendencia: diferencia > 0 ? 'up' : diferencia < 0 ? 'down' : 'neutral'
+      });
+    }
 
     // entradas movimiento - asegurar fecha y campos
     entradasProd.forEach(e => {
       movements.entries.push({
         fecha: getRecordDate(e) || e.fecha || e.FECHA || '',
         codigo_producto: e.codigo ?? e.CODIGO ?? null,
-        descripcion_producto: e.DESCRIPCION ?? e.descripcion ?? e.producto ?? prod.descripcion ?? '',
-        cantidad: parseNumber(e.cantidad ?? e.CANTIDAD ?? 0),
+        descripcion_producto: e.descripcion ?? e.DESCRIPCION ?? e.producto ?? prod.descripcion ?? '',
+        cantidad: parseNumber(e.cantidad_entrada ?? e.cantidad ?? e.CANTIDAD ?? 0),
         responsable: e.responsable ?? e.RESPONSABLE ?? 'No especificado',
         observaciones: e.observaciones ?? e.OBSERVACIONES ?? ''
       });
     });
 
-    // salidas movimiento - asegurar fecha y destino (destinatario)
+    // salidas movimiento - CORREGIDO para salidas sin código
     salidasProd.forEach(s => {
+      // CORRECCIÓN: Usar cantidad_salida para salidas sin código
+      const cantidadSalida = (mode === 'without') ? 
+        parseNumber(s.cantidad_salida ?? s.cantidad ?? s.CANTIDAD_SALIDA ?? s.CANTIDAD ?? 0) :
+        parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0);
+      
       movements.exits.push({
-        fecha: getRecordDate(s) || s.FECHA_SALIDA || s.fecha || '',
-        codigo_producto: s.CODIGO ?? s.codigo ?? null,
-        descripcion_producto: s.DESCRIPCION ?? s.descripcion ?? s.producto ?? prod.descripcion ?? '',
-        cantidad: parseNumber(s.CANTIDAD_SALIDA ?? s.cantidad ?? s.CANTIDAD ?? 0),
-        responsable: s.RESPONSABLE ?? s.responsable ?? 'No especificado',
-        destino: s.DESTINATARIO ?? s.destinatario ?? s.DESTINO ?? s.destino ?? '-',
-        observaciones: s.OBSERVACIONES ?? s.observaciones ?? ''
+        fecha: getRecordDate(s) || s.fecha_salida || s.FECHA_SALIDA || s.fecha || '',
+        codigo_producto: s.codigo ?? s.CODIGO ?? null,
+        descripcion_producto: s.descripcion ?? s.DESCRIPCION ?? s.producto ?? prod.descripcion ?? '',
+        cantidad: cantidadSalida,
+        responsable: s.responsable ?? s.RESPONSABLE ?? 'No especificado',
+        destino: s.destinatario ?? s.DESTINATARIO ?? s.destino ?? s.DESTINO ?? '-',
+        observaciones: s.observaciones ?? s.OBSERVACIONES ?? ''
       });
     });
 
@@ -617,10 +656,13 @@ function processReportData(products, entradas, salidas, month, year, mode = 'all
   console.log("📋 DETALLADO:", detailed.length, "productos");
   console.log("🔄 MOVIMIENTOS - Entradas:", movements.entries.length, "Salidas:", movements.exits.length);
 
+  // DEBUG: Mostrar primeras salidas procesadas
+  if (movements.exits.length > 0) {
+    console.log("🔍 EJEMPLO SALIDAS PROCESADAS:", movements.exits.slice(0, 3));
+  }
+
   return { summary, detailed, movements, month, year, mode };
 }
-
-
 
 // ------------------- ACTUALIZAR UI -------------------
 function updateSummaryCards(summary) {
@@ -644,6 +686,7 @@ function updateSummaryCards(summary) {
     diff.className = `card-value ${summary.stockDifference > 0 ? 'trend-up' : summary.stockDifference < 0 ? 'trend-down' : ''}`;
   }
 }
+
 function updateDetailedTable(detailed) {
   const tbody = document.getElementById('reportTableBody');
   if (!tbody) {
@@ -677,8 +720,8 @@ function updateDetailedTable(detailed) {
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td>${codeStr}</td>
-      <td>${item.descripcion ?? ''}</td>
+      <td>${escapeHtml(codeStr)}</td>
+      <td>${escapeHtml(item.descripcion ?? '')}</td>
       <td>${Math.round(item.stockInicial || 0).toLocaleString()}</td>
       <td>${Math.round(item.entradas || 0).toLocaleString()}</td>
       <td>${Math.round(item.salidas || 0).toLocaleString()}</td>
@@ -690,8 +733,6 @@ function updateDetailedTable(detailed) {
   });
 }
 
-
-
 // helper simple para escapar HTML (por seguridad si los datos vienen con caracteres)
 function escapeHtml(str) {
   return String(str ?? '')
@@ -701,6 +742,8 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// ------------------- ACTUALIZAR TABLAS DE MOVIMIENTOS CORREGIDA (CON OBSERVACIONES) -------------------
 function updateMovementsTables(movements) {
   console.log("🔄 Actualizando tablas de movimientos:", {
     entradas: movements.entries.length,
@@ -726,11 +769,11 @@ function updateMovementsTables(movements) {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${formatDate(entry.fecha)}</td>
-          <td>${code}</td>
-          <td>${entry.descripcion_producto ?? ''}</td>
+          <td>${escapeHtml(code)}</td>
+          <td>${escapeHtml(entry.descripcion_producto ?? '')}</td>
           <td>${Math.round(entry.cantidad || 0).toLocaleString()}</td>
-          <td>${entry.responsable ?? ''}</td>
-          <td>${entry.observaciones ?? ''}</td>
+          <td>${escapeHtml(entry.responsable ?? '')}</td>
+          <td>${escapeHtml(entry.observaciones ?? '')}</td>
         `;
         entriesBody.appendChild(row);
       });
@@ -739,28 +782,29 @@ function updateMovementsTables(movements) {
     console.error("❌ No se encuentra entriesTableBody");
   }
 
-  // TABLA DE SALIDAS
+  // TABLA DE SALIDAS - CORREGIDA CON OBSERVACIONES
   const exitsBody = document.getElementById('exitsTableBody');
   if (exitsBody) {
     exitsBody.innerHTML = '';
     if (!movements.exits || movements.exits.length === 0) {
-      exitsBody.innerHTML = '<tr><td colspan="6" class="text-center">No hay salidas registradas</td></tr>';
+      exitsBody.innerHTML = '<tr><td colspan="7" class="text-center">No hay salidas registradas</td></tr>';
     } else {
       movements.exits.forEach(exit => {
         let code = exit.codigo_producto ?? exit.codigo ?? exit.CODIGO ?? '';
         code = (code === null || typeof code === 'undefined') ? '' : String(code).trim();
         if (showSCWhenMissing && (!code || code.toLowerCase() === 'null' || code.toLowerCase() === 'undefined')) code = 'S/C';
 
-        const destino = exit.destino ?? exit.DESTINATARIO ?? exit.destinatario ?? exit.DESTINO ?? exit.observaciones ?? '-';
+        const destino = exit.destino ?? exit.DESTINATARIO ?? exit.destinatario ?? exit.DESTINO ?? '-';
 
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${formatDate(exit.fecha)}</td>
-          <td>${code}</td>
-          <td>${exit.descripcion_producto ?? ''}</td>
+          <td>${escapeHtml(code)}</td>
+          <td>${escapeHtml(exit.descripcion_producto ?? '')}</td>
           <td>${Math.round(exit.cantidad || 0).toLocaleString()}</td>
-          <td>${exit.responsable ?? ''}</td>
-          <td>${destino}</td>
+          <td>${escapeHtml(exit.responsable ?? '')}</td>
+          <td>${escapeHtml(destino)}</td>
+          <td>${escapeHtml(exit.observaciones ?? '')}</td>
         `;
         exitsBody.appendChild(row);
       });
@@ -769,8 +813,6 @@ function updateMovementsTables(movements) {
     console.error("❌ No se encuentra exitsTableBody");
   }
 }
-
-
 function formatDate(dateString) {
   try {
     if (!dateString) return '';
@@ -780,7 +822,37 @@ function formatDate(dateString) {
     return dateString;
   }
 }
+// ------------------- AGREGAR COLUMNA DE OBSERVACIONES SI NO EXISTE -------------------
+function ensureObservationsColumn() {
+  const exitsTable = document.getElementById('exitsTable');
+  if (!exitsTable) return;
 
+  const thead = exitsTable.querySelector('thead tr');
+  if (!thead) return;
+
+  // Verificar si ya existe la columna de observaciones
+  const headers = Array.from(thead.querySelectorAll('th'));
+  const hasObservations = headers.some(th => 
+    th.textContent.toLowerCase().includes('observación') || 
+    th.textContent.toLowerCase().includes('observacion') ||
+    th.textContent.toLowerCase().includes('observaciones')
+  );
+
+  if (!hasObservations) {
+    // Agregar columna de observaciones
+    const obsHeader = document.createElement('th');
+    obsHeader.textContent = 'Observaciones';
+    thead.appendChild(obsHeader);
+    
+    console.log("✅ Columna de observaciones agregada a la tabla de salidas");
+  }
+}
+
+// Llamar esta función al inicializar
+document.addEventListener('DOMContentLoaded', function() {
+  // ... código existente de inicialización ...
+  ensureObservationsColumn();
+});
 // ------------------- GRÁFICOS -------------------
 function generateCharts(reportData) {
   destroyExistingCharts();
@@ -1124,6 +1196,76 @@ async function refreshReport() {
   }
 }
 
+// ------------------- DIAGNÓSTICO ESPECÍFICO SALIDAS SIN CÓDIGO -------------------
+async function diagnosticarSalidasSinCodigo() {
+  console.log("🔍 DIAGNÓSTICO ESPECÍFICO: Salidas Sin Código");
+  
+  try {
+    // 1. Verificar estructura de la tabla salidas_sin_codigo
+    const { data: estructura, error: errorEstructura } = await supabase
+      .from('salidas_sin_codigo')
+      .select('*')
+      .limit(1);
+    
+    if (!errorEstructura && estructura && estructura[0]) {
+      console.log("✅ ESTRUCTURA salidas_sin_codigo:", Object.keys(estructura[0]));
+      console.log("📋 EJEMPLO registro:", {
+        descripcion: estructura[0].descripcion,
+        cantidad_salida: estructura[0].cantidad_salida,
+        fecha_salida: estructura[0].fecha_salida,
+        responsable: estructura[0].responsable,
+        destinatario: estructura[0].destinatario
+      });
+    } else {
+      console.error("❌ Error obteniendo estructura:", errorEstructura);
+    }
+
+    // 2. Verificar datos reales del mes actual
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+    const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+    const endDate = `${year}-${String(month).padStart(2,'0')}-${new Date(year, month, 0).getDate()}`;
+
+    const { data: salidasMes, error: errorSalidas } = await supabase
+      .from('salidas_sin_codigo')
+      .select('*');
+
+    if (!errorSalidas && salidasMes) {
+      const salidasFiltradas = salidasMes.filter(registro => {
+        const fechaRegistro = getRecordDate(registro);
+        return isDateInRange(fechaRegistro, startDate, endDate);
+      });
+
+      console.log(`📊 SALIDAS este mes: ${salidasFiltradas.length} de ${salidasMes.length} totales`);
+      
+      if (salidasFiltradas.length > 0) {
+        console.log("🔍 SALIDAS FILTRADAS:", salidasFiltradas);
+        console.log("💰 SUMA CANTIDADES:", salidasFiltradas.reduce((sum, s) => sum + parseNumber(s.cantidad_salida), 0));
+      }
+    }
+
+  } catch (e) {
+    console.error("❌ Error en diagnóstico:", e);
+  }
+}
+
+// Ejecutar diagnóstico al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+  // ... código existente ...
+  
+  // Agregar botón de diagnóstico si no existe
+  if (!document.getElementById('btnDiagnostico')) {
+    const btn = document.createElement('button');
+    btn.id = 'btnDiagnostico';
+    btn.textContent = '🔍 Diagnosticar Salidas';
+    btn.style.margin = '10px';
+    btn.style.padding = '5px 10px';
+    btn.addEventListener('click', diagnosticarSalidasSinCodigo);
+    document.querySelector('.filters')?.appendChild(btn);
+  }
+});
+
 // Debug functions
 window.debugEntradas = async () => {
   const { data } = await supabase.from('entradas').select('*').limit(5);
@@ -1133,6 +1275,7 @@ window.debugEntradas = async () => {
 
 window.debugReport = () => console.log("📊 Reporte actual:", currentReportData);
 window.diagnosticarEstructuraCompleta = diagnosticarEstructuraCompleta;
+window.diagnosticarSalidasSinCodigo = diagnosticarSalidasSinCodigo;
 
 // ------------------- PROTECCIÓN DE EXPORT -------------------
 async function exportToPDFIfAllowed() {

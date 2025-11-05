@@ -663,15 +663,14 @@ label {
   .btn-add, .btn-salidas { width: 100%; justify-content: center; }
 }
 
-/* ---------------- Modal overlay & modal base ---------------- */
-/* ----- Modal más grande y aireado ----- */
+
 .entrada-lookup-modal,
 .salida-modal {
-  width: 880px;            /* Aumentado: se verá más grande en pantallas anchas */
+  width: 280px;            /* Aumentado: se verá más grande en pantallas anchas */
   max-width: 96%;
   background: linear-gradient(180deg,#ffffff 0%, #fbfbff 100%);
   border-radius: 14px;     /* un poco más redondeado */
-  padding: 22px;           /* más espacio interior */
+  padding: 82px;           /* más espacio interior */
   box-shadow: 0 28px 64px rgba(2,6,23,0.40);
   font-family: "Quicksand", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
   color: #0f172a;

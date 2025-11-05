@@ -55,7 +55,10 @@ function roundFloat(n, decimals=6){
   const f = Math.pow(10, decimals);
   return Math.round(v * f) / f;
 }
-function formatQty(n){ return String(roundFloat(n,6)).replace(/\.?0+$/,''); }
+function formatQty(n){ 
+  if (n === null || n === undefined) return "0";
+  return String(n);
+}
 function normalizeKeyName(k){ return String(k||"").replace(/[^a-z0-9]/gi,"").toLowerCase(); }
 
 // -------------------- MENSAJES / MODALES --------------------
@@ -221,6 +224,7 @@ function updatePendingCountBadge(){
   }
 }
 
+// SOLUCIÓN: Eliminar la función duplicada y mantener solo una versión
 async function renderPendingList(){
   if (!tablaPendientesBody) return;
   // minimal inline styles (solo una vez)
@@ -233,6 +237,7 @@ async function renderPendingList(){
       .empty-note { text-align:center;color:#666;padding:8px; }
       .col-desc, .col-obs, .col-resp, .col-dest { white-space: normal; overflow-wrap:anywhere; word-break:break-word; }
       .acciones { display:flex; justify-content:flex-end; gap:8px; }
+      .col-cant { text-align: center; font-weight: bold; }
     `;
     document.head.appendChild(s);
   }
@@ -250,7 +255,16 @@ async function renderPendingList(){
   for (let i=0;i<list.length;i++){
     const it = list[i];
     const codigo = (it.CODIGO && String(it.CODIGO).trim() !== "") ? String(it.CODIGO) : "S/C";
-    const cantidad = formatQty(it.CANTIDAD || 0);
+    
+    // 🔥 CORRECIÓN: Mostrar la cantidad completa sin formateo
+    let cantidad = it.CANTIDAD || 0;
+    // Si es un número, convertirlo a string sin redondeo
+    if (typeof cantidad === 'number') {
+      cantidad = String(cantidad);
+    } else {
+      cantidad = String(cantidad || 0);
+    }
+    
     const inventarioRaw = it.INVENTARIO_ORIGEN ?? it.inventario_origen ?? "";
     const inventarioLabel = String(inventarioRaw || "").toUpperCase().replace(/^INVENTARIO\s*/i,'INVENTARIO ');
     const invColor = typeof invColorFor === 'function' ? invColorFor(inventarioRaw) : '#6b7280';
@@ -294,12 +308,14 @@ async function renderPendingList(){
   try { updateVerSalidasBadge(list.length); } catch(e){/* noop */ }
 }
 
-// -------------------- AGREGAR PENDIENTE (API pública que puedes invocar) --------------------
+// SOLUCIÓN: Eliminar la función duplicada y mantener solo una versión
 function addPendingSalida(pendiente){
   // pendiente: { CODIGO?, DESCRIPCION, CANTIDAD, UM, INVENTARIO_ORIGEN, RESPONSABLE, DESTINATARIO, OBSERVACIONES, ORIGENES? }
   const list = getPendingSalidas();
   pendiente.id = pendiente.id || String(Date.now());
-  pendiente.CANTIDAD = roundFloat(Number(pendiente.CANTIDAD || 0) || 0);
+  
+  // 🔥 CORRECIÓN: No redondear la cantidad, guardar el valor exacto
+  pendiente.CANTIDAD = Number(pendiente.CANTIDAD || 0);
   pendiente.ADDED_AT = pendiente.ADDED_AT || (new Date()).toISOString();
   list.push(pendiente);
   savePendingSalidas(list);

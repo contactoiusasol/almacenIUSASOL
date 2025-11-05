@@ -560,7 +560,7 @@ function renderTable(products) {
     console.error("Error renderizando tabla:", error);
   }
 }
-// AGREGA ESTAS FUNCIONES FALTANTES:
+
 
 function formatDate(dateString) {
   if (!dateString) return "";
@@ -957,6 +957,7 @@ async function detectColumnsOfEntradasSinCodigo() {
       showToast("Salida agregada a pendientes", true);
       renderPendingList();
       updatePendingCount();
+       updateVerSalidasBadge();
     
     } catch (error) {
       console.error("Error al agregar salida pendiente:", error);
@@ -968,6 +969,7 @@ async function detectColumnsOfEntradasSinCodigo() {
     if (!tablaPendientesBody) return;
     
     updatePendingCount();
+     updateVerSalidasBadge();
   
     try {
       const list = getPendingSalidas();
@@ -976,6 +978,7 @@ async function detectColumnsOfEntradasSinCodigo() {
       if (!list || list.length === 0) {
         tablaPendientesBody.innerHTML = `<tr><td colspan="9" style="text-align:center">No hay salidas pendientes</td></tr>`;
         updatePendingCount();
+         updateVerSalidasBadge();
         return;
       }
       
@@ -1014,6 +1017,7 @@ async function detectColumnsOfEntradasSinCodigo() {
             const newList = getPendingSalidas().filter((_,i) => i !== idx);
             savePendingSalidas(newList);
             renderPendingList();
+             updateVerSalidasBadge();
             await loadAllProductsWithPagination();
             showToast("Pendiente confirmado", true);
           } catch (error) {
@@ -1035,6 +1039,7 @@ async function detectColumnsOfEntradasSinCodigo() {
           listNow.splice(idx, 1);
           savePendingSalidas(listNow);
           renderPendingList();
+           updateVerSalidasBadge();
           showToast("Pendiente eliminado", true);
         });
       });
@@ -1081,6 +1086,7 @@ async function detectColumnsOfEntradasSinCodigo() {
           await processPendings(list, "salidas");
           savePendingSalidas([]);
           renderPendingList();
+           updateVerSalidasBadge();
           await loadAllProductsWithPagination();
           showToast(`${list.length} pendientes confirmados`, true);
         } catch (error) {
@@ -1092,6 +1098,17 @@ async function detectColumnsOfEntradasSinCodigo() {
         // Cancelado - sin mensaje
       }
     );
+  }
+  // En el botón "Limpiar pendientes":
+  if (btnClearPending) {
+    btnClearPending.addEventListener("click", ()=> {
+      showConfirm("Eliminar todas las salidas pendientes?", ()=> { 
+        savePendingSalidas([]); 
+        renderPendingList(); 
+        updateVerSalidasBadge(); // ✅ ACTUALIZAR BADGE AQUÍ
+        showToast("Pendientes eliminados", true);
+      });
+    });
   }
 
   async function processPendings(items, mode = "salidas") {
@@ -1181,7 +1198,69 @@ async function detectColumnsOfEntradasSinCodigo() {
       showToast("Error al abrir modal de salida", false);
     }
   }
+function showToast(msg, ok = true, time = 4000) {
+  try {
+    // Eliminar toast existente
+    let existingToast = document.getElementById("simpleToast");
+    if (existingToast) {
+      existingToast.remove();
+    }
 
+    // Crear nuevo toast
+    let toast = document.createElement("div");
+    toast.id = "simpleToast";
+    
+    Object.assign(toast.style, {
+      position: "fixed",
+      top: "20px",
+      right: "20px",
+      padding: "16px 20px",
+      borderRadius: "8px",
+      color: "#fff",
+      zIndex: "20001",
+      fontFamily: "'Quicksand', sans-serif",
+      fontWeight: "600",
+      fontSize: "14px",
+      background: ok ? "#10b981" : "#ef4444",
+      boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
+      transition: "all 0.4s ease",
+      opacity: "0",
+      transform: "translateX(100%)",
+      maxWidth: "400px",
+      wordWrap: "break-word",
+      lineHeight: "1.4"
+    });
+
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+
+    // Forzar reflow
+    toast.offsetHeight;
+
+    // Animar entrada
+    toast.style.opacity = "1";
+    toast.style.transform = "translateX(0)";
+
+    // Limpiar timeout anterior
+    if (toast._timeout) clearTimeout(toast._timeout);
+    
+    toast._timeout = setTimeout(() => {
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(100%)";
+      
+      setTimeout(() => {
+        if (toast && toast.parentNode) {
+          toast.parentNode.removeChild(toast);
+        }
+      }, 400);
+    }, time);
+
+  } catch (e) {
+    console.error("Error en toast:", e);
+    // Fallback simple
+    alert(msg);
+  }
+}
   async function openSalidaModal(producto) {
     const existing = document.getElementById("salidaModalOverlay");
     if (existing) existing.remove();
@@ -1189,6 +1268,15 @@ async function detectColumnsOfEntradasSinCodigo() {
     const overlay = document.createElement("div");
     overlay.id = "salidaModalOverlay";
     overlay.className = "salida-overlay";
+      Object.assign(overlay.style, {
+    position: "fixed",
+    inset: "0",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(0,0,0,0.45)",
+    zIndex: "20000"  // 
+  });
 
     const modal = document.createElement("div");
     modal.className = "salida-modal";
@@ -1319,24 +1407,47 @@ async function detectColumnsOfEntradasSinCodigo() {
     }
 
     function updateConfirmState() {
-      const totalNeeded = Number(cantidadInput.value || 0);
-      if (!totalNeeded || totalNeeded <= 0) { 
-        btnConfirm.disabled = true; 
-        return; 
+  const totalNeeded = Number(cantidadInput.value || 0);
+  const distrib = getDistrib();
+  const sumaDistribuciones = distrib.reduce((total, d) => total + Number(d.qty || 0), 0);
+  const diferencia = Math.abs(sumaDistribuciones - totalNeeded);
+  
+  // Validar stock en tiempo real (solo para feedback visual)
+  let stockValido = true;
+  distrib.forEach(d => {
+    const stockDisponible = safeStock(producto, d.inv);
+    const cantidadSolicitada = Number(d.qty || 0);
+    const inputEl = d.el;
+    
+    if (inputEl) {
+      if (cantidadSolicitada > stockDisponible) {
+        inputEl.style.borderColor = "#ef4444";
+        inputEl.style.backgroundColor = "#fef2f2";
+        stockValido = false;
+      } else {
+        inputEl.style.borderColor = "";
+        inputEl.style.backgroundColor = "";
       }
-      const distrib = getDistrib();
-      const sum = distrib.reduce((s,d) => s + Number(d.qty || 0), 0);
-      const availTotal = distrib.reduce((s,d) => s + safeStock(producto, d.inv), 0);
-      if (!Number.isFinite(sum)) { 
-        btnConfirm.disabled = true; 
-        return; 
-      }
-      if (Math.abs(sum - totalNeeded) > 1e-6 || totalNeeded > availTotal) { 
-        btnConfirm.disabled = true; 
-        return; 
-      }
-      btnConfirm.disabled = false;
     }
+  });
+
+  btnConfirm.disabled = false;
+  
+  // Feedback visual en el título del botón
+  if (totalNeeded <= 0) {
+    btnConfirm.title = "Ingresa una cantidad total mayor a 0";
+  } else if (diferencia > 0.001) {
+    if (sumaDistribuciones < totalNeeded) {
+      btnConfirm.title = `Faltan ${(totalNeeded - sumaDistribuciones).toFixed(2)} unidades por distribuir`;
+    } else {
+      btnConfirm.title = `Te excediste por ${(sumaDistribuciones - totalNeeded).toFixed(2)} unidades`;
+    }
+  } else if (!stockValido) {
+    btnConfirm.title = "Hay problemas de stock en algunos inventarios";
+  } else {
+    btnConfirm.title = "Listo para agregar a pendientes";
+  }
+}
 
     cantidadInput.addEventListener("input", updateConfirmState);
     distribContainer.addEventListener("input", updateConfirmState);
@@ -1364,68 +1475,136 @@ async function detectColumnsOfEntradasSinCodigo() {
 
     setTimeout(updateConfirmState, 50);
 
-    btnConfirm.addEventListener("click", () => {
-      try {
-        const totalNeeded = Number(cantidadInput.value || 0);
-        if (!totalNeeded || totalNeeded <= 0) { 
-          showToast("Cantidad inválida", false); 
-          return; 
-        }
+   btnConfirm.addEventListener("click", () => {
+  try {
+    console.log("🎯 Botón confirmar clickeado - Iniciando validaciones completas");
+    
+    const totalNeeded = Number(cantidadInput.value || 0);
+    console.log("📊 Total requerido:", totalNeeded);
 
-        const distrib = getDistrib().filter(d => Number(d.qty) > 0);
-        if (distrib.length === 0) { 
-          showToast("Distribución inválida", false); 
-          return; 
-        }
-        if (Math.abs(distrib.reduce((s,d) => s + Number(d.qty || 0), 0) - totalNeeded) > 1e-6) { 
-          showToast("La suma por inventario debe coincidir con el total", false); 
-          return; 
-        }
+    // 🔥 VALIDACIÓN 1: Cantidad menor o igual a 0
+    if (!totalNeeded || totalNeeded <= 0) { 
+      console.log("❌ Validación 1 falló: cantidad <= 0");
+      showToast("🚫 ERROR: La cantidad total debe ser mayor a 0", false, 5000); 
+      return; 
+    }
 
-        const responsableVal = responsableField.value || "";
-        const destinatarioVal = destinatarioField.value || "";
-        const obsVal = obsField.value || "";
+    const distrib = getDistrib().filter(d => Number(d.qty) > 0);
+    console.log("📦 Distribuciones activas:", distrib);
+    
+    // 🔥 VALIDACIÓN 2: Sin distribuciones válidas
+    if (distrib.length === 0) { 
+      console.log("❌ Validación 2 falló: sin distribuciones válidas");
+      showToast("🚫 ERROR: Debes distribuir la cantidad en al menos un inventario", false, 5000); 
+      return; 
+    }
 
-        if (distrib.length === 1) {
-          const d = distrib[0];
-          const pend = {
-            PRODUCT_ID: producto.id,
-            CODIGO: producto.CODIGO,
-            DESCRIPCION: producto.DESCRIPCION,
-            UM: producto.UM,
-            INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`,
-            CANTIDAD: Number(d.qty),
-            RESPONSABLE: responsableVal,
-            DESTINATARIO: destinatarioVal,
-            OBSERVACIONES: obsVal,
-            ADDED_AT: new Date().toISOString()
-          };
-          addPendingSalida(pend);
-        } else {
-          const pend = {
-            PRODUCT_ID: producto.id,
-            CODIGO: producto.CODIGO,
-            DESCRIPCION: producto.DESCRIPCION,
-            UM: producto.UM,
-            ORIGENES: distrib.map(d => ({ INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`, CANTIDAD: Number(d.qty) })),
-            CANTIDAD: totalNeeded,
-            RESPONSABLE: responsableVal,
-            DESTINATARIO: destinatarioVal,
-            OBSERVACIONES: obsVal,
-            ADDED_AT: new Date().toISOString()
-          };
-          addPendingSalida(pend);
-        }
-
-        showToast("Salida agregada a pendientes", true);
-        renderPendingList();
-        closeOverlay();
-        
-      } catch (err) {
-        console.error("Error al agregar pendiente:", err);
-        showToast("Error al agregar pendiente", false);
+    // 🔥 VALIDACIÓN 3: Suma no coincide con el total
+    const sumaDistribuciones = distrib.reduce((total, d) => total + Number(d.qty || 0), 0);
+    const diferencia = Math.abs(sumaDistribuciones - totalNeeded);
+    console.log("🧮 Suma distribuciones:", sumaDistribuciones, "Diferencia:", diferencia);
+    
+    if (diferencia > 0.001) {
+      console.log("❌ Validación 3 falló: suma no coincide");
+      
+      if (sumaDistribuciones < totalNeeded) {
+        const faltante = (totalNeeded - sumaDistribuciones).toFixed(2);
+        showToast(`🚫 ERROR: La distribución está incompleta\n\nFaltan ${faltante} unidades por distribuir\n\nTotal requerido: ${totalNeeded}\nDistribuido: ${sumaDistribuciones}`, false, 6000);
+      } else {
+        const excedente = (sumaDistribuciones - totalNeeded).toFixed(2);
+        showToast(`🚫 ERROR: Te excediste en la distribución\n\nSobran ${excedente} unidades\n\nTotal requerido: ${totalNeeded}\nDistribuido: ${sumaDistribuciones}`, false, 6000);
       }
-    });
+      return;
+    }
+
+    // 🔥 VALIDACIÓN 4: Stock insuficiente en cualquier inventario
+    let stockInsuficiente = false;
+    let inventarioConProblema = "";
+    let stockDisponibleProblema = 0;
+    let cantidadSolicitadaProblema = 0;
+    
+    for (const d of distrib) {
+      const stockDisponible = safeStock(producto, d.inv);
+      const cantidadSolicitada = Number(d.qty);
+      console.log(`📊 Inventario ${d.inv}: Disponible=${stockDisponible}, Solicitado=${cantidadSolicitada}`);
+      
+      if (cantidadSolicitada > stockDisponible) {
+        stockInsuficiente = true;
+        inventarioConProblema = d.inv;
+        stockDisponibleProblema = stockDisponible;
+        cantidadSolicitadaProblema = cantidadSolicitada;
+        console.log("❌ Validación 4 falló: stock insuficiente en", d.inv);
+        break;
+      }
+    }
+
+    if (stockInsuficiente) {
+      showToast(
+        `🚫 STOCK INSUFICIENTE\n\nInventario: ${inventarioConProblema}\nDisponible: ${stockDisponibleProblema}\nSolicitado: ${cantidadSolicitadaProblema}\n\nNo hay suficiente stock para completar la salida`, 
+        false, 
+        6000
+      );
+      return;
+    }
+
+    // 🔥 VALIDACIÓN 5: Verificar que al menos una distribución tenga cantidad > 0
+    const tieneCantidadesValidas = distrib.some(d => Number(d.qty) > 0);
+    if (!tieneCantidadesValidas) {
+      console.log("❌ Validación 5 falló: sin cantidades válidas");
+      showToast("🚫 ERROR: Debes ingresar al menos una cantidad mayor a 0", false, 5000);
+      return;
+    }
+
+    console.log("✅ TODAS LAS VALIDACIONES PASARON - PROCESANDO PENDIENTE");
+
+    // ✅ TODAS LAS VALIDACIONES PASARON - Proceder con el guardado
+    const responsableVal = responsableField.value || "";
+    const destinatarioVal = destinatarioField.value || "";
+    const obsVal = obsField.value || "";
+
+    if (distrib.length === 1) {
+      const d = distrib[0];
+      const pend = {
+        PRODUCT_ID: producto.id,
+        CODIGO: producto.CODIGO,
+        DESCRIPCION: producto.DESCRIPCION,
+        UM: producto.UM,
+        INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`,
+        CANTIDAD: Number(d.qty),
+        RESPONSABLE: responsableVal,
+        DESTINATARIO: destinatarioVal,
+        OBSERVACIONES: obsVal,
+        ADDED_AT: new Date().toISOString()
+      };
+      addPendingSalida(pend);
+    } else {
+      const pend = {
+        PRODUCT_ID: producto.id,
+        CODIGO: producto.CODIGO,
+        DESCRIPCION: producto.DESCRIPCION,
+        UM: producto.UM,
+        ORIGENES: distrib.map(d => ({ 
+          INVENTARIO_ORIGEN: `INVENTARIO ${d.inv}`, 
+          CANTIDAD: Number(d.qty) 
+        })),
+        CANTIDAD: totalNeeded,
+        RESPONSABLE: responsableVal,
+        DESTINATARIO: destinatarioVal,
+        OBSERVACIONES: obsVal,
+        ADDED_AT: new Date().toISOString()
+      };
+      addPendingSalida(pend);
+    }
+
+    showToast("✅ Salida agregada a pendientes correctamente", true, 4000);
+    renderPendingList();
+    closeOverlay();
+    
+  } catch (err) {
+    console.error("💥 ERROR CRÍTICO al agregar pendiente:", err);
+    showToast("💥 ERROR CRÍTICO: " + err.message, false, 6000);
+  }
+});
   }
 
   // -------------------- ENTRADAS --------------------
@@ -1911,20 +2090,16 @@ async function detectColumnsOfEntradasSinCodigo() {
   }
 // ------------------- FUNCIÓN PARA ACTUALIZAR BADGE EN BOTÓN VER SALIDAS -------------------
 function updateVerSalidasBadge() {
-  const btn = document.getElementById('btnVerSalidas');
-  if (!btn) return;
+  const btnVerSalidas = document.getElementById('btnVerSalidas');
+  if (!btnVerSalidas) return;
   
-  // Asegurar que el botón tenga posición relativa para el badge
-  if (!btn.classList.contains('has-badge')) {
-    btn.classList.add('has-badge');
-    btn.style.position = 'relative';
-  }
-
-  let badge = document.getElementById('verSalidasBadge');
+  const count = getPendingSalidas().length;
+  
+  // Crear o actualizar el badge
+  let badge = btnVerSalidas.querySelector('.pending-badge');
   if (!badge) {
     badge = document.createElement('span');
-    badge.id = 'verSalidasBadge';
-    badge.className = 'ver-salidas-badge';
+    badge.className = 'pending-badge';
     badge.style.cssText = `
       position: absolute;
       top: -8px;
@@ -1941,17 +2116,16 @@ function updateVerSalidasBadge() {
       font-weight: bold;
       box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     `;
-    btn.appendChild(badge);
+    btnVerSalidas.style.position = 'relative';
+    btnVerSalidas.appendChild(badge);
   }
 
-  const count = getPendingSalidas().length;
-  if (!count || count === 0) {
+  if (count === 0) {
     badge.style.display = 'none';
-    return;
+  } else {
+    badge.style.display = 'flex';
+    badge.textContent = count > 99 ? '99+' : String(count);
   }
-
-  badge.style.display = 'flex';
-  badge.textContent = count > 99 ? '99+' : String(count);
 }
   // -------------------- SETUP & BOOT --------------------
   function setupButtonsAndEvents() {
@@ -1994,6 +2168,7 @@ function updateVerSalidasBadge() {
       await loadAllProductsWithPagination();
       renderPendingList();
       updatePendingCount();
+     updateVerSalidasBadge();
       
       // exponer funciones globales
       window.editarProducto = editarProductoById;
@@ -2009,28 +2184,368 @@ function updateVerSalidasBadge() {
     }
   });
 })();
+// -------------------- DETECCIÓN DE DESCRIPCIONES SIMILARES --------------------
 
-function renderTable(products) {
-  // ... código anterior ...
-  
-  products.forEach((p) => {
-    const i069 = getStockFromProduct(p, "I069");
-    const i078 = getStockFromProduct(p, "I078");
-    const i07f = getStockFromProduct(p, "I07F");
-    const i312 = getStockFromProduct(p, "I312");
-    const i073 = getStockFromProduct(p, "I073");
-    const stockReal = i069 + i078 + i07f + i312 + i073;
+function setupDescripcionesSimilares() {
+  const btnSimilares = document.getElementById('btnDescripcionesSimilares');
+  if (!btnSimilares) return;
 
-    // DEBUG: Mostrar en consola para un producto específico
-    if (p.CODIGO === "TU_CODIGO_PROBLEMA" || p.DESCRIPCION.includes("TU_PRODUCTO_PROBLEMA")) {
-      console.log("DEBUG Stock:", {
-        producto: p.DESCRIPCION,
-        i069, i078, i07f, i312, i073,
-        total: stockReal,
-        objetoCompleto: p
-      });
-    }
-    
-    // ... resto del código
-  });
+  btnSimilares.addEventListener('click', mostrarDescripcionesSimilares);
 }
+
+function mostrarDescripcionesSimilares() {
+  if (!allProductsFromServer || allProductsFromServer.length === 0) {
+    showToast("No hay productos cargados", false);
+    return;
+  }
+
+  const existing = document.getElementById("similaresOverlay");
+  if (existing) existing.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "similaresOverlay";
+  Object.assign(overlay.style, {
+    position: "fixed",
+    inset: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(0,0,0,0.5)",
+    zIndex: 20000,
+    padding: "20px",
+    boxSizing: "border-box"
+  });
+
+  const modal = document.createElement("div");
+  modal.className = "similares-modal";
+  Object.assign(modal.style, {
+    width: "90%",
+    maxWidth: "1200px",
+    maxHeight: "80vh",
+    background: "#fff",
+    borderRadius: "8px",
+    padding: "20px",
+    boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+    fontFamily: "'Quicksand', sans-serif",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column"
+  });
+
+  modal.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;border-bottom:1px solid #e5e7eb;padding-bottom:10px">
+      <h3 style="margin:0;color:#1f2937">Descripciones Similares y Repetidas</h3>
+      <button id="similaresCloseBtn" style="background:transparent;border:none;font-size:20px;cursor:pointer;color:#6b7280">✕</button>
+    </div>
+    
+    <div style="margin-bottom:15px">
+      <label style="display:flex;align-items:center;gap:10px">
+        <span>Umbral de similitud:</span>
+        <input type="range" id="similitudRange" min="70" max="95" value="85" style="width:200px">
+        <span id="similitudValue">85%</span>
+      </label>
+      <div style="font-size:12px;color:#6b7280;margin-top:5px">
+        Se consideran similares descripciones con más del <span id="similitudValue2">85%</span> de similitud
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-bottom:15px">
+      <button id="btnBuscarSimilares" class="btn-primary" style="flex:1">🔍 Buscar Similares</button>
+      <button id="btnExportarSimilares" class="btn-secondary">📤 Exportar</button>
+    </div>
+
+    <div style="flex:1;overflow:auto;border:1px solid #e5e7eb;border-radius:6px">
+      <div id="similaresContent" style="padding:15px;min-height:200px">
+        <div style="text-align:center;color:#6b7280;padding:40px">
+          👆 Haz clic en "Buscar Similares" para analizar las descripciones
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:15px;border-top:1px solid #e5e7eb;font-size:14px;color:#6b7280">
+      <span id="similaresStats">-</span>
+      <button id="similaresCancelBtn" class="btn-cancel">Cerrar</button>
+    </div>
+  `;
+
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  const similaresContent = modal.querySelector("#similaresContent");
+  const closeBtn = modal.querySelector("#similaresCloseBtn");
+  const cancelBtn = modal.querySelector("#similaresCancelBtn");
+  const buscarBtn = modal.querySelector("#btnBuscarSimilares");
+  const exportarBtn = modal.querySelector("#btnExportarSimilares");
+  const similitudRange = modal.querySelector("#similitudRange");
+  const similitudValue = modal.querySelector("#similitudValue");
+  const similitudValue2 = modal.querySelector("#similitudValue2");
+  const statsSpan = modal.querySelector("#similaresStats");
+
+  let gruposSimilares = [];
+
+  function actualizarValorSimilitud() {
+    const valor = similitudRange.value;
+    similitudValue.textContent = valor + '%';
+    similitudValue2.textContent = valor + '%';
+  }
+
+  similitudRange.addEventListener('input', actualizarValorSimilitud);
+  actualizarValorSimilitud();
+
+  function closeOverlay() {
+    overlay.remove();
+  }
+
+  closeBtn.addEventListener("click", closeOverlay);
+  cancelBtn.addEventListener("click", closeOverlay);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeOverlay();
+  });
+
+  window.addEventListener("keydown", function onEsc(ev) {
+    if (ev.key === "Escape") {
+      closeOverlay();
+      window.removeEventListener("keydown", onEsc);
+    }
+  });
+
+  function analizarDescripcionesSimilares() {
+    buscarBtn.disabled = true;
+    buscarBtn.textContent = "Analizando...";
+    similaresContent.innerHTML = '<div style="text-align:center;padding:20px">🔄 Analizando descripciones...</div>';
+
+    setTimeout(() => {
+      try {
+        const umbral = parseInt(similitudRange.value) / 100;
+        gruposSimilares = encontrarDescripcionesSimilares(allProductsFromServer, umbral);
+        
+        if (gruposSimilares.length === 0) {
+          similaresContent.innerHTML = `
+            <div style="text-align:center;padding:40px;color:#059669">
+              <div style="font-size:48px;margin-bottom:10px">✅</div>
+              <h3 style="margin:0 0 10px 0;color:#059669">¡Todo en orden!</h3>
+              <p>No se encontraron descripciones similares con el umbral seleccionado.</p>
+            </div>
+          `;
+          statsSpan.textContent = "0 grupos de similares encontrados";
+        } else {
+          renderGruposSimilares(gruposSimilares);
+          statsSpan.textContent = `${gruposSimilares.length} grupos de similares encontrados (${gruposSimilares.reduce((acc, grupo) => acc + grupo.productos.length, 0)} productos afectados)`;
+        }
+      } catch (error) {
+        console.error("Error analizando similares:", error);
+        similaresContent.innerHTML = '<div style="text-align:center;padding:20px;color:#dc2626">❌ Error al analizar las descripciones</div>';
+      } finally {
+        buscarBtn.disabled = false;
+        buscarBtn.textContent = "🔍 Buscar Similares";
+      }
+    }, 100);
+  }
+
+  function encontrarDescripcionesSimilares(productos, umbral = 0.85) {
+    const grupos = [];
+    const procesados = new Set();
+
+    for (let i = 0; i < productos.length; i++) {
+      const producto1 = productos[i];
+      if (procesados.has(producto1.id)) continue;
+
+      const desc1 = (producto1.DESCRIPCION || '').trim().toLowerCase();
+      if (!desc1) continue;
+
+      const similares = [producto1];
+      procesados.add(producto1.id);
+
+      for (let j = i + 1; j < productos.length; j++) {
+        const producto2 = productos[j];
+        if (procesados.has(producto2.id)) continue;
+
+        const desc2 = (producto2.DESCRIPCION || '').trim().toLowerCase();
+        if (!desc2) continue;
+
+        const similitud = similarityRatio(desc1, desc2);
+        if (similitud >= umbral) {
+          similares.push(producto2);
+          procesados.add(producto2.id);
+        }
+      }
+
+      if (similares.length > 1) {
+        similares.sort((a, b) => {
+          const descA = (a.DESCRIPCION || '').toLowerCase();
+          const descB = (b.DESCRIPCION || '').toLowerCase();
+          return descA.localeCompare(descB);
+        });
+        
+        grupos.push({
+          descripcionPrincipal: desc1,
+          productos: similares,
+          similitudPromedio: similares.reduce((sum, p, idx, arr) => {
+            if (idx === 0) return 0;
+            return sum + similarityRatio(desc1, (p.DESCRIPCION || '').toLowerCase());
+          }, 0) / (similares.length - 1)
+        });
+      }
+    }
+
+    // Ordenar grupos por similitud (mayor primero) y luego por cantidad de productos
+    grupos.sort((a, b) => {
+      if (b.productos.length !== a.productos.length) {
+        return b.productos.length - a.productos.length;
+      }
+      return b.similitudPromedio - a.similitudPromedio;
+    });
+
+    return grupos;
+  }
+
+  function renderGruposSimilares(grupos) {
+    const fragment = document.createDocumentFragment();
+    
+    grupos.forEach((grupo, grupoIndex) => {
+      const grupoDiv = document.createElement('div');
+      grupoDiv.className = 'grupo-similar';
+      grupoDiv.style.cssText = `
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        overflow: hidden;
+        background: #fafafa;
+      `;
+
+      const header = document.createElement('div');
+      header.style.cssText = `
+        background: #f3f4f6;
+        padding: 12px 15px;
+        border-bottom: 1px solid #e5e7eb;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      `;
+
+      header.innerHTML = `
+        <div>
+          <strong style="color:#374151">Grupo ${grupoIndex + 1}</strong>
+          <span style="margin-left:10px;color:#6b7280;font-size:14px">
+            ${grupo.productos.length} productos • ${Math.round(grupo.similitudPromedio * 100)}% similitud promedio
+          </span>
+        </div>
+        <button class="btn-toggle" data-grupo="${grupoIndex}" style="background:transparent;border:none;cursor:pointer;font-size:16px">▼</button>
+      `;
+
+      const contenido = document.createElement('div');
+      contenido.className = 'grupo-contenido';
+      contenido.style.cssText = `
+        padding: 15px;
+        background: white;
+      `;
+
+      grupo.productos.forEach((producto, productoIndex) => {
+        const productoDiv = document.createElement('div');
+        productoDiv.style.cssText = `
+          display: flex;
+          align-items: center;
+          padding: 8px 0;
+          border-bottom: ${productoIndex < grupo.productos.length - 1 ? '1px solid #f3f4f6' : 'none'};
+        `;
+
+        const similitud = productoIndex === 0 ? 100 : Math.round(similarityRatio(grupo.descripcionPrincipal, (producto.DESCRIPCION || '').toLowerCase()) * 100);
+
+        productoDiv.innerHTML = `
+          <div style="flex:1">
+            <div style="font-weight:500;color:#111827">${escapeHtml(producto.DESCRIPCION || '')}</div>
+            <div style="font-size:12px;color:#6b7280">
+              ID: ${producto.id} • Código: ${escapeHtml(producto.CODIGO || 'S/C')} • UM: ${escapeHtml(producto.UM || '')}
+            </div>
+          </div>
+          <div style="text-align:right;margin-left:15px">
+            <div style="font-size:12px;color:#6b7280">Similitud</div>
+            <div style="font-weight:600;color:${similitud > 90 ? '#dc2626' : similitud > 80 ? '#ea580c' : '#ca8a04'}">
+              ${similitud}%
+            </div>
+          </div>
+          <div style="margin-left:15px">
+            <button class="btn-ir-producto" data-id="${producto.id}" style="background:#3b82f6;color:white;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px">
+              Ir
+            </button>
+          </div>
+        `;
+
+        contenido.appendChild(productoDiv);
+      });
+
+      grupoDiv.appendChild(header);
+      grupoDiv.appendChild(contenido);
+      fragment.appendChild(grupoDiv);
+
+      // Event listener para toggle
+      header.querySelector('.btn-toggle').addEventListener('click', function() {
+        const estaAbierto = contenido.style.display !== 'none';
+        contenido.style.display = estaAbierto ? 'none' : 'block';
+        this.textContent = estaAbierto ? '▶' : '▼';
+      });
+
+      // Event listeners para botones "Ir"
+      contenido.querySelectorAll('.btn-ir-producto').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const productId = this.dataset.id;
+          closeOverlay();
+          // Buscar y resaltar el producto en la tabla
+          const producto = allProductsFromServer.find(p => String(p.id) === productId);
+          if (producto) {
+            // Aquí puedes implementar la lógica para resaltar/filtrar el producto
+            showToast(`Producto encontrado: ${producto.DESCRIPCION}`, true);
+            // Opcional: filtrar la tabla para mostrar solo este producto
+            searchInput.value = producto.DESCRIPCION;
+            performServerSearchWithPagination(producto.DESCRIPCION);
+          }
+        });
+      });
+    });
+
+    similaresContent.innerHTML = '';
+    similaresContent.appendChild(fragment);
+  }
+
+  function exportarSimilares() {
+    if (gruposSimilares.length === 0) {
+      showToast("No hay datos para exportar", false);
+      return;
+    }
+
+    let csvContent = "Grupo,Descripcion,ID,Codigo,UM,Similitud\n";
+    
+    gruposSimilares.forEach((grupo, grupoIndex) => {
+      grupo.productos.forEach((producto, productoIndex) => {
+        const similitud = productoIndex === 0 ? 100 : Math.round(similarityRatio(grupo.descripcionPrincipal, (producto.DESCRIPCION || '').toLowerCase()) * 100);
+        const fila = [
+          `Grupo ${grupoIndex + 1}`,
+          `"${(producto.DESCRIPCION || '').replace(/"/g, '""')}"`,
+          producto.id,
+          producto.CODIGO || 'S/C',
+          producto.UM || '',
+          `${similitud}%`
+        ].join(',');
+        
+        csvContent += fila + '\n';
+      });
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `descripciones_similares_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Exportados ${gruposSimilares.length} grupos de similares`, true);
+  }
+
+  buscarBtn.addEventListener('click', analizarDescripcionesSimilares);
+  exportarBtn.addEventListener('click', exportarSimilares);
+}
+
+
