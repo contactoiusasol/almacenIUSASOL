@@ -499,3 +499,225 @@ a:focus-visible {
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* RESET Y VARIABLES - Tema Navideño */
+:root {
+  --primary: #1e3a5f;        /* Azul marino principal */
+  --primary-dark: #152642;
+  --festive-red: #e74c3c;    /* Rojo navideño */
+  --festive-green: #27ae60;  /* Verde navideño */
+  --festive-gold: #f1c40f;   /* Dorado navideño */
+  --festive-silver: #bdc3c7; /* Plateado */
+  --snow: #ffffff;
+  --transition: all 0.3s ease;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(135deg, #1a252f 0%, #2c3e50 100%);
+  color: #333;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* EFECTO DE NIEVE CAYENDO */
+.snow-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(30, 58, 95, 0.9), rgba(26, 37, 47, 0.95));
+  z-index: -2;
+  pointer-events: none;
+}
+
+/* Copos de nieve individuales */
+.snowflake {
+  position: absolute;
+  top: -10px;
+  background: var(--snow);
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: snowfall linear infinite;
+}
+
+/* Diferentes tamaños de copos de nieve */
+.snowflake.small {
+  width: 4px;
+  height: 4px;
+  animation-duration: 8s;
+}
+
+.snowflake.medium {
+  width: 6px;
+  height: 6px;
+  animation-duration: 10s;
+}
+
+.snowflake.large {
+  width: 8px;
+  height: 8px;
+  animation-duration: 12s;
+}
+
+/* Animación de caída de nieve */
+@keyframes snowfall {
+  0% {
+    transform: translateY(0) translateX(0) rotate(0deg);
+    opacity: 0.8;
+  }
+  70% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(100vh) translateX(20px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+/* ESFERAS NAVIDEÑAS DECORATIVAS */
+.christmas-ornaments {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ornament {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  animation: ornamentSwing 4s ease-in-out infinite;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  filter: brightness(1.1);
+}
+
+.ornament::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: var(--festive-gold);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.ornament::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background: var(--festive-gold);
+  border-radius: 50%;
+}
+
+/* Colores de las esferas */
+.ornament.red {
+  background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--festive-red));
+  animation-delay: 0s;
+}
+
+.ornament.gold {
+  background: radial-gradient(circle at 30% 30%, #ffd700, var(--festive-gold));
+  animation-delay: 1s;
+}
+
+.ornament.blue {
+  background: radial-gradient(circle at 30% 30%, #74b9ff, #3498db);
+  animation-delay: 2s;
+}
+
+.ornament.green {
+  background: radial-gradient(circle at 30% 30%, #55efc4, var(--festive-green));
+  animation-delay: 3s;
+}
+
+.ornament.silver {
+  background: radial-gradient(circle at 30% 30%, #dfe6e9, var(--festive-silver));
+  animation-delay: 4s;
+}
+
+/* Animación de balanceo para las esferas */
+@keyframes ornamentSwing {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-15px) rotate(5deg);
+  }
+}
+
+/* EFECTO DE CENTELLEO PARA DECORACIONES */
+.twinkle {
+  animation: twinkle 2s infinite alternate;
+}
+
+@keyframes twinkle {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* LUCES NAVIDEÑAS PARPADEANTES */
+.christmas-lights {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+.light {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  animation: lightTwinkle 1.5s infinite alternate;
+}
+
+.light.red { background: #ff4444; animation-delay: 0s; }
+.light.green { background: #44ff44; animation-delay: 0.3s; }
+.light.blue { background: #4444ff; animation-delay: 0.6s; }
+.light.yellow { background: #ffff44; animation-delay: 0.9s; }
+
+@keyframes lightTwinkle {
+  0% { opacity: 0.3; }
+  100% { opacity: 0.8; }
+}
+
+/* CONTENEDOR PRINCIPAL (para contexto) */
+.main-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}

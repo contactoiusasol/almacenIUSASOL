@@ -1,58 +1,189 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>STOCK-VISION</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STOCK-VISION | Crear Cuenta</title>
   <link rel="stylesheet" href="../styles/styles.css">
-  <link rel="stylesheet" href="../styles/login.css">
-
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
-  <!-- JS Registro -->
-  <script type="module" src="../js/register.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <div class="login-container">
-    <h2>Crear Cuenta</h2>
-    <form id="registerForm">
-      <div class="input-group">
-        <label for="newNombre">Nombre</label>
-        <input type="text" id="newNombre" placeholder="Escribe tu nombre">
-      </div>
-      <div class="input-group">
-        <label for="newApellido">Apellido</label>
-        <input type="text" id="newApellido" placeholder="Escribe tu apellido">
-      </div>
-      <div class="input-group">
-        <label for="newemail">Correo</label>
-        <input type="email" id="newemail" placeholder="ejemplo@correo.com">
-      </div>
-      <div class="input-group">
-        <label for="newPassword">Contraseña</label>
-        <input type="password" id="newPassword" placeholder="Crea una contraseña">
-      </div>
-      <div class="input-group">
-        <label for="confirmPassword">Confirmar Contraseña</label>
-        <input type="password" id="confirmPassword" placeholder="Repite tu contraseña">
-      </div>
-      <button type="submit" class="btn">Registrarse</button>
-      <p class="register-link">
-        ¿Ya tienes cuenta? <a href="login.html">Inicia Sesión</a>
-      </p>
-    </form>
+  <!-- Fondo con efecto de nieve -->
+  <div class="snow-background"></div>
+  
+  <!-- Esferas navideñas decorativas -->
+  <div class="christmas-ornaments">
+    <div class="ornament red" style="top: 10%; left: 5%;"></div>
+    <div class="ornament gold" style="top: 15%; right: 7%;"></div>
+    <div class="ornament blue" style="bottom: 20%; left: 8%;"></div>
+    <div class="ornament green" style="bottom: 15%; right: 10%;"></div>
+    <div class="ornament silver" style="top: 25%; left: 15%;"></div>
   </div>
 
-  <!-- Modal de éxito -->
-  <div id="successModal" class="modal">
-    <div class="modal-content">
-      <h3>✅ Registro Exitoso</h3>
-      <p>Tu cuenta ha sido creada correctamente.</p>
+  <!-- Contenedor para notificaciones -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Contenedor principal -->
+  <div class="main-container">
+    <!-- Panel izquierdo - Hero -->
+    <div class="hero-panel">
+      <div class="hero-content">
+        <div class="logo">
+          <div class="logo-icon">
+            <i class="fas fa-boxes"></i>
+          </div>
+          <div class="logo-text">STOCK-VISION</div>
+        </div>
+        
+        <h1 class="hero-title">Únete a Nuestra Plataforma</h1>
+        <p class="hero-subtitle">Comienza a gestionar tu inventario con la herramienta más avanzada del mercado.</p>
+        
+        <div class="features">
+          <div class="feature">
+            <div class="feature-icon">
+              <i class="fas fa-bolt"></i>
+            </div>
+            <div class="feature-text">
+              <div class="feature-title">Configuración Rápida</div>
+              <div class="feature-desc">Comienza en minutos con nuestra configuración guiada</div>
+            </div>
+          </div>
+          
+          <div class="feature">
+            <div class="feature-icon">
+              <i class="fas fa-shield-alt"></i>
+            </div>
+            <div class="feature-text">
+              <div class="feature-title">Seguridad Garantizada</div>
+              <div class="feature-desc">Tus datos protegidos con encriptación de última generación</div>
+            </div>
+          </div>
+          
+          <div class="feature">
+            <div class="feature-icon">
+              <i class="fas fa-chart-bar"></i>
+            </div>
+            <div class="feature-text">
+              <div class="feature-title">Reportes Automatizados</div>
+              <div class="feature-desc">Genera informes detallados con un solo clic</div>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature-icon">
+              <i class="fas fa-headset"></i>
+            </div>
+            <div class="feature-text">
+              <div class="feature-title">Soporte 24/7</div>
+              <div class="feature-desc">Nuestro equipo está disponible cuando lo necesites</div>
+            </div>
+          </div>
+
+          <div class="feature">
+            <div class="feature-icon">
+              <i class="fas fa-plug"></i>
+            </div>
+            <div class="feature-text">
+              <div class="feature-title">Integraciones</div>
+              <div class="feature-desc">Conecta con tus plataformas de e-commerce favoritas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel derecho - Registro -->
+    <div class="register-panel">
+      <div class="register-header"> 
+        <h2 class="register-title">Crear Cuenta</h2>
+      </div>
+      
+      <form id="registerForm">
+        <div class="form-group">
+          <label class="form-label" for="firstName">
+            <i class="fas fa-user"></i>
+            Nombre
+          </label>
+          <div class="input-with-icon">
+            <i class="input-icon fas fa-user"></i>
+            <input type="text" id="firstName" class="form-input" placeholder="Tu nombre" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="lastName">
+            <i class="fas fa-user"></i>
+            Apellido
+          </label>
+          <div class="input-with-icon">
+            <i class="input-icon fas fa-user"></i>
+            <input type="text" id="lastName" class="form-input" placeholder="Tu apellido" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="email">
+            <i class="fas fa-envelope"></i>
+            Correo Electrónico
+          </label>
+          <div class="input-with-icon">
+            <i class="input-icon fas fa-envelope"></i>
+            <input type="email" id="email" class="form-input" placeholder="cruzthail690@gmail.com" required>
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="password">
+            <i class="fas fa-lock"></i>
+            Contraseña
+          </label>
+          <div class="input-with-icon">
+            <i class="input-icon fas fa-lock"></i>
+            <input type="password" id="password" class="form-input" placeholder="······" required>
+            <button type="button" class="password-toggle" id="togglePassword">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+          <div class="password-strength weak">Débil</div>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label" for="confirmPassword">
+            <i class="fas fa-lock"></i>
+            Confirmar Contraseña
+          </label>
+          <div class="input-with-icon">
+            <i class="input-icon fas fa-lock"></i>
+            <input type="password" id="confirmPassword" class="form-input" placeholder="······" required>
+            <button type="button" class="password-toggle" id="toggleConfirmPassword">
+              <i class="fas fa-eye"></i>
+            </button>
+          </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+          <i class="fas fa-user-plus"></i>
+          <span class="btn-text">Crear Cuenta</span>
+        </button>
+        
+        <div class="divider">
+          <span>¿Ya tienes una cuenta?</span>
+        </div>
+        
+        <a href="login.html" class="btn btn-secondary">
+          <i class="fas fa-sign-in-alt"></i>
+          Iniciar Sesión
+        </a>
+      </form>
+      
+      <div class="footer">
+        <p>&copy; 2025 STOCK-VISION. ¡Felices Fiestas! 🎄</p>
+      </div>
     </div>
   </div>
 
-  <!-- Contenedor de notificaciones -->
-  <div id="toastContainer" class="toast-container"></div>
+  <!-- Cargar Supabase desde CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/register.js"></script>
 </body>
 </html>

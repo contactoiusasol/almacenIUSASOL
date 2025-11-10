@@ -1,135 +1,764 @@
-/* Contenedor del login */
-.login-container {
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  padding: 2rem;
-  width: 350px;
-  border-radius: 15px;
-  box-shadow: 0px 20px 35px rgba(0,0,0,0.5);
-  text-align: center;
-
-  animation: float 4s ease-in-out infinite;
+/* RESET Y VARIABLES - Tema Navideño con Azul Marino */
+:root {
+  --primary: #1e3a5f;        /* Azul marino principal */
+  --primary-dark: #152642;
+  --primary-light: #2a4a7a;
+  --secondary: #e67e22;      /* Naranja acento */
+  --accent: #3498db;         /* Azul claro */
+  --festive-red: #e74c3c;    /* Rojo navideño */
+  --festive-green: #27ae60;  /* Verde navideño */
+  --festive-gold: #f1c40f;   /* Dorado navideño */
+  --festive-silver: #bdc3c7; /* Plateado */
+  --dark: #2c3e50;
+  --darker: #1a252f;
+  --light: #f8f9fa;
+  --gray: #95a5a6;
+  --success: #27ae60;
+  --error: #e74c3c;
+  --warning: #f39c12;
+  --snow: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --border-radius: 12px;
+  --transition: all 0.3s ease;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
-@keyframes float {
-  0% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
-  100% { transform: translateY(0px); }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
-h2 {
-  color: #fff;
-}
-
-.input-group {
-  margin-bottom: 1.2rem;
-  text-align: left;
-}
-
-label {
-  font-size: 0.9rem;
-  color: #eee;
-}
-
-.register-link {
-  margin-top: 1rem;
-  font-size: 0.9rem;
-  color: #ddd;
-}
-
-.register-link a {
-  color: #1e90ff;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.register-link a:hover {
-  text-decoration: underline;
-}
-
-/* ---------------- MODAL ---------------- */
-.modal {
-  display: none;
-  position: fixed;
-  z-index: 9999;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0,0,0,0.6);
-  justify-content: center;
+body {
+  background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+  color: #333;
+  min-height: 100vh;
+  display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
-.modal-content {
-  background: #fff;
-  padding: 2rem;
-  border-radius: 12px;
-  width: 300px;
+/* FONDO CON EFECTO DE NIEVE */
+.snow-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(rgba(30, 58, 95, 0.9), rgba(26, 37, 47, 0.95));
+  z-index: -2;
+}
+
+.snow-background::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 40px 70px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 90px 40px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 130px 80px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 160px 30px, var(--snow) 50%, transparent 50%),
+    radial-gradient(3px 3px at 50px 160px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 110px 60px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 140px 110px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 180px 70px, var(--snow) 50%, transparent 50%);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  animation: snowFall 10s linear infinite;
+  opacity: 0.6;
+}
+
+@keyframes snowFall {
+  0% {
+    transform: translateY(-100px);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* ESFERAS NAVIDEÑAS */
+.christmas-ornaments {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ornament {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  animation: ornamentSwing 4s ease-in-out infinite;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ornament::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: var(--festive-gold);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.ornament::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background: var(--festive-gold);
+  border-radius: 50%;
+}
+
+.ornament.red {
+  background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--festive-red));
+  animation-delay: 0s;
+}
+
+.ornament.gold {
+  background: radial-gradient(circle at 30% 30%, #ffd700, var(--festive-gold));
+  animation-delay: 1s;
+}
+
+.ornament.blue {
+  background: radial-gradient(circle at 30% 30%, #74b9ff, var(--accent));
+  animation-delay: 2s;
+}
+
+.ornament.green {
+  background: radial-gradient(circle at 30% 30%, #55efc4, var(--festive-green));
+  animation-delay: 3s;
+}
+
+.ornament.silver {
+  background: radial-gradient(circle at 30% 30%, #dfe6e9, var(--festive-silver));
+  animation-delay: 4s;
+}
+
+@keyframes ornamentSwing {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+/* MENSAJE HAPPY NEW YEAR */
+.new-year-message {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  z-index: 10;
+  animation: messagePulse 3s infinite alternate;
+}
+
+.message-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  box-shadow: 0px 10px 25px rgba(0,0,0,0.5);
-  animation: pop 0.3s ease;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-@keyframes pop {
-  from { transform: scale(0.8); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+.message-content span {
+  font-weight: bold;
+  font-size: 1.2rem;
+  line-height: 1.2;
 }
 
-#closeModal {
-  margin-top: 1rem;
-  padding: 0.6rem 1rem;
+.happy {
+  color: var(--festive-red);
+}
+
+.new {
+  color: var(--festive-green);
+}
+
+.year {
+  color: var(--festive-gold);
+}
+
+@keyframes messagePulse {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+/* CONTENEDOR PRINCIPAL */
+.main-container {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  min-height: 700px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  position: relative;
+  z-index: 1;
+}
+
+/* PANEL IZQUIERDO - HERO */
+.hero-panel {
+  flex: 1;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 20%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 20%);
+  background-size: 50px 50px;
+  animation: gentleFloat 20s infinite linear;
+}
+
+@keyframes gentleFloat {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-50px) rotate(360deg); }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.logo-icon {
+  font-size: 2.5rem;
+  margin-right: 15px;
+  background: rgba(255, 255, 255, 0.15);
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  animation: spin 10s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.logo-text {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.hero-title {
+  font-size: 2.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 40px;
+  max-width: 90%;
+  line-height: 1.6;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transition: var(--transition);
+  border-left: 4px solid var(--festive-gold);
+}
+
+.feature:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(5px);
+}
+
+.feature-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.feature-text {
+  flex: 1;
+}
+
+.feature-title {
+  font-weight: 600;
+  margin-bottom: 5px;
+  font-size: 1rem;
+}
+
+.feature-desc {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+/* PANEL DERECHO - LOGIN */
+.login-panel {
+  flex: 0 0 450px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: white;
+  position: relative;
+}
+
+.festive-decoration {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--festive-gold);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dark);
+  font-size: 1.2rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  animation: twinkle 2s infinite alternate;
+}
+
+@keyframes twinkle {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.1); }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding-top: 20px;
+}
+
+.login-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--dark);
+  position: relative;
+}
+
+.login-title::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--festive-red));
+  border-radius: 2px;
+}
+
+.login-subtitle {
+  color: var(--gray);
+}
+
+/* FORMULARIO */
+.form-group {
+  margin-bottom: 25px;
+  position: relative;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--dark);
+}
+
+.form-label i {
+  color: var(--primary);
+}
+
+.input-with-icon {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray);
+  z-index: 2;
+}
+
+.form-input {
+  width: 100%;
+  padding: 15px 15px 15px 45px;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  color: var(--dark);
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
   border: none;
-  background: #1e90ff;
-  color: #fff;
-  border-radius: 8px;
+  color: var(--gray);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.password-toggle:hover {
+  color: var(--primary);
+}
+
+.form-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  font-size: 0.9rem;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--dark);
+  position: relative;
+  padding-left: 30px;
+}
+
+.checkbox-container input {
+  position: absolute;
+  opacity: 0;
   cursor: pointer;
 }
-#closeModal:hover {
-  background: #0d6efd;
+
+.checkmark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 20px;
+  width: 20px;
+  background-color: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 4px;
+  transition: var(--transition);
 }
-/* Contenedor de toasts */
+
+.checkbox-container input:checked ~ .checkmark {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox-container input:checked ~ .checkmark:after {
+  display: block;
+}
+
+.forgot-link {
+  color: var(--primary);
+  text-decoration: none;
+  transition: var(--transition);
+  font-weight: 500;
+}
+
+.forgot-link:hover {
+  color: var(--secondary);
+}
+
+/* BOTONES */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(30, 58, 95, 0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.btn-secondary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-loading {
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.btn-loading::after {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: auto;
+  border: 2px solid transparent;
+  border-top-color: white;
+  border-radius: 50%;
+  animation: button-loading-spinner 1s ease infinite;
+}
+
+@keyframes button-loading-spinner {
+  from { transform: rotate(0turn); }
+  to { transform: rotate(1turn); }
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 25px 0;
+  color: var(--gray);
+  font-size: 0.9rem;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e9ecef;
+}
+
+.divider::before {
+  margin-right: 15px;
+}
+
+.divider::after {
+  margin-left: 15px;
+}
+
+/* FOOTER */
+.footer {
+  margin-top: 30px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+  color: var(--gray);
+  font-size: 0.8rem;
+}
+
+/* TOAST NOTIFICATIONS */
 .toast-container {
   position: fixed;
   top: 20px;
-  left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  z-index: 9999;
+  right: 20px;
+  z-index: 1000;
 }
 
-/* Estilo base de los toasts */
 .toast {
-  min-width: 250px;
-  padding: 12px 18px;
-  border-radius: 8px;
-  color: #fff;
-  font-weight: 500;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: white;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(400px);
   opacity: 0;
-  transform: translateX(-100%);
-  animation: slideIn 0.5s forwards, fadeOut 0.5s 2.5s forwards; /* Entrada y salida */
-  cursor: pointer;
-  transition: transform 0.2s;
+  transition: var(--transition);
+  max-width: 350px;
 }
 
-/* Hover: pequeño rebote */
-.toast:hover {
-  transform: scale(1.05);
+.toast.show {
+  transform: translateX(0);
+  opacity: 1;
 }
 
-/* Animaciones */
-@keyframes slideIn {
-  0% { opacity: 0; transform: translateX(-100%); }
-  60% { opacity: 1; transform: translateX(10px); }
-  100% { opacity: 1; transform: translateX(0); }
+.toast-success {
+  background: var(--success);
+  border-left: 4px solid #219653;
 }
 
-@keyframes fadeOut {
-  to { opacity: 0; transform: translateX(-20px); }
+.toast-error {
+  background: var(--error);
+  border-left: 4px solid #c0392b;
 }
 
-/* Colores según tipo */
-.toast.success { background: linear-gradient(135deg, #4caf50, #28a745); }
-.toast.error { background: linear-gradient(135deg, #e53935, #dc3545); }
-.toast.warning { background: linear-gradient(135deg, #8eabe9, #573ab7); color: #000; }
+.toast-warning {
+  background: var(--warning);
+  border-left: 4px solid #e67e22;
+}
+
+.toast i {
+  font-size: 1.2rem;
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .main-container {
+    flex-direction: column;
+    max-width: 500px;
+  }
+  
+  .hero-panel {
+    padding: 30px;
+  }
+  
+  .login-panel {
+    flex: 1;
+  }
+  
+  .new-year-message {
+    top: 10px;
+    right: 10px;
+  }
+  
+  .message-content span {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 576px) {
+  body {
+    padding: 10px;
+  }
+  
+  .main-container {
+    min-height: auto;
+  }
+  
+  .hero-panel, .login-panel {
+    padding: 25px;
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .form-options {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .toast {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+  
+  .ornament {
+    width: 20px;
+    height: 20px;
+  }
+}

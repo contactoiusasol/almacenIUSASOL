@@ -1,55 +1,604 @@
-/* Reset y estilos base */
+/* RESET Y VARIABLES - Tema Navideño con Azul Marino */
+:root {
+  --primary: #1e3a5f;        /* Azul marino principal */
+  --primary-dark: #152642;
+  --primary-light: #2a4a7a;
+  --secondary: #e67e22;      /* Naranja acento */
+  --accent: #3498db;         /* Azul claro */
+  --festive-red: #e74c3c;    /* Rojo navideño */
+  --festive-green: #27ae60;  /* Verde navideño */
+  --festive-gold: #f1c40f;   /* Dorado navideño */
+  --festive-silver: #bdc3c7; /* Plateado */
+  --dark: #2c3e50;
+  --darker: #1a252f;
+  --light: #f8f9fa;
+  --gray: #95a5a6;
+  --success: #27ae60;
+  --error: #e74c3c;
+  --warning: #f39c12;
+  --snow: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.95);
+  --border-radius: 12px;
+  --transition: all 0.3s ease;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
 body {
+  background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+  color: #333;
+  min-height: 100vh;
   display: flex;
-  height: 100vh;
-  justify-content: center;
   align-items: center;
-  background: url("../img/almacen.jpg") no-repeat center center/cover;
-  background-size: cover;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Títulos */
-h2 {
-  margin-bottom: 1.5rem;
-  text-shadow: 1px 1px 5px rgba(0,0,0,0.4);
-}
-
-/* Inputs */
-input {
+/* FONDO CON EFECTO DE NIEVE */
+.snow-background {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  padding: 0.8rem;
-  margin-top: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 10px;
-  outline: none;
-  transition: 0.3s;
+  height: 100%;
+  background: 
+    linear-gradient(rgba(30, 58, 95, 0.9), rgba(26, 37, 47, 0.95));
+  z-index: -2;
 }
 
-input:focus {
-  border-color: #1e90ff;
-  box-shadow: 0px 0px 5px rgba(30,144,255,0.5);
+.snow-background::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 40px 70px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 90px 40px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 130px 80px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 160px 30px, var(--snow) 50%, transparent 50%),
+    radial-gradient(3px 3px at 50px 160px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 110px 60px, var(--snow) 50%, transparent 50%),
+    radial-gradient(1px 1px at 140px 110px, var(--snow) 50%, transparent 50%),
+    radial-gradient(2px 2px at 180px 70px, var(--snow) 50%, transparent 50%);
+  background-repeat: repeat;
+  background-size: 200px 200px;
+  animation: snowFall 10s linear infinite;
+  opacity: 0.6;
 }
 
-/* Botón principal */
-.btn {
+@keyframes snowFall {
+  0% {
+    transform: translateY(-100px);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+/* ESFERAS NAVIDEÑAS */
+.christmas-ornaments {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 100%;
-  padding: 0.9rem;
-  background: #1e90ff;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ornament {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  animation: ornamentSwing 4s ease-in-out infinite;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.ornament::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 10px;
+  height: 10px;
+  background: var(--festive-gold);
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
+.ornament::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background: var(--festive-gold);
+  border-radius: 50%;
+}
+
+.ornament.red {
+  background: radial-gradient(circle at 30% 30%, #ff6b6b, var(--festive-red));
+  animation-delay: 0s;
+}
+
+.ornament.gold {
+  background: radial-gradient(circle at 30% 30%, #ffd700, var(--festive-gold));
+  animation-delay: 1s;
+}
+
+.ornament.blue {
+  background: radial-gradient(circle at 30% 30%, #74b9ff, var(--accent));
+  animation-delay: 2s;
+}
+
+.ornament.green {
+  background: radial-gradient(circle at 30% 30%, #55efc4, var(--festive-green));
+  animation-delay: 3s;
+}
+
+.ornament.silver {
+  background: radial-gradient(circle at 30% 30%, #dfe6e9, var(--festive-silver));
+  animation-delay: 4s;
+}
+
+@keyframes ornamentSwing {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+/* CONTENEDOR PRINCIPAL */
+.main-container {
+  display: flex;
+  width: 100%;
+  max-width: 1200px;
+  min-height: 700px;
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  position: relative;
+  z-index: 1;
+}
+
+/* PANEL IZQUIERDO - HERO */
+.hero-panel {
+  flex: 1;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
   color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 20%),
+    radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 20%);
+  background-size: 50px 50px;
+  animation: gentleFloat 20s infinite linear;
+}
+
+@keyframes gentleFloat {
+  0% { transform: translateY(0) rotate(0deg); }
+  100% { transform: translateY(-50px) rotate(360deg); }
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.logo-icon {
+  font-size: 2.5rem;
+  margin-right: 15px;
+  background: rgba(255, 255, 255, 0.15);
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  animation: spin 10s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.logo-text {
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.hero-title {
+  font-size: 2.3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 20px;
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  margin-bottom: 40px;
+  max-width: 90%;
+  line-height: 1.6;
+}
+
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.feature {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transition: var(--transition);
+  border-left: 4px solid var(--festive-gold);
+}
+
+.feature:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(5px);
+}
+
+.feature-icon {
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.feature-text {
+  flex: 1;
+}
+
+.feature-title {
+  font-weight: 600;
+  margin-bottom: 5px;
   font-size: 1rem;
+}
+
+.feature-desc {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  line-height: 1.4;
+}
+
+/* PANEL DERECHO - REGISTRO */
+.register-panel {
+  flex: 0 0 450px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: white;
+  position: relative;
+  overflow-y: auto;
+  max-height: 100vh;
+}
+
+.festive-decoration {
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--festive-gold);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--dark);
+  font-size: 1.2rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  animation: twinkle 2s infinite alternate;
+}
+
+@keyframes twinkle {
+  0% { transform: translateX(-50%) scale(1); }
+  100% { transform: translateX(-50%) scale(1.1); }
+}
+
+.register-header {
+  text-align: center;
+  margin-bottom: 30px;
+  padding-top: 20px;
+}
+
+.register-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--dark);
+  position: relative;
+}
+
+.register-title::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--primary), var(--festive-red));
+  border-radius: 2px;
+}
+
+.register-subtitle {
+  color: var(--gray);
+  margin-bottom: 10px;
+}
+
+/* FORMULARIO */
+.form-group {
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  color: var(--dark);
+}
+
+.form-label i {
+  color: var(--primary);
+}
+
+.input-with-icon {
+  position: relative;
+}
+
+.input-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray);
+  z-index: 2;
+}
+
+.form-input {
+  width: 100%;
+  padding: 15px 15px 15px 45px;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 10px;
+  color: var(--dark);
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.password-strength {
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.weak {
+  color: var(--error);
+}
+
+.password-toggle {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--gray);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.password-toggle:hover {
+  color: var(--primary);
+}
+
+/* BOTONES */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 15px;
   border: none;
   border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: 0.3s;
+  transition: var(--transition);
+  text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.btn:hover {
-  background: #00c9a7;
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(30, 58, 95, 0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.btn-secondary:hover {
+  background: var(--primary);
+  color: white;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 25px 0;
+  color: var(--gray);
+  font-size: 0.9rem;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #e9ecef;
+}
+
+.divider::before {
+  margin-right: 15px;
+}
+
+.divider::after {
+  margin-left: 15px;
+}
+
+/* FOOTER */
+.footer {
+  margin-top: 30px;
+  text-align: center;
+  padding-top: 20px;
+  border-top: 1px solid #e9ecef;
+  color: var(--gray);
+  font-size: 0.8rem;
+}
+
+/* TOAST NOTIFICATIONS */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.toast {
+  padding: 15px 20px;
+  border-radius: 10px;
+  color: white;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateX(400px);
+  opacity: 0;
+  transition: var(--transition);
+  max-width: 350px;
+}
+
+.toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.toast-success {
+  background: var(--success);
+  border-left: 4px solid #219653;
+}
+
+.toast-error {
+  background: var(--error);
+  border-left: 4px solid #c0392b;
+}
+
+.toast-warning {
+  background: var(--warning);
+  border-left: 4px solid #e67e22;
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .main-container {
+    flex-direction: column;
+    max-width: 500px;
+  }
+  
+  .hero-panel {
+    padding: 30px;
+  }
+  
+  .register-panel {
+    flex: 1;
+  }
+}
+
+@media (max-width: 576px) {
+  body {
+    padding: 10px;
+  }
+  
+  .main-container {
+    min-height: auto;
+  }
+  
+  .hero-panel, .register-panel {
+    padding: 25px;
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
 }
