@@ -345,13 +345,15 @@ async function init() {
   // Inicial render
   renderTabla();
 
-  // Escuchar cambios de sesión Supabase
-  supabase.auth.onAuthStateChange((event) => {
-    if (event === "SIGNED_OUT" || event === "SIGNED_IN") {
+  // Escuchar cambios de sesión Supabase: solo borrar al SIGNED_OUT
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") {
       localStorage.removeItem("movimientoMaterial");
       lista = [];
       renderTabla();
-      console.log("✅ Lista limpiada por cambio de sesión:", event);
+      console.log("✅ Lista limpiada por SIGNED_OUT");
+      mostrarAlerta("Sesión cerrada — lista local eliminada", "success");
     }
   });
+
 }
