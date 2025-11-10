@@ -4,18 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>STOCK-VISION | Sistema de Gestión de Almacén</title>
+
+  <meta name="author" content="Thalía Cruz López">
+  <meta name="copyright" content="© 2025 STOCK-VISION. Todos los derechos reservados.">
+
   <link rel="stylesheet" href="../styles/login.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-  <!-- Fondo con efecto de nieve -->
   <div class="snow-background">
     <div class="snow-container"></div>
   </div>
-   <!-- Fondo con efecto de nieve -->
-  <div class="snow-background"></div>
-  
-  <!-- Esferas navideñas decorativas -->
+
   <div class="christmas-ornaments">
     <div class="ornament red" style="top: 10%; left: 5%;"></div>
     <div class="ornament gold" style="top: 15%; right: 7%;"></div>
@@ -24,36 +24,28 @@
     <div class="ornament silver" style="top: 25%; left: 15%;"></div>
   </div>
 
-  <!-- Contenedor principal -->
   <div class="main-container">
-    <!-- Panel izquierdo - Hero -->
     <div class="hero-panel">
       <div class="hero-content">
         <div class="logo">
-          <div class="logo-icon">
-            <i class="fas fa-snowflake"></i>
-          </div>
+          <div class="logo-icon"><i class="fas fa-snowflake"></i></div>
           <div class="logo-text">STOCK-VISION</div>
         </div>
         
-        <h1 class="hero-title">Control de almacén  IUSASOL</h1>
-        <p class="hero-subtitle">Sistema especializado para gestión de inventarios  y optimización de:</p>
+        <h1 class="hero-title">Control de almacén IUSASOL</h1>
+        <p class="hero-subtitle">Sistema especializado para gestión de inventarios y optimización de:</p>
         
         <div class="features">
           <div class="feature">
-            <div class="feature-icon">
-              <i class="fas fa-gift"></i>
-            </div>
+            <div class="feature-icon"><i class="fas fa-gift"></i></div>
             <div class="feature-text">
               <div class="feature-title">Gestión de productos</div>
-              <div class="feature-desc">Control de  inventarios con actualizaciones instantáneas.</div>
+              <div class="feature-desc">Control de inventarios con actualizaciones instantáneas.</div>
             </div>
           </div>
           
           <div class="feature">
-            <div class="feature-icon">
-              <i class="fas fa-chart-line"></i>
-            </div>
+            <div class="feature-icon"><i class="fas fa-chart-line"></i></div>
             <div class="feature-text">
               <div class="feature-title">Control de remisiones</div>
               <div class="feature-desc">Control activo de remisiones en tiempo real.</div>
@@ -61,24 +53,19 @@
           </div>
           
           <div class="feature">
-            <div class="feature-icon">
-              <i class="fas fa-tree"></i>
-            </div>
+            <div class="feature-icon"><i class="fas fa-tree"></i></div>
             <div class="feature-text">
               <div class="feature-title">Control de inventarios</div>
-              <div class="feature-desc">Actualizacion de inventarios por codigo y descripcion.</div>
+              <div class="feature-desc">Actualización de inventarios por código y descripción.</div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Panel derecho - Login -->
     <div class="login-panel">
       <div class="login-header">
-        <div class="christmas-decoration">
-          <i class="fas fa-star"></i>
-        </div>
+        <div class="christmas-decoration"><i class="fas fa-star"></i></div>
         <h2 class="login-title">Iniciar Sesión</h2>
         <p class="login-subtitle">Accede a tu panel de control.</p>
       </div>
@@ -86,8 +73,7 @@
       <form id="loginForm">
         <div class="form-group">
           <label class="form-label" for="loginEmail">
-            <i class="fas fa-envelope"></i>
-            Correo Electrónico
+            <i class="fas fa-envelope"></i> Correo Electrónico
           </label>
           <div class="input-with-icon">
             <i class="input-icon fas fa-envelope"></i>
@@ -97,13 +83,12 @@
         
         <div class="form-group">
           <label class="form-label" for="loginPassword">
-            <i class="fas fa-lock"></i>
-            Contraseña
+            <i class="fas fa-lock"></i> Contraseña
           </label>
           <div class="input-with-icon">
             <i class="input-icon fas fa-lock"></i>
             <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
-            <button type="button" class="password-toggle" id="togglePassword">
+            <button type="button" class="password-toggle" id="togglePassword" aria-label="Mostrar contraseña">
               <i class="fas fa-eye"></i>
             </button>
           </div>
@@ -119,28 +104,36 @@
         </div>
         
         <button type="submit" class="btn btn-primary" id="submitBtn">
-          <i class="fas fa-sign-in-alt"></i>
-          <span class="btn-text">Iniciar Sesión</span>
+          <i class="fas fa-sign-in-alt"></i> <span class="btn-text">Iniciar Sesión</span>
         </button>
         
-        <div class="divider">
-          <span>¿Eres nuevo?</span>
-        </div>
+        <div class="divider"><span>¿Eres nuevo?</span></div>
         
         <a href="../html/register.html" class="btn btn-secondary">
-          <i class="fas fa-user-plus"></i>
-          Crear Cuenta
+          <i class="fas fa-user-plus"></i> Crear Cuenta
         </a>
       </form>
       
-      <div class="footer">
-        <p>&copy; 2025 STOCK-VISION. ¡Felices Fiestas! 🎄</p>
+      <div class="panel-footer" style="text-align:center;margin-top:18px;font-size:12px;color:#6b8192;">
+        © 2025 STOCK-VISION.
       </div>
     </div>
   </div>
 
-  <!-- Contenedor para notificaciones -->
   <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Firma discreta -->
+  <div style="
+    position:fixed;
+    bottom:4px;
+    right:12px;
+    font-size:10px;
+    color:#ffffff;
+    opacity:0.12;
+    user-select:none;
+    pointer-events:none;">
+    © 2025 STOCK-VISION | Desarrollado por Thalía C. L.
+  </div>
 
   <script src="../js/login.js"></script>
 </body>

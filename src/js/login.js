@@ -172,6 +172,7 @@ function setupForm() {
   console.log('STOCK-VISION Navideño cargado correctamente');
 }
 
+
 // --- HANDLER FORM ---
 async function handleLogin(e) {
   e.preventDefault();

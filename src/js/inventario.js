@@ -85,6 +85,12 @@ function showToast(message, success = true) {
     setTimeout(() => { toast.textContent = ""; }, 280);
   }, 3000);
 }
+(function() {
+  const copyright = "© 2025 STOCK-VISION | Desarrollado por Thalía Cruz López";
+  const encoded = btoa(copyright); // codifica la firma
+  console.log(atob(encoded)); // se puede ver si inspeccionas la consola
+})();
+
 
 // ------------------- Confirmación personalizada -------------------
 function showConfirm(message, onConfirm) {
