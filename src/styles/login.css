@@ -39,7 +39,7 @@ body {
   justify-content: center;
   padding: 20px;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* FONDO CON EFECTO DE NIEVE */
@@ -86,7 +86,7 @@ body {
   }
 }
 
-/* ESFERAS NAVIDEÑAS */
+/* ESFERAS NAVIDEÑAS - OCULTAR EN MÓVIL */
 .christmas-ornaments {
   position: fixed;
   top: 0;
@@ -703,62 +703,268 @@ body {
   font-size: 1.2rem;
 }
 
-/* RESPONSIVE */
+/* =============================== */
+/* DISEÑO MEJORADO PARA MÓVILES */
+/* =============================== */
+
 @media (max-width: 992px) {
+  body {
+    padding: 15px;
+    align-items: flex-start;
+    min-height: 100vh;
+    overflow-y: auto;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  }
+
+  .snow-background,
+  .christmas-ornaments,
+  .new-year-message {
+    display: none;
+  }
+
   .main-container {
     flex-direction: column;
-    max-width: 500px;
+    max-width: 100%;
+    min-height: auto;
+    margin: 0;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   }
-  
+
   .hero-panel {
-    padding: 30px;
+    padding: 30px 25px;
+    border-radius: 20px 20px 0 0;
+    text-align: center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   }
-  
+
+  .logo {
+    justify-content: center;
+    margin-bottom: 25px;
+  }
+
+  .logo-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 2rem;
+  }
+
+  .logo-text {
+    font-size: 1.6rem;
+  }
+
+  .hero-title {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    margin-bottom: 30px;
+    max-width: 100%;
+  }
+
+  .features {
+    gap: 15px;
+  }
+
+  .feature {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .feature-title {
+    font-size: 0.95rem;
+  }
+
+  .feature-desc {
+    font-size: 0.85rem;
+  }
+
   .login-panel {
     flex: 1;
+    padding: 30px 25px;
+    border-radius: 0 0 20px 20px;
   }
-  
-  .new-year-message {
-    top: 10px;
-    right: 10px;
-  }
-  
-  .message-content span {
+
+  .festive-decoration {
+    top: -15px;
+    width: 35px;
+    height: 35px;
     font-size: 1rem;
+  }
+
+  .login-header {
+    margin-bottom: 30px;
+  }
+
+  .login-title {
+    font-size: 1.6rem;
+  }
+
+  .form-input {
+    padding: 14px 14px 14px 45px;
+    font-size: 16px; /* Previene zoom en iOS */
+  }
+
+  .btn {
+    padding: 14px;
+    font-size: 16px; /* Previene zoom en iOS */
   }
 }
 
 @media (max-width: 576px) {
   body {
     padding: 10px;
+    background: var(--primary-dark);
   }
-  
+
   .main-container {
-    min-height: auto;
+    border-radius: 16px;
+    margin: 5px 0;
   }
-  
-  .hero-panel, .login-panel {
-    padding: 25px;
+
+  .hero-panel {
+    padding: 25px 20px;
+    border-radius: 16px 16px 0 0;
   }
-  
+
+  .logo {
+    margin-bottom: 20px;
+  }
+
+  .logo-text {
+    font-size: 1.4rem;
+  }
+
   .hero-title {
-    font-size: 2rem;
+    font-size: 1.5rem;
   }
-  
+
+  .hero-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .login-panel {
+    padding: 25px 20px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .login-title {
+    font-size: 1.4rem;
+  }
+
+  .form-group {
+    margin-bottom: 20px;
+  }
+
   .form-options {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px;
+    gap: 12px;
+    margin-bottom: 20px;
   }
-  
-  .toast {
-    right: 10px;
-    left: 10px;
-    max-width: none;
+
+  .forgot-link {
+    align-self: flex-end;
   }
-  
-  .ornament {
-    width: 20px;
-    height: 20px;
+
+  .divider {
+    margin: 20px 0;
+  }
+
+  .footer {
+    margin-top: 20px;
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .hero-panel,
+  .login-panel {
+    padding: 20px 15px;
+  }
+
+  .logo {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    margin-right: 0;
+  }
+
+  .feature {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .feature-icon {
+    align-self: center;
+  }
+
+  .hero-title {
+    font-size: 1.3rem;
+  }
+
+  .login-title {
+    font-size: 1.3rem;
+  }
+}
+
+/* Mejoras específicas para orientación landscape en móviles */
+@media (max-height: 600px) and (max-width: 992px) {
+  body {
+    padding: 10px;
+  }
+
+  .main-container {
+    max-height: 95vh;
+  }
+
+  .hero-panel {
+    padding: 20px;
+    max-height: 45vh;
+    overflow-y: auto;
+  }
+
+  .login-panel {
+    padding: 20px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .features {
+    gap: 10px;
+  }
+
+  .feature {
+    padding: 10px;
+  }
+}
+
+/* Scrollbars suaves para móviles */
+@media (max-width: 992px) {
+  .hero-panel::-webkit-scrollbar,
+  .login-panel::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .hero-panel::-webkit-scrollbar-track,
+  .login-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .hero-panel::-webkit-scrollbar-thumb,
+  .login-panel::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 3px;
   }
 }

@@ -39,7 +39,7 @@ body {
   justify-content: center;
   padding: 20px;
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* FONDO CON EFECTO DE NIEVE */
@@ -569,36 +569,279 @@ body {
   border-left: 4px solid #e67e22;
 }
 
-/* RESPONSIVE */
+/* =============================== */
+/* DISEÑO MEJORADO PARA MÓVILES - REGISTRO */
+/* =============================== */
+
 @media (max-width: 992px) {
+  body {
+    padding: 15px;
+    align-items: flex-start;
+    min-height: 100vh;
+    overflow-y: auto;
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  }
+
+  .snow-background,
+  .christmas-ornaments {
+    display: none;
+  }
+
   .main-container {
     flex-direction: column;
-    max-width: 500px;
+    max-width: 100%;
+    min-height: auto;
+    margin: 0;
+    border-radius: 20px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
   }
-  
+
   .hero-panel {
-    padding: 30px;
+    padding: 30px 25px;
+    border-radius: 20px 20px 0 0;
+    text-align: center;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
   }
-  
+
+  .logo {
+    justify-content: center;
+    margin-bottom: 25px;
+  }
+
+  .logo-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 2rem;
+  }
+
+  .logo-text {
+    font-size: 1.6rem;
+  }
+
+  .hero-title {
+    font-size: 1.8rem;
+    margin-bottom: 15px;
+  }
+
+  .hero-subtitle {
+    font-size: 1rem;
+    margin-bottom: 30px;
+    max-width: 100%;
+  }
+
+  .features {
+    gap: 15px;
+  }
+
+  .feature {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+
+  .feature-title {
+    font-size: 0.95rem;
+  }
+
+  .feature-desc {
+    font-size: 0.85rem;
+  }
+
   .register-panel {
     flex: 1;
+    padding: 30px 25px;
+    border-radius: 0 0 20px 20px;
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .festive-decoration {
+    top: -15px;
+    width: 35px;
+    height: 35px;
+    font-size: 1rem;
+  }
+
+  .register-header {
+    margin-bottom: 25px;
+  }
+
+  .register-title {
+    font-size: 1.6rem;
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  .form-input {
+    padding: 14px 14px 14px 45px;
+    font-size: 16px; /* Previene zoom en iOS */
+  }
+
+  .btn {
+    padding: 14px;
+    font-size: 16px; /* Previene zoom en iOS */
+  }
+
+  .divider {
+    margin: 20px 0;
   }
 }
 
 @media (max-width: 576px) {
   body {
     padding: 10px;
+    background: var(--primary-dark);
   }
-  
+
   .main-container {
-    min-height: auto;
+    border-radius: 16px;
+    margin: 5px 0;
   }
-  
-  .hero-panel, .register-panel {
-    padding: 25px;
+
+  .hero-panel {
+    padding: 25px 20px;
+    border-radius: 16px 16px 0 0;
   }
-  
+
+  .logo {
+    margin-bottom: 20px;
+  }
+
+  .logo-text {
+    font-size: 1.4rem;
+  }
+
   .hero-title {
-    font-size: 2rem;
+    font-size: 1.5rem;
+  }
+
+  .hero-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .register-panel {
+    padding: 25px 20px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .register-title {
+    font-size: 1.4rem;
+  }
+
+  .register-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+
+  .form-label {
+    font-size: 0.85rem;
+  }
+
+  .form-input {
+    padding: 12px 12px 12px 40px;
+    font-size: 16px;
+  }
+
+  .input-icon {
+    left: 12px;
+  }
+
+  .password-toggle {
+    right: 12px;
+  }
+
+  .btn {
+    padding: 14px;
+    font-size: 16px;
+  }
+
+  .footer {
+    margin-top: 25px;
+    font-size: 0.75rem;
+  }
+
+  .toast {
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .hero-panel,
+  .register-panel {
+    padding: 20px 15px;
+  }
+
+  .logo {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    margin-right: 0;
+  }
+
+  .feature {
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+  }
+
+  .feature-icon {
+    align-self: center;
+  }
+
+  .hero-title {
+    font-size: 1.3rem;
+  }
+
+  .register-title {
+    font-size: 1.3rem;
+  }
+
+  .form-input {
+    padding: 12px 12px 12px 40px;
+  }
+}
+
+/* Mejoras específicas para formularios de registro en móviles */
+@media (max-width: 992px) {
+  .register-panel {
+    gap: 5px; /* Reduce espacio entre elementos del formulario */
+  }
+
+  .form-group:last-child {
+    margin-bottom: 10px; /* Menos espacio antes del botón */
+  }
+
+  .btn {
+    margin-top: 10px;
+  }
+}
+
+/* Scrollbars suaves para móviles */
+@media (max-width: 992px) {
+  .register-panel::-webkit-scrollbar {
+    width: 3px;
+  }
+
+  .register-panel::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .register-panel::-webkit-scrollbar-thumb {
+    background: rgba(30, 58, 95, 0.3);
+    border-radius: 3px;
   }
 }
